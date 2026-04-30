@@ -262,6 +262,46 @@ mod tests {
     }
 
     #[test]
+    fn template_service_json_targets_wasip1_with_substitutable_name() {
+        // service.json's wasm_path has to (a) point at
+        // wasm32-wasip1 (the target `forge build` shells out to)
+        // and (b) reference the artifact name in a form
+        // `forge new`'s substitution can rewrite. The substitution
+        // rewrites `forge_template_<name>` (underscored) → the
+        // customer's underscored crate name, so wasm_path must
+        // contain that exact token. A drift here means the
+        // customer's `forge deploy` looks for a file at the
+        // wrong path and fails. Past bug: templates shipped
+        // wasip2 + a literal `{{crate_name}}` placeholder, both
+        // broken.
+        for (name, files) in TEMPLATES {
+            let service = files
+                .iter()
+                .find(|(p, _)| *p == "service.json")
+                .map(|(_, c)| *c)
+                .unwrap();
+            assert!(
+                service.contains("wasm32-wasip1"),
+                "template `{name}` service.json doesn't reference wasm32-wasip1 — \
+                 forge build only emits wasip1 artifacts, so a wasip2 path is dead-on-arrival",
+            );
+            let token = format!("forge_template_{}", name.replace('-', "_"));
+            assert!(
+                service.contains(&token),
+                "template `{name}` service.json must reference the underscored \
+                 placeholder `{token}` in wasm_path so `forge new`'s artifact-name \
+                 substitution rewrites it. Current service.json:\n{service}",
+            );
+            assert!(
+                !service.contains("{{crate_name}}"),
+                "template `{name}` service.json has a literal `{{{{crate_name}}}}` \
+                 placeholder that `forge new` does NOT substitute — use the underscored \
+                 form instead",
+            );
+        }
+    }
+
+    #[test]
     fn template_cargo_toml_uses_canonical_placeholder_name() {
         // The substitution logic depends on each template's
         // Cargo.toml using `name = "forge-template-<template>"`.
