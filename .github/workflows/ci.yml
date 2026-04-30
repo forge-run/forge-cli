@@ -10,8 +10,12 @@ concurrency:
 
 jobs:
   test:
-    name: build + test (linux)
-    runs-on: ubuntu-latest
+    name: build + test
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+      fail-fast: false
+    runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout forge-cli
         uses: actions/checkout@v4
