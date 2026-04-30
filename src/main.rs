@@ -84,9 +84,8 @@ enum Cmd {
     /// workspace.
     Deploy(cmd::deploy::DeployArgs),
 
-    /// Tail recent logs from the workspace.
-    #[command(hide = true)]
-    Logs,
+    /// Tail recent request log entries from the workspace.
+    Logs(cmd::logs::LogsArgs),
 
     /// Scaffold a new forge workload from a starter template.
     New(cmd::new::NewArgs),
@@ -131,9 +130,14 @@ async fn main() -> Result<()> {
             cmd::deploy::run(d, &client).await
         }
         Cmd::New(args) => cmd::new::run(args).await,
-        Cmd::Ops | Cmd::Logs => {
+        Cmd::Logs(args) => {
+            let cfg = config::resolve(cli.base_url, cli.token, cli.profile)?;
+            let client = client::ForgeClient::new(cfg)?;
+            cmd::logs::run(args, &client).await
+        }
+        Cmd::Ops => {
             anyhow::bail!(
-                "not implemented yet — login/logout/whoami/tokens/schema/build/deploy/new are wired",
+                "not implemented yet — login/logout/whoami/tokens/schema/build/deploy/new/logs are wired",
             )
         }
     }
