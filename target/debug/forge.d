@@ -1,0 +1,1 @@
+/Users/rory/Documents/forge-cli/target/debug/forge: /Users/rory/Documents/forge-cli/src/client.rs /Users/rory/Documents/forge-cli/src/cmd/mod.rs /Users/rory/Documents/forge-cli/src/cmd/tokens.rs /Users/rory/Documents/forge-cli/src/config.rs /Users/rory/Documents/forge-cli/src/main.rs
