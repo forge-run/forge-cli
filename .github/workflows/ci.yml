@@ -1,0 +1,58 @@
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: build + test (linux)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout forge-cli
+        uses: actions/checkout@v4
+        with:
+          path: forge-cli
+
+      # forge-cli's `new` command embeds forge-sdk's templates via
+      # include_str! at `../../../forge-sdk/...`, so the SDK source
+      # must be checked out as a sibling at compile time. Same PAT
+      # setup as forge-runtime / forge-control-plane.
+      - name: Checkout forge-sdk
+        uses: actions/checkout@v4
+        with:
+          repository: forge-run/forge-sdk
+          token: ${{ secrets.FORGE_CROSS_REPO_TOKEN }}
+          path: forge-sdk
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+          targets: wasm32-wasip1
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: forge-cli
+          cache-on-failure: true
+
+      - name: Fmt check
+        working-directory: forge-cli
+        run: cargo fmt --all -- --check
+
+      - name: Clippy (all warnings are errors)
+        working-directory: forge-cli
+        run: cargo clippy --tests --locked -- -D warnings
+
+      - name: Build
+        working-directory: forge-cli
+        run: cargo build --tests --locked
+
+      - name: Test
+        working-directory: forge-cli
+        run: cargo test --tests --no-fail-fast --locked
