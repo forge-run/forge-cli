@@ -70,12 +70,11 @@ enum Cmd {
     Ops,
 
     /// Build a Rust crate to a workspace-deployable WASM module.
-    #[command(hide = true)]
-    Build,
+    Build(cmd::build::BuildArgs),
 
-    /// Upload built artifacts and apply schema/ops in one transaction.
-    #[command(hide = true)]
-    Deploy,
+    /// Upload a service manifest + compiled WASM module(s) to the
+    /// workspace.
+    Deploy(cmd::deploy::DeployArgs),
 
     /// Tail recent logs from the workspace.
     #[command(hide = true)]
@@ -108,10 +107,18 @@ async fn main() -> Result<()> {
             let client = client::ForgeClient::new(cfg)?;
             cmd::schema::run(s, &client).await
         }
-        Cmd::Ops | Cmd::Build | Cmd::Deploy | Cmd::Logs | Cmd::New => {
-            anyhow::bail!(
-                "not implemented yet — `forge login`, `forge tokens`, and `forge schema` are wired",
-            )
+        Cmd::Build(b) => {
+            // `build` doesn't talk to the network — it shells out
+            // to cargo. Skip the config + client construction.
+            cmd::build::run(b).await
+        }
+        Cmd::Deploy(d) => {
+            let cfg = config::resolve(cli.base_url, cli.token, cli.profile)?;
+            let client = client::ForgeClient::new(cfg)?;
+            cmd::deploy::run(d, &client).await
+        }
+        Cmd::Ops | Cmd::Logs | Cmd::New => {
+            anyhow::bail!("not implemented yet — login/tokens/schema/build/deploy are wired",)
         }
     }
 }
