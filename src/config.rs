@@ -129,6 +129,63 @@ pub fn resolve_for_login(
     Ok((base_url, chosen_profile))
 }
 
+/// What `forge logout` reads out of the config so it knows what
+/// to revoke + clear. None of these are required to be present —
+/// a missing profile is a no-op for logout.
+#[derive(Debug, Clone)]
+pub struct StoredProfile {
+    pub base_url: String,
+    pub access_token: String,
+    pub refresh_token: Option<String>,
+}
+
+/// Read the saved tokens for `profile` from `~/.forge/config.toml`.
+/// Returns `Ok(None)` if the profile doesn't exist or has no
+/// tokens yet (e.g. created by `--profile` flag, never logged in).
+pub fn read_profile_token(profile: &str) -> Result<Option<StoredProfile>> {
+    let path = home_config_path()?;
+    let cfg: ConfigFile = match read_optional(path)? {
+        Some(c) => c,
+        None => return Ok(None),
+    };
+    let entry = match cfg.profile.get(profile) {
+        Some(e) => e,
+        None => return Ok(None),
+    };
+    let (Some(base_url), Some(access_token)) = (entry.base_url.clone(), entry.token.clone()) else {
+        return Ok(None);
+    };
+    Ok(Some(StoredProfile {
+        base_url,
+        access_token,
+        refresh_token: entry.refresh_token.clone(),
+    }))
+}
+
+/// Remove a profile from `~/.forge/config.toml`. Idempotent — a
+/// missing profile is a no-op success.
+pub fn clear_profile_token(profile: &str) -> Result<()> {
+    let path = home_config_path()?;
+    let mut cfg: ConfigFile = match read_optional(path.clone())? {
+        Some(c) => c,
+        None => return Ok(()),
+    };
+    if cfg.profile.remove(profile).is_none() {
+        return Ok(());
+    }
+    // If we just cleared the default profile, drop the
+    // default_profile field too — it'd otherwise point at a
+    // missing entry.
+    if cfg.default_profile.as_deref() == Some(profile) {
+        cfg.default_profile = None;
+    }
+    let serialized = toml::to_string_pretty(&cfg).context("serialize ~/.forge/config.toml")?;
+    atomic_write(&path, serialized.as_bytes())
+        .with_context(|| format!("writing {}", path.display()))?;
+    set_owner_only_permissions(&path);
+    Ok(())
+}
+
 /// Atomic-write a profile's token + base_url back into
 /// `~/.forge/config.toml`. Read-modify-write so other profiles in
 /// the same file are preserved untouched. Refuses to clobber the

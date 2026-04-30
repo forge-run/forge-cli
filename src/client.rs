@@ -75,8 +75,30 @@ impl ForgeClient {
         Ok(parsed)
     }
 
+    /// `POST <base>/<path>` with an optional header. No JSON body.
+    /// Used by `forge logout` to send `X-Forge-Refresh: <token>`
+    /// when the saved profile has a refresh token.
+    pub async fn post_with_optional_header(
+        &self,
+        path: &str,
+        header_name: &str,
+        header_value: Option<&str>,
+    ) -> Result<(), ForgeError> {
+        let url = format!("{}{}", self.base_url, path);
+        let mut req = self.inner.post(&url).bearer_auth(self.token.as_str());
+        if let Some(v) = header_value {
+            req = req.header(header_name, v);
+        }
+        let resp = req.send().await?;
+        let status = resp.status();
+        if !status.is_success() {
+            let body = resp.text().await.unwrap_or_default();
+            return Err(ForgeError::Http { status, body });
+        }
+        Ok(())
+    }
+
     /// `GET <base>/<path>`, decoded as `R`.
-    #[allow(dead_code)] // wired in once `tokens list` lands
     pub async fn get_json<R: DeserializeOwned>(&self, path: &str) -> Result<R, ForgeError> {
         let url = format!("{}{}", self.base_url, path);
         let resp = self

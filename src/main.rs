@@ -57,6 +57,14 @@ enum Cmd {
     /// the active profile in `~/.forge/config.toml`.
     Login(cmd::login::LoginArgs),
 
+    /// Revoke the saved bearer + refresh token and clear the
+    /// active profile from `~/.forge/config.toml`.
+    Logout(cmd::logout::LogoutArgs),
+
+    /// Print the identity of the saved bearer (subject, role,
+    /// workspace).
+    Whoami(cmd::whoami::WhoamiArgs),
+
     /// Manage opaque-token authentication for the workspace.
     #[command(subcommand)]
     Tokens(cmd::tokens::TokensCmd),
@@ -97,6 +105,12 @@ async fn main() -> Result<()> {
     // and goes through the standard config::resolve path.
     match cli.cmd {
         Cmd::Login(args) => cmd::login::run(args, cli.base_url, cli.profile).await,
+        Cmd::Logout(args) => cmd::logout::run(args, cli.base_url, cli.token, cli.profile).await,
+        Cmd::Whoami(args) => {
+            let cfg = config::resolve(cli.base_url, cli.token, cli.profile)?;
+            let client = client::ForgeClient::new(cfg)?;
+            cmd::whoami::run(args, &client).await
+        }
         Cmd::Tokens(t) => {
             let cfg = config::resolve(cli.base_url, cli.token, cli.profile)?;
             let client = client::ForgeClient::new(cfg)?;

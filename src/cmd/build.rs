@@ -89,11 +89,124 @@ pub async fn run(args: BuildArgs) -> Result<()> {
             wasm_path.display(),
         );
     }
-    let size = std::fs::metadata(&wasm_path).map(|m| m.len()).unwrap_or(0);
+    let bytes =
+        std::fs::read(&wasm_path).with_context(|| format!("reading {}", wasm_path.display()))?;
+    let size = bytes.len();
+    validate_wasm_artifact(&bytes)?;
 
     println!("{}", wasm_path.display());
     eprintln!("size: {} bytes ({:.1} KiB)", size, size as f64 / 1024.0);
+    if size as u64 > WARN_SIZE_BYTES {
+        eprintln!(
+            "warning: module is over {} MiB; deploys above {} MiB will be rejected.",
+            WARN_SIZE_BYTES / 1_048_576,
+            HARD_SIZE_BYTES / 1_048_576,
+        );
+    }
     Ok(())
+}
+
+/// Soft cap — over this we warn but still let the customer deploy.
+const WARN_SIZE_BYTES: u64 = 10 * 1_048_576;
+/// Hard cap — manage_routes::wasm_deploy_handler rejects over this.
+const HARD_SIZE_BYTES: u64 = 25 * 1_048_576;
+
+/// Validate the freshly-built `.wasm` is actually a wasm module
+/// before letting the customer waste a deploy roundtrip on garbage
+/// bytes. Surfaces three failure modes in priority order:
+///
+/// 1. Empty / missing magic header → not a wasm file at all.
+///    The most common shape of "I built the wrong target".
+/// 2. Wrong wasm version → forge-runtime won't load it.
+/// 3. No exports → forge-storage's user_service_validator will
+///    reject it on deploy ("service has no exports"). Catch here so
+///    the error lands at build time, not after upload.
+///
+/// We don't WIT-validate (would require tracking the host imports
+/// against the crate's compiled component-model interface);
+/// forge-runtime's wasmtime layer surfaces those at instantiation,
+/// not deploy. Adding WIT validation here is H2 territory.
+fn validate_wasm_artifact(bytes: &[u8]) -> Result<()> {
+    if bytes.len() < 8 {
+        anyhow::bail!(
+            "output is not a wasm module — too short ({} bytes). \
+             Did `cargo build` write to a different path? \
+             Re-run with --profile debug to see the cargo output.",
+            bytes.len(),
+        );
+    }
+    // wasm magic = `\0asm`, followed by 4-byte little-endian version.
+    if &bytes[0..4] != b"\0asm" {
+        anyhow::bail!(
+            "output is not a wasm module — missing `\\0asm` header. \
+             Make sure the crate's [lib] section sets `crate-type = [\"cdylib\"]` \
+             and that you're targeting wasm32-wasip2.",
+        );
+    }
+    let version = u32::from_le_bytes([bytes[4], bytes[5], bytes[6], bytes[7]]);
+    if version != 1 {
+        anyhow::bail!(
+            "wasm module declares version {version}; forge-runtime expects version 1. \
+             Toolchain mismatch — re-run `rustup update` and retry.",
+        );
+    }
+    if !has_export_section(bytes) {
+        anyhow::bail!(
+            "wasm module has no exports — forge-runtime won't be able to invoke any \
+             operations against this module. Make sure your crate exports its handler \
+             functions (e.g. `#[no_mangle] pub extern \"C\" fn forge_op(...)`) and that \
+             they're not optimized away by lto.",
+        );
+    }
+    Ok(())
+}
+
+/// Walk the wasm sections looking for one with id 7 (Export).
+/// Caller has already confirmed the magic + version (8 bytes); we
+/// pick up at offset 8. v1 doesn't decode the exports — we just
+/// need to know whether at least one is declared.
+///
+/// WASM section header is `[id: u8][size: u32-leb128][body...]`.
+/// Section ids: 0=custom, 1=type, 2=import, 3=function, 4=table,
+/// 5=memory, 6=global, 7=export, 8=start, 9=element, ... See
+/// `https://webassembly.github.io/spec/core/binary/modules.html`.
+fn has_export_section(bytes: &[u8]) -> bool {
+    let mut cursor = 8usize;
+    while cursor < bytes.len() {
+        let section_id = bytes[cursor];
+        cursor += 1;
+        let (size, leb_len) = match read_leb128_u32(&bytes[cursor..]) {
+            Some(v) => v,
+            None => return false,
+        };
+        cursor += leb_len;
+        if section_id == 7 {
+            // Export section exists. v1 doesn't dig further — an
+            // empty export section is technically valid wasm but
+            // never produced by rustc; treating presence-of-section
+            // as proof-of-export is the right tradeoff for build-time
+            // validation.
+            return true;
+        }
+        cursor += size as usize;
+    }
+    false
+}
+
+/// Decode a single ULEB128 u32 from the head of `bytes`. Returns
+/// `(value, bytes_consumed)` or `None` on overflow / overflow.
+/// The wasm spec caps section-size LEB128s at 5 bytes.
+fn read_leb128_u32(bytes: &[u8]) -> Option<(u32, usize)> {
+    let mut result: u32 = 0;
+    let mut shift = 0;
+    for (i, &b) in bytes.iter().take(5).enumerate() {
+        result |= ((b & 0x7f) as u32).checked_shl(shift)?;
+        if b & 0x80 == 0 {
+            return Some((result, i + 1));
+        }
+        shift += 7;
+    }
+    None
 }
 
 /// Pull `[package].name` out of a `Cargo.toml` without going through
@@ -147,5 +260,52 @@ edition = "2024"
         writeln!(f, "[workspace]\nmembers = [\"foo\"]").unwrap();
         let err = read_crate_name(&path).unwrap_err();
         assert!(format!("{err:#}").contains("missing [package].name"));
+    }
+
+    #[test]
+    fn validate_wasm_rejects_empty_bytes() {
+        let err = validate_wasm_artifact(&[]).unwrap_err();
+        assert!(format!("{err:#}").contains("too short"));
+    }
+
+    #[test]
+    fn validate_wasm_rejects_wrong_magic() {
+        // ELF magic — what `cargo build` produces if the customer
+        // forgot to pass `--target wasm32-wasip2`.
+        let mut bytes = vec![0x7f, b'E', b'L', b'F'];
+        bytes.extend_from_slice(&[0; 100]);
+        let err = validate_wasm_artifact(&bytes).unwrap_err();
+        assert!(format!("{err:#}").contains("missing `\\0asm`"));
+    }
+
+    #[test]
+    fn validate_wasm_rejects_wrong_version() {
+        // Magic + version=2 (which doesn't exist; spec is v1).
+        let bytes = [b'\0', b'a', b's', b'm', 2, 0, 0, 0];
+        let err = validate_wasm_artifact(&bytes).unwrap_err();
+        assert!(format!("{err:#}").contains("version"));
+    }
+
+    #[test]
+    fn validate_wasm_accepts_a_module_with_exports() {
+        // Use wat to produce a known-good module with at least one
+        // export. Same library forge-runtime tests use for fixture
+        // wasm.
+        let bytes = wat::parse_str(
+            r#"
+            (module
+              (memory (export "memory") 1)
+              (func (export "noop")))
+        "#,
+        )
+        .unwrap();
+        validate_wasm_artifact(&bytes).expect("module with exports should pass");
+    }
+
+    #[test]
+    fn validate_wasm_rejects_module_without_exports() {
+        let bytes = wat::parse_str("(module (memory 1))").unwrap();
+        let err = validate_wasm_artifact(&bytes).unwrap_err();
+        assert!(format!("{err:#}").contains("no exports"));
     }
 }
