@@ -38,6 +38,20 @@ pub enum ForgeError {
 }
 
 impl ForgeClient {
+    /// Workspace base URL with no trailing slash. Exposed so
+    /// long-lived streaming consumers (e.g. `forge logs --follow`)
+    /// can build their own no-timeout client without going
+    /// through this client's request-level helpers.
+    pub fn base_url(&self) -> &str {
+        &self.base_url
+    }
+
+    /// Bearer token for the workspace. Exposed for the same
+    /// streaming-consumer reason as [`base_url`]. Never log this.
+    pub fn token(&self) -> &str {
+        &self.token
+    }
+
     pub fn new(cfg: ResolvedConfig) -> Result<Self> {
         let inner = Client::builder()
             .timeout(Duration::from_secs(30))

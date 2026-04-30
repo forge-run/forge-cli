@@ -1,11 +1,11 @@
 //! `forge logs` — tail the workspace's request log.
 //!
-//! Hits `GET /api/v1/manage/logs?lines=N` on the active
-//! workspace and prints each line. Admin-tier required.
+//! Two modes:
+//! - default: GET /api/v1/manage/logs?lines=N, print, exit.
+//! - --follow: GET /api/v1/manage/logs?follow=true (SSE),
+//!   print each event as it arrives until Ctrl-C.
 //!
-//! v1 ships poll mode only — no SSE follow. Customers
-//! iterating on a workload can re-run the command, or wrap it
-//! in a shell loop. SSE follow lands when there's demand.
+//! Admin-tier required either way.
 
 use anyhow::Result;
 use clap::Args;
@@ -15,14 +15,18 @@ use crate::client::{ForgeClient, ForgeError};
 
 #[derive(Debug, Args)]
 pub struct LogsArgs {
-    /// How many trailing lines to fetch. Capped server-side at
-    /// 1000.
+    /// How many trailing lines to fetch (one-shot mode).
+    /// Capped server-side at 1000. Ignored when --follow.
     #[arg(long, default_value_t = 100)]
     lines: usize,
     /// Print as JSON-lines instead of the formatted columnar
     /// view. Easier to pipe into jq / less.
     #[arg(long)]
     json: bool,
+    /// Subscribe to the live request stream over SSE. Prints
+    /// each new request as it lands; Ctrl-C to exit.
+    #[arg(long)]
+    follow: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -35,6 +39,9 @@ struct LogRecord {
 }
 
 pub async fn run(args: LogsArgs, client: &ForgeClient) -> Result<()> {
+    if args.follow {
+        return run_follow(args, client).await;
+    }
     let path = format!("/api/v1/manage/logs?lines={}", args.lines);
     let records: Vec<LogRecord> = client.get_json(&path).await.map_err(map_err)?;
     if records.is_empty() {
@@ -73,6 +80,91 @@ pub async fn run(args: LogsArgs, client: &ForgeClient) -> Result<()> {
                 dur = r.dur_ms,
             );
         }
+    }
+    Ok(())
+}
+
+/// SSE follow path. Opens a long-lived GET against
+/// `/api/v1/manage/logs?follow=true`, reads chunks as they
+/// arrive, parses `data: {...}` events and prints them in the
+/// same shape as the one-shot path.
+async fn run_follow(args: LogsArgs, client: &ForgeClient) -> Result<()> {
+    let url = format!("{}/api/v1/manage/logs?follow=true", client.base_url());
+    // Fresh client with NO request timeout — SSE streams are
+    // long-lived and the default 30s timeout would terminate
+    // them. We still rely on the OS / network for connection
+    // health.
+    let stream_client = reqwest::Client::builder()
+        .user_agent(concat!("forge-cli/", env!("CARGO_PKG_VERSION")))
+        .build()
+        .map_err(|e| anyhow::anyhow!("build streaming client: {e}"))?;
+    let mut resp = stream_client
+        .get(&url)
+        .bearer_auth(client.token())
+        .send()
+        .await
+        .map_err(|e| anyhow::anyhow!("connect to {url}: {e}"))?;
+    let status = resp.status();
+    if !status.is_success() {
+        let body = resp.text().await.unwrap_or_default();
+        return Err(map_err(ForgeError::Http { status, body }));
+    }
+
+    // SSE parser: events are `data: <payload>\n\n`. We
+    // accumulate bytes, scan for `\n\n` boundaries, parse the
+    // `data:` line out of each event, and print one record per
+    // event. Keep-alive comments (`: ...\n\n`) are ignored.
+    eprintln!("following {} (Ctrl-C to exit)", url);
+    let mut buf = String::new();
+    while let Some(chunk) = resp
+        .chunk()
+        .await
+        .map_err(|e| anyhow::anyhow!("read SSE chunk: {e}"))?
+    {
+        buf.push_str(&String::from_utf8_lossy(&chunk));
+        while let Some(end) = buf.find("\n\n") {
+            let event = buf[..end].to_string();
+            buf.drain(..end + 2);
+            if let Some(payload) = event.lines().find_map(|l| l.strip_prefix("data:")) {
+                let payload = payload.trim();
+                if payload.is_empty() {
+                    continue;
+                }
+                if let Ok(rec) = serde_json::from_str::<LogRecord>(payload) {
+                    print_record(&rec, args.json)?;
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+fn print_record(r: &LogRecord, json: bool) -> Result<()> {
+    if json {
+        println!(
+            "{}",
+            serde_json::to_string(&serde_json::json!({
+                "ts": r.ts,
+                "method": r.method,
+                "path": r.path,
+                "status": r.status,
+                "dur_ms": r.dur_ms,
+            }))?
+        );
+    } else {
+        let path_display = if r.path.len() > 80 {
+            format!("{}…", &r.path[..79])
+        } else {
+            r.path.clone()
+        };
+        println!(
+            "{ts}  {status:>3}  {method:<7} {path}  {dur}ms",
+            ts = r.ts,
+            status = r.status,
+            method = r.method,
+            path = path_display,
+            dur = r.dur_ms,
+        );
     }
     Ok(())
 }
