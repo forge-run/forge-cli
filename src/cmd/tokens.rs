@@ -102,13 +102,16 @@ async fn mint(args: MintArgs, client: &ForgeClient) -> Result<()> {
         .map_err(map_err)?;
 
     if args.json {
-        println!("{}", serde_json::to_string_pretty(&serde_json::json!({
-            "raw_token": resp.raw_token,
-            "token_hash_hex": resp.token_hash_hex,
-            "subject": resp.subject,
-            "tier": resp.tier,
-            "expires_at": resp.expires_at,
-        }))?);
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&serde_json::json!({
+                "raw_token": resp.raw_token,
+                "token_hash_hex": resp.token_hash_hex,
+                "subject": resp.subject,
+                "tier": resp.tier,
+                "expires_at": resp.expires_at,
+            }))?
+        );
     } else {
         // Raw token first on stdout so `$(forge tokens mint ...)`
         // captures cleanly. Everything else goes to stderr.

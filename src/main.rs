@@ -13,9 +13,12 @@
 //! 3. Environment: `FORGE_BASE_URL`, `FORGE_TOKEN`.
 //! 4. Command-line flags: `--base-url`, `--token`.
 //!
-//! v0 ships only `tokens mint`. The rest of the surface (`schema`,
-//! `ops`, `deploy`, `logs`, `new`, `build`) is stubbed and prints
-//! "not implemented" so the command shape is visible immediately.
+//! v0 ships `login` (RFC 8628 device flow → saves token to config)
+//! and `tokens mint` (System-tier; today only callable when the CLI
+//! holds an admin-tier token, which is provisioning-shaped, not
+//! customer-shaped). Other commands (`schema`, `ops`, `deploy`,
+//! `logs`, `new`, `build`) are stubbed and print "not implemented"
+//! so the command shape is visible immediately.
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
@@ -49,6 +52,11 @@ struct Cli {
 
 #[derive(Debug, Subcommand)]
 enum Cmd {
+    /// Authenticate this CLI to a workspace via browser-based
+    /// device flow (RFC 8628). Saves the resulting token under
+    /// the active profile in `~/.forge/config.toml`.
+    Login(cmd::login::LoginArgs),
+
     /// Manage opaque-token authentication for the workspace.
     #[command(subcommand)]
     Tokens(cmd::tokens::TokensCmd),
@@ -84,13 +92,21 @@ async fn main() -> Result<()> {
     fmt().with_env_filter(filter).with_target(false).init();
 
     let cli = Cli::parse();
-    let cfg = config::resolve(cli.base_url, cli.token, cli.profile)?;
-    let client = client::ForgeClient::new(cfg)?;
 
+    // `login` resolves base_url + profile *without* a token (login
+    // is what produces the token). Every other command needs both
+    // and goes through the standard config::resolve path.
     match cli.cmd {
-        Cmd::Tokens(t) => cmd::tokens::run(t, &client).await,
+        Cmd::Login(args) => cmd::login::run(args, cli.base_url, cli.profile).await,
+        Cmd::Tokens(t) => {
+            let cfg = config::resolve(cli.base_url, cli.token, cli.profile)?;
+            let client = client::ForgeClient::new(cfg)?;
+            cmd::tokens::run(t, &client).await
+        }
         Cmd::Schema | Cmd::Ops | Cmd::Build | Cmd::Deploy | Cmd::Logs | Cmd::New => {
-            anyhow::bail!("not implemented yet — only `forge tokens` is wired in v0")
+            anyhow::bail!(
+                "not implemented yet — `forge login` and `forge tokens` are the only wired commands",
+            )
         }
     }
 }
