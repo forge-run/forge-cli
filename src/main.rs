@@ -62,8 +62,8 @@ enum Cmd {
     Tokens(cmd::tokens::TokensCmd),
 
     /// Apply schema definitions to the workspace.
-    #[command(hide = true)]
-    Schema,
+    #[command(subcommand)]
+    Schema(cmd::schema::SchemaCmd),
 
     /// Apply declarative operations to the workspace.
     #[command(hide = true)]
@@ -103,9 +103,14 @@ async fn main() -> Result<()> {
             let client = client::ForgeClient::new(cfg)?;
             cmd::tokens::run(t, &client).await
         }
-        Cmd::Schema | Cmd::Ops | Cmd::Build | Cmd::Deploy | Cmd::Logs | Cmd::New => {
+        Cmd::Schema(s) => {
+            let cfg = config::resolve(cli.base_url, cli.token, cli.profile)?;
+            let client = client::ForgeClient::new(cfg)?;
+            cmd::schema::run(s, &client).await
+        }
+        Cmd::Ops | Cmd::Build | Cmd::Deploy | Cmd::Logs | Cmd::New => {
             anyhow::bail!(
-                "not implemented yet — `forge login` and `forge tokens` are the only wired commands",
+                "not implemented yet — `forge login`, `forge tokens`, and `forge schema` are wired",
             )
         }
     }
