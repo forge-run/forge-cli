@@ -1,14 +1,14 @@
 //! `forge build` — compile a Rust crate to a workspace-deployable
 //! WASM module.
 //!
-//! Wraps `cargo build --release --target wasm32-wasip2`. The result
-//! lands at `target/wasm32-wasip2/release/<crate>.wasm`. v1 doesn't
+//! Wraps `cargo build --release --target wasm32-wasip1`. The result
+//! lands at `target/wasm32-wasip1/release/<crate>.wasm`. v1 doesn't
 //! do post-processing (no `wasm-opt`, no component-model packaging
-//! beyond what wasm32-wasip2 already produces) — those are
+//! beyond what wasm32-wasip1 already produces) — those are
 //! H2-territory optimizations.
 //!
 //! v1 also intentionally leaves the toolchain installation as a
-//! prerequisite — `rustup target add wasm32-wasip2` is the customer's
+//! prerequisite — `rustup target add wasm32-wasip1` is the customer's
 //! responsibility. The CLI surfaces a clear error when the target
 //! isn't installed; we don't try to install it for them.
 
@@ -48,13 +48,13 @@ pub async fn run(args: BuildArgs) -> Result<()> {
     }
 
     eprintln!(
-        "building {} for wasm32-wasip2 ({})",
+        "building {} for wasm32-wasip1 ({})",
         manifest_dir.display(),
         args.profile,
     );
 
     let mut cmd = Command::new("cargo");
-    cmd.arg("build").arg("--target").arg("wasm32-wasip2");
+    cmd.arg("build").arg("--target").arg("wasm32-wasip1");
     if args.profile == "release" {
         cmd.arg("--release");
     } else if args.profile != "debug" {
@@ -73,16 +73,21 @@ pub async fn run(args: BuildArgs) -> Result<()> {
     }
 
     // Locate the resulting `.wasm`. Cargo puts it at
-    // target/wasm32-wasip2/{release|debug}/<crate>.wasm; the crate
+    // target/wasm32-wasip1/{release|debug}/<crate>.wasm; the crate
     // name comes from the workspace's Cargo.toml `[package].name`
     // (read directly to avoid a cargo-metadata roundtrip).
     let crate_name = read_crate_name(&manifest)?;
     let profile_dir = args.profile.as_str();
+    // Cargo replaces `-` with `_` in artifact filenames. A crate
+    // named `my-app` produces `my_app.wasm`, not `my-app.wasm`.
+    // Mirror the transform so the validator looks where cargo
+    // actually wrote the file.
+    let artifact_name = crate_name.replace('-', "_");
     let wasm_path = manifest_dir
         .join("target")
-        .join("wasm32-wasip2")
+        .join("wasm32-wasip1")
         .join(profile_dir)
-        .join(format!("{crate_name}.wasm"));
+        .join(format!("{artifact_name}.wasm"));
     if !wasm_path.exists() {
         anyhow::bail!(
             "build succeeded but expected output not found at {}",
@@ -140,7 +145,7 @@ fn validate_wasm_artifact(bytes: &[u8]) -> Result<()> {
         anyhow::bail!(
             "output is not a wasm module — missing `\\0asm` header. \
              Make sure the crate's [lib] section sets `crate-type = [\"cdylib\"]` \
-             and that you're targeting wasm32-wasip2.",
+             and that you're targeting wasm32-wasip1.",
         );
     }
     let version = u32::from_le_bytes([bytes[4], bytes[5], bytes[6], bytes[7]]);
@@ -271,7 +276,7 @@ edition = "2024"
     #[test]
     fn validate_wasm_rejects_wrong_magic() {
         // ELF magic — what `cargo build` produces if the customer
-        // forgot to pass `--target wasm32-wasip2`.
+        // forgot to pass `--target wasm32-wasip1`.
         let mut bytes = vec![0x7f, b'E', b'L', b'F'];
         bytes.extend_from_slice(&[0; 100]);
         let err = validate_wasm_artifact(&bytes).unwrap_err();

@@ -88,9 +88,8 @@ enum Cmd {
     #[command(hide = true)]
     Logs,
 
-    /// Scaffold a new forge project in the current directory.
-    #[command(hide = true)]
-    New,
+    /// Scaffold a new forge workload from a starter template.
+    New(cmd::new::NewArgs),
 }
 
 #[tokio::main]
@@ -131,8 +130,11 @@ async fn main() -> Result<()> {
             let client = client::ForgeClient::new(cfg)?;
             cmd::deploy::run(d, &client).await
         }
-        Cmd::Ops | Cmd::Logs | Cmd::New => {
-            anyhow::bail!("not implemented yet — login/tokens/schema/build/deploy are wired",)
+        Cmd::New(args) => cmd::new::run(args).await,
+        Cmd::Ops | Cmd::Logs => {
+            anyhow::bail!(
+                "not implemented yet — login/logout/whoami/tokens/schema/build/deploy/new are wired",
+            )
         }
     }
 }
