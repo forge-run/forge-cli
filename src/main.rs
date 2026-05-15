@@ -96,6 +96,14 @@ enum Cmd {
     /// the v2.0 manual `scp` step. ADR 0017.
     #[command(subcommand)]
     Static(cmd::static_cmd::StaticCmd),
+
+    /// ADR 0021 — federated workspace access via the portal.
+    /// `forge sso connect <workspace_id>` drives the SSO
+    /// mint→consume dance and emits the resulting `fr_f_*`
+    /// bearer. Requires that the active profile already holds
+    /// a portal bearer (from `forge login` against app.forge.run).
+    #[command(subcommand)]
+    Sso(cmd::sso::SsoCmd),
 }
 
 #[tokio::main]
@@ -147,6 +155,7 @@ async fn main() -> Result<()> {
             let client = client::ForgeClient::new(cfg)?;
             cmd::logs::run(args, &client).await
         }
+        Cmd::Sso(s) => cmd::sso::run(s, cli.base_url, cli.token, cli.profile).await,
         Cmd::Ops => {
             anyhow::bail!(
                 "not implemented yet — login/logout/whoami/tokens/schema/build/deploy/new/logs are wired",
