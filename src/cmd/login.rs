@@ -96,9 +96,22 @@ pub async fn run(
         .await;
     }
 
-    // Direct mode (legacy). The login flow has its own profile
-    // handling because it can override where the token lands
-    // without changing the global active-profile semantics.
+    // Direct mode (legacy / break-glass). The login flow has
+    // its own profile handling because it can override where
+    // the token lands without changing the global active-profile
+    // semantics.
+    //
+    // ADR 0021 deprecation notice: direct-mode `forge login`
+    // remains available as the break-glass when the portal is
+    // unreachable, but every operator should be on `forge sso
+    // login` for federated access. Print to stderr so scripts
+    // that parse stdout keep working unchanged.
+    eprintln!(
+        "warning: direct-mode `forge login` is deprecated (ADR 0021). \
+         Use `forge sso login` for portal-mediated access; \
+         `forge login --portal-url <url>` delegates to it automatically. \
+         This command remains available as a break-glass path."
+    );
     let effective_profile = args.profile_override.clone().or(cli_profile.clone());
     let (base_url, profile) = resolve_for_login(cli_base_url, effective_profile)?;
     let base_url = base_url.trim_end_matches('/').to_string();

@@ -61,9 +61,13 @@ struct Cli {
 
 #[derive(Debug, Subcommand)]
 enum Cmd {
-    /// Authenticate this CLI to a workspace via browser-based
-    /// device flow (RFC 8628). Saves the resulting token under
-    /// the active profile in `~/.forge/config.toml`.
+    /// [DEPRECATED] Authenticate this CLI to a workspace via
+    /// browser-based device flow (RFC 8628). Use `forge sso login`
+    /// for federated mode (ADR 0021) — that's the path every
+    /// operator should be on. Direct-mode `forge login` is
+    /// retained as the documented break-glass for when the
+    /// portal is unreachable; passing `--portal-url` (or setting
+    /// `FORGE_PORTAL_URL`) makes it delegate to `forge sso login`.
     Login(cmd::login::LoginArgs),
 
     /// Revoke the saved bearer + refresh token and clear the
