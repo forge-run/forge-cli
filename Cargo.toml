@@ -22,6 +22,14 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", default-features = false, features = ["env-filter", "fmt"] }
 walkdir = "2.5.0"
 base64 = "0.22.1"
+# Wrap the wasm32-wasip1 cdylib as a Component-Model artifact
+# before deploy. forge-runtime W3 cutover (2026-05-15) made the
+# runtime reject core modules — only Components instantiate. The
+# adapter blob ships inside the provider crate's `artefacts/` dir.
+# Versions pinned to the major forge-runtime uses (see its
+# Cargo.lock).
+wit-component = "0.236"
+wasi-preview1-component-adapter-provider = "37.0.3"
 
 [dev-dependencies]
 tempfile = "3"

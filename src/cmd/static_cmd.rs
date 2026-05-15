@@ -62,9 +62,10 @@ pub async fn run(cmd: StaticCmd, client: &ForgeClient) -> Result<()> {
 }
 
 async fn upload(args: UploadArgs, client: &ForgeClient) -> Result<()> {
-    let source = args.source.canonicalize().with_context(|| {
-        format!("source path {:?} does not exist", args.source)
-    })?;
+    let source = args
+        .source
+        .canonicalize()
+        .with_context(|| format!("source path {:?} does not exist", args.source))?;
     let prefix = args.prefix.trim_matches('/').to_string();
 
     // Walk: file → single upload, dir → tree.
@@ -90,7 +91,10 @@ async fn upload(args: UploadArgs, client: &ForgeClient) -> Result<()> {
             })
             .collect()
     } else {
-        anyhow::bail!("source {:?} is neither a regular file nor a directory", source);
+        anyhow::bail!(
+            "source {:?} is neither a regular file nor a directory",
+            source
+        );
     };
 
     if entries.is_empty() {
@@ -100,8 +104,7 @@ async fn upload(args: UploadArgs, client: &ForgeClient) -> Result<()> {
 
     let mut total_bytes: u64 = 0;
     for (local, target_path) in &entries {
-        let bytes = std::fs::read(local)
-            .with_context(|| format!("read {}", local.display()))?;
+        let bytes = std::fs::read(local).with_context(|| format!("read {}", local.display()))?;
         let b64 = base64::engine::general_purpose::STANDARD.encode(&bytes);
         let req = UploadRequest {
             path: target_path.clone(),

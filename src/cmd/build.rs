@@ -1,13 +1,17 @@
 //! `forge build` — compile a Rust crate to a workspace-deployable
 //! WASM module.
 //!
-//! Wraps `cargo build --release --target wasm32-wasip1`. The result
-//! lands at `target/wasm32-wasip1/release/<crate>.wasm`. v1 doesn't
-//! do post-processing (no `wasm-opt`, no component-model packaging
-//! beyond what wasm32-wasip1 already produces) — those are
-//! H2-territory optimizations.
+//! Wraps `cargo build --release --target wasm32-wasip1`, then
+//! repackages the resulting cdylib as a Component-Model artifact
+//! via `wit-component` with the WASI Preview-1 reactor adapter.
+//! Required since forge-runtime's W3 cutover (2026-05-15) — the
+//! runtime refuses core modules and only instantiates Components.
 //!
-//! v1 also intentionally leaves the toolchain installation as a
+//! The result lands at `target/wasm32-wasip1/release/<crate>.wasm`
+//! (in-place replacement of the raw cdylib). `forge deploy`
+//! consumes the same path.
+//!
+//! v1 intentionally leaves the toolchain installation as a
 //! prerequisite — `rustup target add wasm32-wasip1` is the customer's
 //! responsibility. The CLI surfaces a clear error when the target
 //! isn't installed; we don't try to install it for them.
@@ -96,9 +100,24 @@ pub async fn run(args: BuildArgs) -> Result<()> {
     }
     let bytes =
         std::fs::read(&wasm_path).with_context(|| format!("reading {}", wasm_path.display()))?;
-    let size = bytes.len();
     validate_wasm_artifact(&bytes)?;
 
+    // Wrap the core cdylib as a Component-Model artifact. Skip if
+    // the bytes are already a Component (header layer byte at offset
+    // 4 is `0d`; core cdylib's is `01`) — re-running `forge build`
+    // shouldn't double-wrap.
+    let final_bytes = if is_component(&bytes) {
+        eprintln!("already a Component — skipping wit-component wrap");
+        bytes
+    } else {
+        eprintln!("wrapping cdylib as Component (wit-component)");
+        let wrapped = wrap_as_component(&bytes).context("wit-component wrap")?;
+        std::fs::write(&wasm_path, &wrapped)
+            .with_context(|| format!("writing {}", wasm_path.display()))?;
+        wrapped
+    };
+
+    let size = final_bytes.len();
     println!("{}", wasm_path.display());
     eprintln!("size: {} bytes ({:.1} KiB)", size, size as f64 / 1024.0);
     if size as u64 > WARN_SIZE_BYTES {
@@ -109,6 +128,30 @@ pub async fn run(args: BuildArgs) -> Result<()> {
         );
     }
     Ok(())
+}
+
+/// Header byte at offset 4 distinguishes Component (0x0d) from
+/// core module (0x01). The wasm magic at bytes 0..4 is `\0asm` in
+/// both; the next 4 bytes encode `version | layer` little-endian.
+/// Core: `01 00 00 00`. Component: `0d 00 01 00`.
+fn is_component(bytes: &[u8]) -> bool {
+    bytes.len() >= 8 && bytes[4..8] == [0x0d, 0x00, 0x01, 0x00]
+}
+
+/// Re-package a wasm32-wasip1 cdylib as a Component using
+/// `wit-component` with the WASI Preview-1 reactor adapter (which
+/// satisfies the wasi_snapshot_preview1 imports the cdylib makes).
+/// Adapter blob ships inside `wasi-preview1-component-adapter-provider`.
+fn wrap_as_component(core: &[u8]) -> Result<Vec<u8>> {
+    let adapter = wasi_preview1_component_adapter_provider::WASI_SNAPSHOT_PREVIEW1_REACTOR_ADAPTER;
+    let bytes = wit_component::ComponentEncoder::default()
+        .module(core)
+        .context("core wasm has no wit-bindgen metadata — make sure the crate uses forge-sdk-v2")?
+        .adapter("wasi_snapshot_preview1", adapter)
+        .context("attach WASI Preview-1 reactor adapter")?
+        .encode()
+        .context("encode Component")?;
+    Ok(bytes)
 }
 
 /// Soft cap — over this we warn but still let the customer deploy.
