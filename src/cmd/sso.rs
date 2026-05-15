@@ -1,23 +1,17 @@
 //! `forge sso` — federated workspace access via the portal.
 //!
-//! Implements the operator-driven half of ADR 0021:
+//! Implements the operator-visible half of ADR 0021. Two paths:
 //!
-//!     forge sso connect <workspace_id>
+//!     forge sso login                 — device flow against the portal
+//!     forge sso connect <workspace>   — mint a federated bearer for a workspace
 //!
-//! The CLI hits the portal's `/api/v1/auth/sso/issue` with
-//! `mint_tier="federated"`, follows the returned `target_url` to the
-//! target workspace's `/api/v1/auth/sso/consume`, and prints the
-//! resulting `fr_f_*` access token + expiry. The operator can then
-//! attach the bearer to subsequent `forge --token … --base-url …`
-//! calls.
-//!
-//! This is the explicit, operator-visible form of the dance. The
-//! transparent 401-retry interceptor (which would do this
-//! automatically inside `client::ForgeClient`) is the next step —
-//! see the comment block at the bottom of this file. Shipping the
-//! explicit command first means operators can verify the federated
-//! path works end-to-end without depending on the implicit retry
-//! logic.
+//! `login` writes `[portal]` to `~/.forge/config.toml`; `connect`
+//! reads it, drives `/api/v1/auth/sso/issue` (mint_tier=federated)
+//! and follows through to the target workspace's
+//! `/api/v1/auth/sso/consume`. The resulting `fr_f_*` bearer +
+//! expiry is printed for explicit operator use; the same dance
+//! also fires automatically inside `client::ForgeClient` on a 401
+//! when an active workspace is selected.
 
 use std::time::Duration;
 
@@ -30,43 +24,48 @@ use crate::config;
 
 #[derive(Debug, Subcommand)]
 pub enum SsoCmd {
+    /// Run the portal-side device flow and save the resulting
+    /// portal session to `[portal]` in `~/.forge/config.toml`.
+    /// Operators run this once per laptop; all subsequent
+    /// federated mints reuse the saved bearer.
+    Login(LoginArgs),
     /// Mint a federated bearer for a target workspace via the
-    /// portal's SSO mint/consume path. Requires that the active
-    /// profile already holds a portal bearer (from `forge login`
-    /// against `app.forge.run`).
+    /// portal's SSO mint/consume path. Requires `[portal]` to be
+    /// configured (i.e. `forge sso login` was already run).
     Connect(ConnectArgs),
+}
+
+#[derive(Debug, clap::Args)]
+pub struct LoginArgs {
+    /// Portal base URL. Falls back to the global `--portal-url`
+    /// flag, `FORGE_PORTAL_URL`, and finally
+    /// `https://app.forge.run`. Subcommand-local override exists
+    /// so an operator can briefly point `forge sso login` at a
+    /// portal fixture (e.g. for testing) without exporting an
+    /// env var that affects other shells.
+    #[arg(long)]
+    pub portal_url: Option<String>,
 }
 
 #[derive(Debug, clap::Args)]
 pub struct ConnectArgs {
     /// Target workspace id (e.g. `ws-30bb36de`).
     pub workspace_id: String,
-    /// Portal base URL. Defaults to the active profile's
-    /// `base_url` from `~/.forge/config.toml` (set by `forge login`
-    /// against the portal).
-    #[arg(long, env = "FORGE_PORTAL_URL")]
-    pub portal_url: Option<String>,
     /// Target workspace base URL. Defaults to
     /// `https://<workspace_id>.forge.run` — overridable for local
     /// dev where the workspace isn't behind the public edge.
     #[arg(long)]
     pub workspace_url: Option<String>,
     /// Emit just the bearer on stdout (suitable for shell-script
-    /// capture: `BEARER=$(forge sso connect ws-… --raw)`). Without
-    /// this flag, prints a human-readable banner with the bearer +
-    /// expiry.
+    /// capture: `BEARER=$(forge sso connect ws-… --raw)`).
     #[arg(long, default_value_t = false)]
     pub raw: bool,
 }
 
-pub async fn run(
-    cmd: SsoCmd,
-    cli_base_url: Option<String>,
-    cli_token: Option<String>,
-    cli_profile: Option<String>,
-) -> Result<()> {
+pub async fn run(cmd: SsoCmd, cli_portal_url: Option<String>) -> Result<()> {
     match cmd {
-        SsoCmd::Connect(args) => connect(args, cli_base_url, cli_token, cli_profile).await,
+        SsoCmd::Login(args) => login(args, cli_portal_url).await,
+        SsoCmd::Connect(args) => connect(args, cli_portal_url).await,
     }
 }
 
@@ -78,8 +77,6 @@ struct IssueBody<'a> {
 
 #[derive(Debug, Deserialize)]
 struct IssueResponse {
-    #[allow(dead_code)] // diagnostic; we follow target_url directly
-    token: String,
     target_url: String,
 }
 
@@ -89,41 +86,150 @@ struct ConsumeResponse {
     access_expires_at: String,
 }
 
-async fn connect(
-    args: ConnectArgs,
-    cli_base_url: Option<String>,
-    cli_token: Option<String>,
-    cli_profile: Option<String>,
-) -> Result<()> {
-    // The portal session lives under the active profile (whatever
-    // the operator's `forge login` wrote). Re-use the existing
-    // config resolver so the precedence order (flag > env > profile)
-    // stays consistent across the CLI.
-    let portal_url = args.portal_url.or(cli_base_url.clone());
-    let cfg = config::resolve(portal_url, cli_token, cli_profile)
-        .context("resolving portal session for SSO mint")?;
-    let portal_base = cfg.base_url.trim_end_matches('/').to_string();
-    let portal_bearer = cfg.token;
-
+async fn login(args: LoginArgs, cli_portal_url: Option<String>) -> Result<()> {
+    let portal_url = args
+        .portal_url
+        .or(cli_portal_url)
+        .unwrap_or_else(|| "https://app.forge.run".to_string());
+    let portal_base = portal_url.trim_end_matches('/');
     let client = reqwest::Client::builder()
         .timeout(Duration::from_secs(15))
+        .redirect(reqwest::redirect::Policy::none())
         .build()
         .context("build http client")?;
 
-    // 1. Mint via portal. `mint_tier=federated` makes the consume
-    //    side route to the federated branch (no _users row, no
-    //    cookie, JSON response).
+    // Mint a device grant. The runtime's device-flow endpoints are
+    // /api/v1/auth/device/{authorize,token}; same shape every
+    // workspace serves, but we hit the portal specifically.
+    #[derive(Deserialize)]
+    struct AuthorizeResp {
+        device_code: String,
+        user_code: String,
+        verification_uri: String,
+        expires_in: u64,
+        interval: u64,
+    }
+    let authorize_url = format!("{portal_base}/api/v1/auth/device/authorize");
+    let resp = client
+        .post(&authorize_url)
+        .header("content-type", "application/json")
+        .body("{}")
+        .send()
+        .await
+        .with_context(|| format!("POST {authorize_url}"))?;
+    if !resp.status().is_success() {
+        let status = resp.status();
+        let body = resp.text().await.unwrap_or_default();
+        bail!("device authorize {status}: {body}");
+    }
+    let grant: AuthorizeResp = resp.json().await.context("decode authorize response")?;
+    eprintln!(
+        "\nOpen the URL in your browser and enter the code:\n  {}\n  code: {}\n",
+        grant.verification_uri, grant.user_code,
+    );
+    eprintln!(
+        "Waiting for approval (expires in {}s, polling every {}s)…",
+        grant.expires_in, grant.interval,
+    );
+
+    let token_url = format!("{portal_base}/api/v1/auth/device/token");
+    let interval = Duration::from_secs(grant.interval.max(1));
+    let deadline = std::time::Instant::now() + Duration::from_secs(grant.expires_in);
+    #[derive(Deserialize)]
+    struct TokenResp {
+        access_token: String,
+        #[serde(default)]
+        refresh_token: Option<String>,
+        #[serde(default)]
+        user_id: Option<String>,
+    }
+    let poll_body = serde_json::json!({"device_code": grant.device_code});
+    loop {
+        tokio::time::sleep(interval).await;
+        if std::time::Instant::now() > deadline {
+            bail!("device flow timed out without approval");
+        }
+        let poll = client
+            .post(&token_url)
+            .header("content-type", "application/json")
+            .body(serde_json::to_vec(&poll_body)?)
+            .send()
+            .await
+            .with_context(|| format!("POST {token_url}"))?;
+        let status = poll.status();
+        if status.is_success() {
+            let token: TokenResp = poll.json().await.context("decode token response")?;
+            config::save_portal_session(
+                portal_base,
+                &token.access_token,
+                token.refresh_token.as_deref(),
+                token.user_id.as_deref(),
+            )?;
+            eprintln!("portal session saved to ~/.forge/config.toml");
+            return Ok(());
+        }
+        if status == StatusCode::BAD_REQUEST {
+            // RFC 8628 — "authorization_pending" / "slow_down" /
+            // "expired_token" / "access_denied". The runtime
+            // emits these as 400s with a JSON body containing
+            // {error}. authorization_pending = keep polling;
+            // slow_down = back off; the rest are terminal.
+            let body = poll.text().await.unwrap_or_default();
+            #[derive(Deserialize)]
+            struct DeviceErr {
+                error: String,
+            }
+            if let Ok(e) = serde_json::from_str::<DeviceErr>(&body) {
+                match e.error.as_str() {
+                    "authorization_pending" => continue,
+                    "slow_down" => {
+                        // Back off another interval-worth before
+                        // the next try. The forge-runtime device
+                        // handler emits this when polling is too
+                        // aggressive; honour it.
+                        tokio::time::sleep(interval).await;
+                        continue;
+                    }
+                    other => bail!("device flow rejected: {other}"),
+                }
+            }
+            bail!("device flow returned 400 with unrecognised body: {body}");
+        }
+        let body = poll.text().await.unwrap_or_default();
+        bail!("device flow returned {status}: {body}");
+    }
+}
+
+async fn connect(args: ConnectArgs, cli_portal_url: Option<String>) -> Result<()> {
+    let mut portal = config::read_portal_session()?.ok_or_else(no_portal_hint)?;
+    // CLI override for ad-hoc portal fixtures. Doesn't touch the
+    // saved config; the next invocation falls back to the on-disk
+    // base_url unless the operator re-passes --portal-url.
+    if let Some(override_url) = cli_portal_url {
+        portal.base_url = override_url.trim_end_matches('/').to_string();
+    }
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(15))
+        .redirect(reqwest::redirect::Policy::none())
+        .build()
+        .context("build http client")?;
+
+    // 1. Mint via portal. mint_tier=federated routes the consume
+    //    side to the federated branch (no _users row, no cookie,
+    //    JSON response).
+    let portal_base = portal.base_url.trim_end_matches('/');
     let issue_url = format!("{portal_base}/api/v1/auth/sso/issue");
     let issue_resp = client
         .post(&issue_url)
-        .bearer_auth(&portal_bearer)
-        // Match the portal's CSRF gate — same-origin Origin header
-        // is what the SSO issue handler checks (auth_routes::csrf_check).
-        .header("origin", &portal_base)
-        .json(&IssueBody {
+        .bearer_auth(&portal.bearer)
+        // Same-origin Origin satisfies the issuer's CSRF gate
+        // (auth_routes::csrf_check).
+        .header("origin", portal_base)
+        .header("content-type", "application/json")
+        .body(serde_json::to_vec(&IssueBody {
             target_ws: &args.workspace_id,
             mint_tier: "federated",
-        })
+        })?)
         .send()
         .await
         .with_context(|| format!("POST {issue_url}"))?;
@@ -137,11 +243,8 @@ async fn connect(
         .await
         .context("decode portal SSO issue response")?;
 
-    // 2. The target_url the portal returns points at
-    //    `https://<workspace>.forge.run/api/v1/auth/sso/consume?token=…`.
-    //    For local-dev / private-network setups the operator can
-    //    override the host portion via --workspace-url; we keep
-    //    the query string verbatim either way.
+    // 2. Follow the target URL. --workspace-url overrides the host
+    //    portion for local-dev / private-network deploys.
     let target_url = if let Some(override_host) = args.workspace_url.as_deref() {
         rewrite_host(&issued.target_url, override_host.trim_end_matches('/'))
             .context("rewrite target_url host")?
@@ -149,9 +252,6 @@ async fn connect(
         issued.target_url.clone()
     };
 
-    // 3. Consume on the target. The federated branch returns JSON
-    //    (not a 302 redirect), so we follow with a plain GET and
-    //    decode the body.
     let consume_resp = client
         .get(&target_url)
         .send()
@@ -160,11 +260,8 @@ async fn connect(
     let status = consume_resp.status();
     if status == StatusCode::FOUND || status == StatusCode::SEE_OTHER {
         bail!(
-            "target workspace returned a redirect from /sso/consume — \
-             this usually means the target's runtime_config.federated_mint_enabled \
-             is false (so the portal accepted the federated mint request but \
-             the workspace is configured to reject it). Set federated_mint_enabled=true \
-             on the target's envelope and retry."
+            "target returned {status} from /sso/consume — usually means \
+             federated_mint_enabled=false in the target's envelope. Flip it true and retry."
         );
     }
     if !status.is_success() {
@@ -176,8 +273,23 @@ async fn connect(
         .await
         .context("decode federated consume response")?;
 
+    // 3. Cache the resulting bearer for future invocations so the
+    //    client's 401-retry path can find it without going back to
+    //    the portal. Derive api_url from the issued target_url so
+    //    private-network overrides survive.
+    let api_url = if let Some(path_idx) = target_url.find("/api/v1/auth/sso/consume") {
+        target_url[..path_idx].trim_end_matches('/').to_string()
+    } else {
+        format!("https://{}.forge.run", args.workspace_id)
+    };
+    config::cache_workspace_bearer(
+        &args.workspace_id,
+        &api_url,
+        &consumed.access_token,
+        &consumed.access_expires_at,
+    )?;
+
     if args.raw {
-        // Stdout: just the bearer. Stderr stays human-friendly.
         println!("{}", consumed.access_token);
         eprintln!(
             "federated bearer minted for {} (expires {})",
@@ -187,25 +299,35 @@ async fn connect(
         println!("Federated bearer for {}:", args.workspace_id);
         println!("  Bearer:     {}", consumed.access_token);
         println!("  Expires at: {}", consumed.access_expires_at);
-        println!(
-            "\nUsage (env):\n  FORGE_TOKEN={} forge --base-url {} <cmd>",
-            consumed.access_token,
-            args.workspace_url
-                .as_deref()
-                .unwrap_or(&format!("https://{}.forge.run", args.workspace_id)),
-        );
+        println!("  API URL:    {api_url}");
+        println!("\nCached to ~/.forge/config.toml — subsequent commands will reuse it.");
     }
     Ok(())
 }
 
-/// Replace the scheme + host of an absolute URL with `new_base`.
-/// Used by --workspace-url to redirect the consume hop at a
-/// non-public-edge endpoint (local dev, private-network probe).
-/// Preserves the path + query verbatim.
+/// Error message for "no `[portal]` session in
+/// ~/.forge/config.toml" — split out so the federated-only
+/// subcommands (`forge tenant`, `forge ws`, `forge sso connect`)
+/// surface the same hint. When the user is on an old (direct-mode-
+/// only) config, the message includes a concrete migration step.
+pub(crate) fn no_portal_hint() -> anyhow::Error {
+    let legacy = config::is_legacy_config().unwrap_or(false);
+    if legacy {
+        anyhow::anyhow!(
+            "no `[portal]` section in ~/.forge/config.toml — your config predates the federated \
+             tier (ADR 0021). Existing `[profile.*]` entries are preserved; run \
+             `forge sso login --portal-url https://app.forge.run` to add a portal session \
+             alongside them.",
+        )
+    } else {
+        anyhow::anyhow!(
+            "no portal session — run `forge sso login --portal-url https://app.forge.run` first \
+             (or `forge login --portal-url …`).",
+        )
+    }
+}
+
 fn rewrite_host(absolute_url: &str, new_base: &str) -> Result<String> {
-    // Parse out the path+query suffix. The portal always emits an
-    // absolute URL with `/api/v1/auth/sso/consume?token=…`, so we
-    // find that prefix and join with new_base.
     let path_idx = absolute_url
         .find("/api/v1/auth/sso/consume")
         .ok_or_else(|| anyhow::anyhow!("target_url does not contain `/api/v1/auth/sso/consume`"))?;
@@ -231,42 +353,3 @@ mod tests {
         assert!(rewrite_host("https://example.com/", "http://10.0.0.3").is_err());
     }
 }
-
-// ── Follow-ups (intentionally not in this commit) ──────────────────
-//
-// 1. Transparent 401-retry interceptor inside `client::ForgeClient`.
-//    On a 401 against the workspace, look up the active workspace
-//    in `~/.forge/config.toml`'s `[current]` section, run the same
-//    mint→consume dance against the configured `[portal]`, cache
-//    the resulting `fr_f_*` under `[cache.workspaces.<id>]`, retry
-//    the original request once. Second 401 propagates. Bumps the
-//    config shape to:
-//
-//        [portal]
-//        base_url   = "https://app.forge.run"
-//        bearer     = "fr_u_…"
-//        refresh_token = "fr_s_…"
-//        email      = "ops@forge.run"
-//
-//        [current]
-//        tenant_id    = "0b8971ba-…"
-//        workspace_id = "ws-30bb36de"
-//
-//        [cache.workspaces."ws-30bb36de"]
-//        bearer      = "fr_f_…"
-//        expires_at  = "2026-05-16T08:00:00Z"
-//        api_url     = "https://ws-30bb36de.forge.run"
-//
-// 2. `forge tenant list` / `forge tenant use <id>` — calls portal
-//    `/api/v1/data/tenants` (the portal user's tenant_memberships
-//    drive visibility) and writes `[current].tenant_id` on `use`.
-//
-// 3. `forge ws list` / `forge ws use <id>` — calls portal
-//    `/api/v1/cp-admin/workspaces` filtered to the current tenant
-//    and writes `[current].workspace_id` on `use`.
-//
-// 4. Old-config detection — when the new client encounters a
-//    profile without `[portal]`, print a clear "your config is
-//    pre-federated; please re-run `forge login`" and exit
-//    non-zero. Do NOT auto-rewrite — multi-profile configs would
-//    lose state.

@@ -43,8 +43,16 @@ pub struct LoginArgs {
     /// Profile name to write the resulting token under. Defaults
     /// to the global `--profile`, then the config file's
     /// `default_profile`, then the literal `"default"`.
+    /// Direct-mode only — federated mode (the default for new
+    /// users) keys off `[portal]` instead of named profiles.
     #[arg(long)]
     profile_override: Option<String>,
+
+    /// Run the federated-mode login flow against this portal URL.
+    /// Equivalent to `forge sso login --portal-url <url>`. When
+    /// set, --base-url and --profile-override are ignored. ADR 0021.
+    #[arg(long)]
+    portal_url: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -71,10 +79,26 @@ pub async fn run(
     args: LoginArgs,
     cli_base_url: Option<String>,
     cli_profile: Option<String>,
+    cli_portal_url: Option<String>,
 ) -> Result<()> {
-    // The login flow has its own profile handling because it can
-    // override where the token lands without changing the global
-    // active-profile semantics.
+    // Federated mode (ADR 0021): when --portal-url is supplied
+    // (locally or globally), or when FORGE_PORTAL_URL is set,
+    // delegate to the portal device flow. The legacy direct-mode
+    // path runs only when no portal URL is in scope.
+    if let Some(portal_url) = args.portal_url.clone().or(cli_portal_url) {
+        eprintln!("federated mode: running portal device flow against {portal_url}");
+        return crate::cmd::sso::run(
+            crate::cmd::sso::SsoCmd::Login(crate::cmd::sso::LoginArgs {
+                portal_url: Some(portal_url),
+            }),
+            None,
+        )
+        .await;
+    }
+
+    // Direct mode (legacy). The login flow has its own profile
+    // handling because it can override where the token lands
+    // without changing the global active-profile semantics.
     let effective_profile = args.profile_override.clone().or(cli_profile.clone());
     let (base_url, profile) = resolve_for_login(cli_base_url, effective_profile)?;
     let base_url = base_url.trim_end_matches('/').to_string();

@@ -9,5 +9,7 @@ pub mod new;
 pub mod schema;
 pub mod sso;
 pub mod static_cmd;
+pub mod tenant;
 pub mod tokens;
 pub mod whoami;
+pub mod ws;

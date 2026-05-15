@@ -46,6 +46,15 @@ struct Cli {
     #[arg(long, global = true)]
     profile: Option<String>,
 
+    /// Portal base URL for federated mode (ADR 0021). Falls back
+    /// to env / config / the hardcoded `https://app.forge.run`.
+    /// Used by `forge sso login` + the 401-retry interceptor when
+    /// the saved `[portal].base_url` should be overridden for a
+    /// one-shot invocation (e.g. local dev against a portal
+    /// fixture).
+    #[arg(long, global = true, env = "FORGE_PORTAL_URL")]
+    portal_url: Option<String>,
+
     #[command(subcommand)]
     cmd: Cmd,
 }
@@ -98,12 +107,26 @@ enum Cmd {
     Static(cmd::static_cmd::StaticCmd),
 
     /// ADR 0021 — federated workspace access via the portal.
-    /// `forge sso connect <workspace_id>` drives the SSO
-    /// mint→consume dance and emits the resulting `fr_f_*`
-    /// bearer. Requires that the active profile already holds
-    /// a portal bearer (from `forge login` against app.forge.run).
+    /// `forge sso login` runs portal device flow;
+    /// `forge sso connect <workspace_id>` mints a federated
+    /// bearer (also fires automatically inside other commands
+    /// via the 401-retry path when `forge ws use` set an
+    /// active workspace).
     #[command(subcommand)]
     Sso(cmd::sso::SsoCmd),
+
+    /// List + select tenants from the active portal session.
+    /// Federated mode (ADR 0021).
+    #[command(subcommand)]
+    Tenant(cmd::tenant::TenantCmd),
+
+    /// List + select workspaces visible to the active portal
+    /// session, scoped to the active tenant. Setting a workspace
+    /// here lets every other CLI command (`schema apply`,
+    /// `deploy`, `logs`, …) auto-mint a federated bearer
+    /// against it on first 401.
+    #[command(subcommand)]
+    Ws(cmd::ws::WsCmd),
 }
 
 #[tokio::main]
@@ -117,7 +140,7 @@ async fn main() -> Result<()> {
     // is what produces the token). Every other command needs both
     // and goes through the standard config::resolve path.
     match cli.cmd {
-        Cmd::Login(args) => cmd::login::run(args, cli.base_url, cli.profile).await,
+        Cmd::Login(args) => cmd::login::run(args, cli.base_url, cli.profile, cli.portal_url).await,
         Cmd::Logout(args) => cmd::logout::run(args, cli.base_url, cli.token, cli.profile).await,
         Cmd::Whoami(args) => {
             let cfg = config::resolve(cli.base_url, cli.token, cli.profile)?;
@@ -155,7 +178,9 @@ async fn main() -> Result<()> {
             let client = client::ForgeClient::new(cfg)?;
             cmd::logs::run(args, &client).await
         }
-        Cmd::Sso(s) => cmd::sso::run(s, cli.base_url, cli.token, cli.profile).await,
+        Cmd::Sso(s) => cmd::sso::run(s, cli.portal_url).await,
+        Cmd::Tenant(t) => cmd::tenant::run(t).await,
+        Cmd::Ws(w) => cmd::ws::run(w).await,
         Cmd::Ops => {
             anyhow::bail!(
                 "not implemented yet — login/logout/whoami/tokens/schema/build/deploy/new/logs are wired",

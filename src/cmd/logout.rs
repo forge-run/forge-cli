@@ -12,7 +12,10 @@
 use anyhow::{Context, Result};
 use clap::Args;
 
-use crate::config::{ResolvedConfig, clear_profile_token, read_profile_token};
+use crate::config::{
+    ResolvedConfig, clear_portal_session, clear_profile_token, read_portal_session,
+    read_profile_token,
+};
 
 #[derive(Debug, Args)]
 pub struct LogoutArgs {
@@ -68,6 +71,8 @@ pub async fn run(
         let cfg = ResolvedConfig {
             base_url: base_url.clone(),
             token: access_token.clone(),
+            portal: None,
+            workspace_id: None,
         };
         let client = crate::client::ForgeClient::new(cfg)?;
         match call_logout(&client, refresh_token.as_deref()).await {
@@ -78,6 +83,20 @@ pub async fn run(
 
     clear_profile_token(&profile).context("clearing profile from ~/.forge/config.toml")?;
     eprintln!("logged out (profile: {profile})");
+
+    // Federated mode (ADR 0021): if a [portal] section is present,
+    // clear it along with [current] + the workspace bearer cache.
+    // Best-effort revocation of the portal bearer is a follow-up
+    // (the portal's existing /api/v1/auth/logout already accepts
+    // it, but we don't drive that here to keep logout offline-
+    // capable). The cached fr_f_* bearers have short TTLs and
+    // revoking them server-side is unnecessary; clearing locally
+    // is the right call.
+    if read_portal_session()?.is_some() {
+        clear_portal_session()
+            .context("clearing portal session + cache from ~/.forge/config.toml")?;
+        eprintln!("portal session + workspace cache cleared");
+    }
     Ok(())
 }
 
