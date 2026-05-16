@@ -48,12 +48,28 @@ pub async fn run(args: UpdateArgs) -> Result<()> {
 
 fn drive(args: UpdateArgs, current_version: String) -> Result<()> {
     let mut update = self_update::backends::github::Update::configure();
+    // The release workflow packages each binary inside a
+    // `forge-<tag>-<target>/` directory (so the tarball is
+    // self-describing on extract). Tell self_update to look
+    // inside that wrapper for the binary.
+    let bin_path_in_archive = format!(
+        "forge-{{{{ version }}}}-{{{{ target }}}}/{}",
+        BIN_NAME
+    );
     update
         .repo_owner(REPO_OWNER)
         .repo_name(REPO_NAME)
         .bin_name(BIN_NAME)
+        .bin_path_in_archive(&bin_path_in_archive)
         .show_download_progress(true)
         .show_output(false)
+        // `no_confirm(true)` — we don't have a tty in every CLI
+        // invocation context (CI, scripted updates, `forge update`
+        // piped from another tool), and the operator already
+        // typed `forge update`, which is consent. The --force
+        // flag is a separate guard for "re-install current
+        // version"; we don't need a yes/no on top.
+        .no_confirm(true)
         .current_version(&current_version);
     if args.force {
         // self_update only swaps when `latest > current`. The

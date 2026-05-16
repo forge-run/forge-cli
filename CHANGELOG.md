@@ -6,6 +6,21 @@ for downloadable binaries and platform-specific tarballs.
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-05-16
+
+### Fixed
+
+- `forge update` was failing with
+  `Could not find the required path in the archive: "forge"` because
+  the release tarball wraps the binary inside a
+  `forge-<tag>-<target>/` directory and `self_update` was looking
+  for it at the archive root. Tell `self_update` the in-archive
+  path explicitly.
+- `forge update` no longer prompts `Do you want to continue? [Y/n]`
+  on the swap step. The operator already invoked `forge update`,
+  which is consent enough; the previous prompt blocked
+  non-interactive invocations (CI, scripted updates).
+
 ## [0.2.1] - 2026-05-16
 
 ### Added
@@ -94,6 +109,7 @@ common platforms.
 
 Pre-public versions. See `git log` for granular history.
 
-[Unreleased]: https://github.com/forge-run/forge-cli/compare/v0.2.1...HEAD
+[Unreleased]: https://github.com/forge-run/forge-cli/compare/v0.2.2...HEAD
+[0.2.2]: https://github.com/forge-run/forge-cli/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/forge-run/forge-cli/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/forge-run/forge-cli/releases/tag/v0.2.0
