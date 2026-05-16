@@ -46,12 +46,11 @@ struct Cli {
     #[arg(long, global = true)]
     profile: Option<String>,
 
-    /// Portal base URL for federated mode (ADR 0021). Falls back
-    /// to env / config / the hardcoded `https://app.forge.run`.
-    /// Used by `forge sso login` + the 401-retry interceptor when
-    /// the saved `[portal].base_url` should be overridden for a
-    /// one-shot invocation (e.g. local dev against a portal
-    /// fixture).
+    /// Portal base URL. Falls back to env / config / the default
+    /// `https://app.forge.run`. Used by `forge sso login` plus the
+    /// transparent 401-retry path when the saved `[portal].base_url`
+    /// should be overridden for a one-shot invocation (e.g. local
+    /// dev against a portal fixture).
     #[arg(long, global = true, env = "FORGE_PORTAL_URL")]
     portal_url: Option<String>,
 
@@ -62,8 +61,8 @@ struct Cli {
 #[derive(Debug, Subcommand)]
 enum Cmd {
     /// Authenticate this CLI via browser-based device flow.
-    /// Federated mode (ADR 0021) is the default — `forge login`
-    /// with no flags delegates to `forge sso login` against
+    /// Federated mode is the default — `forge login` with no
+    /// flags delegates to `forge sso login` against
     /// `https://app.forge.run`. Pass `--base-url <url>` to opt
     /// into direct mode (the deprecated break-glass for when the
     /// portal is unreachable).
@@ -103,23 +102,21 @@ enum Cmd {
     New(cmd::new::NewArgs),
 
     /// Upload static assets (CSS, JS, images) to the workspace's
-    /// `<data_dir>/static/` directory. Each file becomes
-    /// reachable at `https://<workspace>/static/<path>`. Replaces
-    /// the v2.0 manual `scp` step. ADR 0017.
+    /// static directory. Each file becomes reachable at
+    /// `https://<workspace>/static/<path>`.
     #[command(subcommand)]
     Static(cmd::static_cmd::StaticCmd),
 
-    /// ADR 0021 — federated workspace access via the portal.
+    /// Federated workspace access via the portal.
     /// `forge sso login` runs portal device flow;
     /// `forge sso connect <workspace_id>` mints a federated
-    /// bearer (also fires automatically inside other commands
-    /// via the 401-retry path when `forge ws use` set an
-    /// active workspace).
+    /// bearer for a specific workspace (also fires automatically
+    /// inside other commands via the transparent re-auth path
+    /// when `forge ws use` set an active workspace).
     #[command(subcommand)]
     Sso(cmd::sso::SsoCmd),
 
-    /// List + select tenants from the active portal session.
-    /// Federated mode (ADR 0021).
+    /// List and select tenants visible to the active portal session.
     #[command(subcommand)]
     Tenant(cmd::tenant::TenantCmd),
 

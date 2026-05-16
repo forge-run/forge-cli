@@ -5,7 +5,7 @@
 //! of `get_json` / `post_json` / `post_with_optional_header` here so
 //! the auth + URL shape lives in exactly one place.
 //!
-//! **401-retry (ADR 0021).** When a portal session is configured
+//! **Transparent re-auth on 401.** When a portal session is configured
 //! (`config::ResolvedConfig.portal`) and an active workspace is
 //! selected (`config::ResolvedConfig.workspace_id`), the client
 //! transparently re-mints a federated bearer on 401 and retries once:

@@ -6,7 +6,7 @@
 //! `/api/v1/manage/static/upload`; the runtime decodes the
 //! base64 body, writes atomically into the static dir, and the
 //! asset becomes reachable via the runtime's `ServeDir` mount at
-//! `https://<workspace>/static/<path>`. ADR 0017.
+//! `https://<workspace>/static/<path>`.
 
 use std::path::PathBuf;
 

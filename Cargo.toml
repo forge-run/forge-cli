@@ -1,9 +1,15 @@
 [package]
 name = "forge-cli"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 publish = false
-description = "Customer-facing CLI for the forge platform — talks to a workspace's forge-runtime over HTTPS."
+license = "MIT OR Apache-2.0"
+description = "Customer-facing CLI for the Forge platform — talks to a workspace's forge-runtime over HTTPS."
+repository = "https://github.com/forge-run/forge-cli"
+homepage = "https://app.forge.run"
+readme = "README.md"
+keywords = ["forge", "cli", "device-flow", "wasm", "workspace"]
+categories = ["command-line-utilities"]
 
 [[bin]]
 name = "forge"

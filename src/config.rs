@@ -2,7 +2,7 @@
 //!
 //! Two operating modes share one TOML file at `~/.forge/config.toml`:
 //!
-//! 1. **Federated mode** (ADR 0021, the default for `forge login`
+//! 1. **Federated mode** (the default for `forge login`
 //!    against app.forge.run). Auth state lives in `[portal]` (the
 //!    portal session — `fr_u_*` bearer + refresh + email) and
 //!    `[current]` (the operator's selected `tenant_id` +

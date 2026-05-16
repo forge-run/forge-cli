@@ -84,7 +84,7 @@ pub async fn run(
     clear_profile_token(&profile).context("clearing profile from ~/.forge/config.toml")?;
     eprintln!("logged out (profile: {profile})");
 
-    // Federated mode (ADR 0021): if a [portal] section is present,
+    // Federated mode: if a [portal] section is present,
     // clear it along with [current] + the workspace bearer cache.
     // Best-effort revocation of the portal bearer is a follow-up
     // (the portal's existing /api/v1/auth/logout already accepts

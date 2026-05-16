@@ -83,10 +83,10 @@ pub async fn run(
     cli_profile: Option<String>,
     cli_portal_url: Option<String>,
 ) -> Result<()> {
-    // ADR 0021: federated mode is the default. Direct mode runs
-    // only when the operator explicitly opts in with --base-url
-    // (the break-glass for unreachable-portal scenarios). The
-    // common case — `forge login` with no flags — delegates to
+    // Federated mode is the default. Direct mode runs only when
+    // the operator explicitly opts in with --base-url (the
+    // break-glass for unreachable-portal scenarios). The common
+    // case — `forge login` with no flags — delegates to
     // `forge sso login` against the saved or default portal URL.
     let portal_url = args.portal_url.clone().or(cli_portal_url);
     let want_direct_mode = cli_base_url.is_some() && portal_url.is_none();
@@ -107,16 +107,15 @@ pub async fn run(
     // the token lands without changing the global active-profile
     // semantics.
     //
-    // ADR 0021 deprecation notice: direct-mode `forge login`
-    // remains available as the break-glass when the portal is
+    // Deprecation notice: direct-mode `forge login` remains
+    // available as the break-glass when the portal is
     // unreachable, but every operator should be on `forge sso
-    // login` for federated access. Print to stderr so scripts
-    // that parse stdout keep working unchanged.
+    // login` for portal-mediated access. Print to stderr so
+    // scripts that parse stdout keep working unchanged.
     eprintln!(
-        "warning: direct-mode `forge login --base-url …` is deprecated (ADR 0021). \
+        "warning: direct-mode `forge login --base-url …` is deprecated. \
          The default `forge login` now delegates to `forge sso login` (portal-mediated \
-         federated access). Pass --base-url only as a break-glass when the portal is \
-         unreachable."
+         access). Pass --base-url only as a break-glass when the portal is unreachable."
     );
     let effective_profile = args.profile_override.clone().or(cli_profile.clone());
     let (base_url, profile) = resolve_for_login(cli_base_url, effective_profile)?;

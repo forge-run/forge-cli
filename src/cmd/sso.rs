@@ -1,6 +1,7 @@
 //! `forge sso` — federated workspace access via the portal.
 //!
-//! Implements the operator-visible half of ADR 0021. Two paths:
+//! Implements the operator-visible half of the portal-mediated SSO
+//! flow. Two paths:
 //!
 //!     forge sso login                 — device flow against the portal
 //!     forge sso connect <workspace>   — mint a federated bearer for a workspace
@@ -335,7 +336,7 @@ pub(crate) fn no_portal_hint() -> anyhow::Error {
     if legacy {
         anyhow::anyhow!(
             "no `[portal]` section in ~/.forge/config.toml — your config predates the federated \
-             tier (ADR 0021). Existing `[profile.*]` entries are preserved; run \
+             session model. Existing `[profile.*]` entries are preserved; run \
              `forge sso login --portal-url https://app.forge.run` to add a portal session \
              alongside them.",
         )
