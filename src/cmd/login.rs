@@ -93,7 +93,10 @@ pub async fn run(
 
     if !want_direct_mode {
         return crate::cmd::sso::run(
-            crate::cmd::sso::SsoCmd::Login(crate::cmd::sso::LoginArgs { portal_url }),
+            crate::cmd::sso::SsoCmd::Login(crate::cmd::sso::LoginArgs {
+                portal_url,
+                no_browser: false,
+            }),
             None,
         )
         .await;
@@ -133,6 +136,12 @@ pub async fn run(
     eprintln!("Open {} in your browser.", auth.verification_uri);
     eprintln!("Enter this code: {}", auth.user_code);
     eprintln!();
+    // Best-effort auto-open; the printed URL above is the
+    // always-works fallback if it fails (headless / no browser).
+    match webbrowser::open(&auth.verification_uri) {
+        Ok(()) => eprintln!("(opened in your default browser)"),
+        Err(e) => eprintln!("(couldn't open browser automatically — open manually: {e})"),
+    }
     eprintln!("Waiting for approval...");
 
     // Step 3: poll until done, expired, or denied.

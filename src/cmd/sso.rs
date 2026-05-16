@@ -45,6 +45,14 @@ pub struct LoginArgs {
     /// env var that affects other shells.
     #[arg(long)]
     pub portal_url: Option<String>,
+
+    /// Don't auto-open the device-flow verification URL in the
+    /// operator's default browser. Useful on headless boxes / CI
+    /// runners where opening a browser would either fail or
+    /// surprise. The URL + user_code are always printed; this
+    /// flag just skips the `open(url)` attempt.
+    #[arg(long, default_value_t = false)]
+    pub no_browser: bool,
 }
 
 #[derive(Debug, clap::Args)]
@@ -124,9 +132,21 @@ async fn login(args: LoginArgs, cli_portal_url: Option<String>) -> Result<()> {
     }
     let grant: AuthorizeResp = resp.json().await.context("decode authorize response")?;
     eprintln!(
-        "\nOpen the URL in your browser and enter the code:\n  {}\n  code: {}\n",
+        "\nOpen this URL in your browser and enter the code:\n  {}\n  code: {}\n",
         grant.verification_uri, grant.user_code,
     );
+    if !args.no_browser {
+        // Best-effort. `webbrowser::open` returns Err on headless
+        // boxes / no DISPLAY / no registered handler; the printed
+        // URL+code above is the always-works fallback either way,
+        // so a failure here is a soft warning, not a hard error.
+        match webbrowser::open(&grant.verification_uri) {
+            Ok(()) => eprintln!("(opened in your default browser)"),
+            Err(e) => eprintln!(
+                "(couldn't open browser automatically — open the URL manually: {e})",
+            ),
+        }
+    }
     eprintln!(
         "Waiting for approval (expires in {}s, polling every {}s)…",
         grant.expires_in, grant.interval,

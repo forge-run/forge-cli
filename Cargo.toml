@@ -30,6 +30,10 @@ base64 = "0.22.1"
 # Cargo.lock).
 wit-component = "0.236"
 wasi-preview1-component-adapter-provider = "37.0.3"
+# Open the device-flow verification URL in the operator's default
+# browser. Cross-platform; failures (no DISPLAY, no default
+# browser) fall back to the printed-URL-and-code UX.
+webbrowser = "1"
 
 [dev-dependencies]
 tempfile = "3"
