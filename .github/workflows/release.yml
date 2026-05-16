@@ -1,0 +1,125 @@
+name: release
+
+# Tag-driven cross-platform release: pushes of `v*` tags trigger
+# this workflow, which builds the `forge` binary for macOS
+# (aarch64 + x86_64) and Linux (aarch64 + x86_64), packages each
+# build as `forge-<tag>-<target>.tar.gz`, computes a combined
+# `checksums.sha256`, and attaches them all to the GitHub Release.
+#
+# The release page is what `install.sh` and `forge update` pull
+# from, so this workflow is the single source of distribution.
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+env:
+  # Force the JS actions onto Node 24 to silence the Node 20
+  # deprecation warning GitHub will turn into an error in June 2026.
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
+jobs:
+  build:
+    name: build (${{ matrix.target }})
+    runs-on: ${{ matrix.runs_on }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: aarch64-apple-darwin
+            runs_on: macos-latest
+            archive_os: macos
+          - target: x86_64-apple-darwin
+            runs_on: macos-13
+            archive_os: macos
+          - target: aarch64-unknown-linux-gnu
+            runs_on: ubuntu-22.04-arm
+            archive_os: linux
+          - target: x86_64-unknown-linux-gnu
+            runs_on: ubuntu-latest
+            archive_os: linux
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
+
+      - name: Build release binary
+        run: cargo build --release --locked --target ${{ matrix.target }} --bin forge
+
+      - name: Package
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          ARCHIVE="forge-${GITHUB_REF_NAME}-${{ matrix.target }}.tar.gz"
+          # Stage the binary + license/readme into a single directory
+          # so `tar xzf` extracts something self-describing rather
+          # than a bare `forge` blob.
+          STAGE="dist/forge-${GITHUB_REF_NAME}-${{ matrix.target }}"
+          mkdir -p "$STAGE"
+          cp "target/${{ matrix.target }}/release/forge" "$STAGE/"
+          cp LICENSE-MIT LICENSE-APACHE README.md "$STAGE/"
+          tar -C dist -czf "dist/$ARCHIVE" "$(basename "$STAGE")"
+          # Per-target sha256 sidecar — combined into one file in
+          # the release step below.
+          (cd dist && shasum -a 256 "$ARCHIVE" > "$ARCHIVE.sha256")
+          ls -la dist
+
+      - name: Upload artefact
+        uses: actions/upload-artifact@v4
+        with:
+          name: forge-${{ matrix.target }}
+          path: dist/forge-*.tar.gz*
+          retention-days: 1
+
+  release:
+    name: release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download all build artefacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artefacts
+
+      - name: Stage release assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p release
+          # Flatten the per-target subdirs into a single dir + combine
+          # the per-target sha256 files into one `checksums.sha256`
+          # the install.sh + self-update can fetch as a single asset.
+          for f in artefacts/*/forge-*.tar.gz; do
+            cp "$f" release/
+          done
+          for f in artefacts/*/forge-*.tar.gz.sha256; do
+            cat "$f" >> release/checksums.sha256
+          done
+          # Normalise the checksum lines to point at the archive
+          # filenames as they'll appear on the release page (strip
+          # any leading dist/ prefix the build step may have left in).
+          sed -i -E 's@ +dist/@  @; s@ +./@  @' release/checksums.sha256 || true
+          echo "=== release/ ===" && ls -la release && cat release/checksums.sha256
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            release/forge-*.tar.gz
+            release/checksums.sha256
+          generate_release_notes: true
