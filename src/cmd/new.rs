@@ -47,19 +47,19 @@ const TEMPLATES: &[(&str, &[(&str, &str)])] = &[
         &[
             (
                 "Cargo.toml",
-                include_str!("../../../forge-sdk/templates/echo/Cargo.toml"),
+                include_str!("../../templates/echo/Cargo.toml"),
             ),
             (
                 "src/lib.rs",
-                include_str!("../../../forge-sdk/templates/echo/src/lib.rs"),
+                include_str!("../../templates/echo/src/lib.rs"),
             ),
             (
                 "service.json",
-                include_str!("../../../forge-sdk/templates/echo/service.json"),
+                include_str!("../../templates/echo/service.json"),
             ),
             (
                 "README.md",
-                include_str!("../../../forge-sdk/templates/echo/README.md"),
+                include_str!("../../templates/echo/README.md"),
             ),
         ],
     ),
@@ -68,19 +68,19 @@ const TEMPLATES: &[(&str, &[(&str, &str)])] = &[
         &[
             (
                 "Cargo.toml",
-                include_str!("../../../forge-sdk/templates/mcp-tool/Cargo.toml"),
+                include_str!("../../templates/mcp-tool/Cargo.toml"),
             ),
             (
                 "src/lib.rs",
-                include_str!("../../../forge-sdk/templates/mcp-tool/src/lib.rs"),
+                include_str!("../../templates/mcp-tool/src/lib.rs"),
             ),
             (
                 "service.json",
-                include_str!("../../../forge-sdk/templates/mcp-tool/service.json"),
+                include_str!("../../templates/mcp-tool/service.json"),
             ),
             (
                 "README.md",
-                include_str!("../../../forge-sdk/templates/mcp-tool/README.md"),
+                include_str!("../../templates/mcp-tool/README.md"),
             ),
         ],
     ),
@@ -89,19 +89,19 @@ const TEMPLATES: &[(&str, &[(&str, &str)])] = &[
         &[
             (
                 "Cargo.toml",
-                include_str!("../../../forge-sdk/templates/subscription-publisher/Cargo.toml"),
+                include_str!("../../templates/subscription-publisher/Cargo.toml"),
             ),
             (
                 "src/lib.rs",
-                include_str!("../../../forge-sdk/templates/subscription-publisher/src/lib.rs"),
+                include_str!("../../templates/subscription-publisher/src/lib.rs"),
             ),
             (
                 "service.json",
-                include_str!("../../../forge-sdk/templates/subscription-publisher/service.json"),
+                include_str!("../../templates/subscription-publisher/service.json"),
             ),
             (
                 "README.md",
-                include_str!("../../../forge-sdk/templates/subscription-publisher/README.md"),
+                include_str!("../../templates/subscription-publisher/README.md"),
             ),
         ],
     ),

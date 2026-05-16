@@ -1,0 +1,23 @@
+[package]
+name = "forge-template-echo"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+forge-sdk = { path = "../.." }
+serde_json = "1"
+
+[profile.release]
+# WASM size matters: deploy artifact is uploaded over HTTPS, lives
+# in storage's runtime store, gets faulted in on every cold start.
+# strip + lto + opt-level "z" trade compile time for ~40% smaller
+# modules. Customers who want faster builds can drop these.
+strip = true
+lto = true
+opt-level = "z"
+codegen-units = 1
+panic = "abort"

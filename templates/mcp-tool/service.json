@@ -1,0 +1,81 @@
+{
+  "services": [
+    {
+      "name": "calc",
+      "namespace": "tools",
+      "tables_accessed": [],
+      "permissions": [],
+      "limits": {},
+      "operations": [
+        {
+          "name": "add",
+          "kind": "query",
+          "idempotency": "idempotent",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "a": {"type": "number"},
+              "b": {"type": "number"}
+            },
+            "required": ["a", "b"]
+          },
+          "output_schema": {
+            "type": "object",
+            "properties": {
+              "result": {"type": "number"}
+            },
+            "required": ["result"]
+          },
+          "error_codes": [],
+          "http": {
+            "method": "POST",
+            "path": "/api/v1/services/calc/add",
+            "has_request_body": true,
+            "success_status": 200
+          },
+          "summary": "Add two numbers.",
+          "description": "Returns `a + b`.",
+          "tags": ["calc"]
+        },
+        {
+          "name": "sub",
+          "kind": "query",
+          "idempotency": "idempotent",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "a": {"type": "number"},
+              "b": {"type": "number"}
+            },
+            "required": ["a", "b"]
+          },
+          "output_schema": {
+            "type": "object",
+            "properties": {
+              "result": {"type": "number"}
+            },
+            "required": ["result"]
+          },
+          "error_codes": [],
+          "http": {
+            "method": "POST",
+            "path": "/api/v1/services/calc/sub",
+            "has_request_body": true,
+            "success_status": 200
+          },
+          "summary": "Subtract two numbers.",
+          "description": "Returns `a - b`.",
+          "tags": ["calc"]
+        }
+      ],
+      "description": "Tiny calculator surfaced via the MCP adapter."
+    }
+  ],
+  "wasm_modules": [
+    {
+      "service_namespace": "tools",
+      "service_name": "calc",
+      "wasm_path": "target/wasm32-wasip1/release/forge_template_mcp_tool.wasm"
+    }
+  ]
+}

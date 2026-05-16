@@ -1,0 +1,38 @@
+{
+  "services": [
+    {
+      "name": "echo",
+      "namespace": "echo",
+      "tables_accessed": [],
+      "permissions": [],
+      "limits": {},
+      "operations": [
+        {
+          "name": "ping",
+          "kind": "query",
+          "idempotency": "idempotent",
+          "input_schema": {},
+          "output_schema": {},
+          "error_codes": [],
+          "http": {
+            "method": "POST",
+            "path": "/api/v1/services/echo/ping",
+            "has_request_body": true,
+            "success_status": 200
+          },
+          "summary": "Echo the input back to the caller.",
+          "description": "Returns the input under an `echoed` key. The simplest valid workload — useful as a deploy smoke target.",
+          "tags": ["smoke"]
+        }
+      ],
+      "description": "Echo workload from forge-sdk's `echo` template."
+    }
+  ],
+  "wasm_modules": [
+    {
+      "service_namespace": "echo",
+      "service_name": "echo",
+      "wasm_path": "target/wasm32-wasip1/release/forge_template_echo.wasm"
+    }
+  ]
+}

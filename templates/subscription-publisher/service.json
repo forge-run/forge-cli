@@ -1,0 +1,52 @@
+{
+  "services": [
+    {
+      "name": "pings",
+      "namespace": "events",
+      "tables_accessed": [],
+      "permissions": [],
+      "limits": {},
+      "operations": [
+        {
+          "name": "trigger",
+          "kind": "subscription",
+          "idempotency": "non_idempotent",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "reason": {"type": "string"}
+            }
+          },
+          "output_schema": {
+            "type": "object",
+            "properties": {
+              "published": {"type": "boolean"}
+            },
+            "required": ["published"]
+          },
+          "error_codes": [],
+          "http": {
+            "method": "GET",
+            "path": "/api/v1/subscriptions/pings/trigger",
+            "has_request_body": false,
+            "success_status": 200
+          },
+          "permissions": [
+            {"permission": "subscription:publish", "scope": null}
+          ],
+          "summary": "Publish a ping event to active subscribers.",
+          "description": "Subscription op that, when invoked, publishes the trigger payload to any active subscriber of this op. Demonstrates forge_sdk::publish_event.",
+          "tags": ["events"]
+        }
+      ],
+      "description": "Subscription publisher template — fan-out via forge_publish_event."
+    }
+  ],
+  "wasm_modules": [
+    {
+      "service_namespace": "events",
+      "service_name": "pings",
+      "wasm_path": "target/wasm32-wasip1/release/forge_template_subscription_publisher.wasm"
+    }
+  ]
+}
