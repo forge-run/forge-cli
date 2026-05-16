@@ -372,6 +372,14 @@ fn build_head_extras_from_asset_manifest(app_dir: &std::path::Path) -> Result<St
             escape_html_attr(href),
         ));
     }
+    // Favicon — emit when the app has a static/favicon.svg checked
+    // in. Not driven by the asset-manifest (forge-web/build doesn't
+    // hash arbitrary static files), just a "if the file exists,
+    // link it" convenience so customer apps don't have to remember
+    // to write the link tag themselves.
+    if app_dir.join("static").join("favicon.svg").exists() {
+        out.push_str(r#"<link rel="icon" type="image/svg+xml" href="/static/favicon.svg">"#);
+    }
     if let Some(href) = map.get("vendor_htmx_href") {
         out.push_str(&format!(
             "<script src=\"{}\" defer></script>",
