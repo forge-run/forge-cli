@@ -609,11 +609,11 @@ refresh_token = "fr_s_portal"
 email = "ops@forge.run"
 
 [current]
-tenant_id = "0b8971ba-7954-49b8-8159-f960a20925a3"
-workspace_id = "ws-30bb36de"
+tenant_id = "00000000-0000-0000-0000-000000000000"
+workspace_id = "ws-XXXXXXXX"
 
-[cache.workspaces."ws-30bb36de"]
-api_url = "https://ws-30bb36de.forge.run"
+[cache.workspaces."ws-XXXXXXXX"]
+api_url = "https://ws-XXXXXXXX.forge.run"
 bearer = "fr_f_cached"
 expires_at = "2026-05-16T08:00:00Z"
 "#;
@@ -622,10 +622,10 @@ expires_at = "2026-05-16T08:00:00Z"
         assert_eq!(cfg.portal.as_ref().unwrap().bearer.as_str(), "fr_u_portal");
         assert_eq!(
             cfg.current.as_ref().unwrap().workspace_id.as_deref(),
-            Some("ws-30bb36de")
+            Some("ws-XXXXXXXX")
         );
         assert_eq!(cfg.cache.workspaces.len(), 1);
-        let cached = cfg.cache.workspaces.get("ws-30bb36de").unwrap();
+        let cached = cfg.cache.workspaces.get("ws-XXXXXXXX").unwrap();
         assert_eq!(cached.bearer, "fr_f_cached");
         // Round-trip preserves shape.
         let back = toml::to_string_pretty(&cfg).unwrap();

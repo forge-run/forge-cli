@@ -386,27 +386,27 @@ mod tests {
 
     #[test]
     fn derive_api_url_strips_path() {
-        let url = "https://ws-30bb36de.forge.run/api/v1/auth/sso/consume?token=abc.def";
+        let url = "https://ws-XXXXXXXX.forge.run/api/v1/auth/sso/consume?token=abc.def";
         assert_eq!(
-            derive_api_url_from_target(url, "ws-30bb36de"),
-            "https://ws-30bb36de.forge.run"
+            derive_api_url_from_target(url, "ws-XXXXXXXX"),
+            "https://ws-XXXXXXXX.forge.run"
         );
     }
 
     #[test]
     fn derive_api_url_handles_private_host() {
-        let url = "http://10.0.0.3:40001/api/v1/auth/sso/consume?token=…";
+        let url = "http://127.0.0.1:40001/api/v1/auth/sso/consume?token=…";
         assert_eq!(
-            derive_api_url_from_target(url, "ws-30bb36de"),
-            "http://10.0.0.3:40001"
+            derive_api_url_from_target(url, "ws-XXXXXXXX"),
+            "http://127.0.0.1:40001"
         );
     }
 
     #[test]
     fn derive_api_url_falls_back_on_malformed_target() {
         assert_eq!(
-            derive_api_url_from_target("not-a-url", "ws-30bb36de"),
-            "https://ws-30bb36de.forge.run"
+            derive_api_url_from_target("not-a-url", "ws-XXXXXXXX"),
+            "https://ws-XXXXXXXX.forge.run"
         );
     }
 }

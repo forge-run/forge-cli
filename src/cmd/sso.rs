@@ -58,7 +58,7 @@ pub struct LoginArgs {
 
 #[derive(Debug, clap::Args)]
 pub struct ConnectArgs {
-    /// Target workspace id (e.g. `ws-30bb36de`).
+    /// Target workspace id (e.g. `ws-XXXXXXXX`).
     pub workspace_id: String,
     /// Target workspace base URL. Defaults to
     /// `https://<workspace_id>.forge.run` — overridable for local
@@ -361,16 +361,16 @@ mod tests {
 
     #[test]
     fn rewrite_host_preserves_path_and_query() {
-        let original = "https://ws-30bb36de.forge.run/api/v1/auth/sso/consume?token=abc.def";
-        let rewritten = rewrite_host(original, "http://10.0.0.3:40001").unwrap();
+        let original = "https://ws-XXXXXXXX.forge.run/api/v1/auth/sso/consume?token=abc.def";
+        let rewritten = rewrite_host(original, "http://127.0.0.1:40001").unwrap();
         assert_eq!(
             rewritten,
-            "http://10.0.0.3:40001/api/v1/auth/sso/consume?token=abc.def"
+            "http://127.0.0.1:40001/api/v1/auth/sso/consume?token=abc.def"
         );
     }
 
     #[test]
     fn rewrite_host_rejects_url_without_consume_path() {
-        assert!(rewrite_host("https://example.com/", "http://10.0.0.3").is_err());
+        assert!(rewrite_host("https://example.com/", "http://127.0.0.1").is_err());
     }
 }
