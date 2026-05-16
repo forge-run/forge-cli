@@ -57,10 +57,7 @@ const TEMPLATES: &[(&str, &[(&str, &str)])] = &[
                 "service.json",
                 include_str!("../../templates/echo/service.json"),
             ),
-            (
-                "README.md",
-                include_str!("../../templates/echo/README.md"),
-            ),
+            ("README.md", include_str!("../../templates/echo/README.md")),
         ],
     ),
     (

@@ -427,6 +427,8 @@ dependencies = [
  "anyhow",
  "base64",
  "clap",
+ "forge-schema",
+ "regex",
  "reqwest",
  "self_update",
  "serde",
@@ -442,6 +444,15 @@ dependencies = [
  "wat",
  "webbrowser",
  "wit-component 0.236.1",
+]
+
+[[package]]
+name = "forge-schema"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "thiserror",
 ]
 
 [[package]]

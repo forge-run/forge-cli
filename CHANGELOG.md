@@ -4,6 +4,33 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This file mirrors the GitHub release notes; consult the release page
 for downloadable binaries and platform-specific tarballs.
 
+## [Unreleased] — Phase E (2026-05-16)
+
+### Added
+
+- **`forge domain policy <hostname> <strict|open>`** — wired from
+  CLI stub to the new CP route
+  `PUT /admin/tenants/:id/domains/:hostname/policy`. Operator
+  flow only (FORGE_CP_URL + FORGE_ADMIN_TOKEN).
+- **`forge deploy --app-manifest` cross-validation**:
+  - `{{ component("name", …) }}` invocations in pages +
+    components now fail at deploy time if `name` is unqualified
+    and not present in the bundle's components/ directory.
+    Qualified names (`@forge/...`, `@tenant/...`) accepted and
+    deferred to the runtime resolver.
+  - `app.json.tenant_claims.domains` cross-checked against the
+    CP's validated-domain catalog when FORGE_CP_URL +
+    FORGE_ADMIN_TOKEN + FORGE_TENANT_ID are set. Without those,
+    the check is skipped with a single-line warning.
+- **`forge domain add` 409 affordance** — when forge-cp responds
+  409 to a hostname claim, the CLI prints an actionable hint
+  (`forge domain list` + contact-ops fallback) instead of the
+  raw error.
+- **`forge deploy` response summary line** — when `--app-manifest`
+  is set and the runtime echoes back an `app_bundle` summary
+  (Phase E.5 / forge-runtime), the CLI prints
+  `deployed app `name` with N page(s), M component(s)`.
+
 ## [Unreleased]
 
 ## [0.2.7] - 2026-05-16

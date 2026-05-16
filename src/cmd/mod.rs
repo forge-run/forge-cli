@@ -2,6 +2,7 @@
 
 pub mod build;
 pub mod deploy;
+pub mod domain;
 pub mod login;
 pub mod logout;
 pub mod logs;

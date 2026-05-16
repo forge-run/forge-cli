@@ -28,6 +28,15 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", default-features = false, features = ["env-filter", "fmt"] }
 walkdir = "2.5.0"
 base64 = "0.22.1"
+# Phase E.4 — minimal regex for cross-validating component()
+# invocations in template bodies before deploy. `default-features
+# = false` drops unicode tables (~250KB) we don't need for our
+# ASCII identifier patterns.
+regex = { version = "1", default-features = false, features = ["std"] }
+# Phase E.4 — substrate manifest validation. Pure-data crate with
+# no wasm coupling; safe to depend on directly for app.json /
+# pages / components validation in the deploy pipeline.
+forge-schema = { path = "../forge-schema" }
 # Wrap the wasm32-wasip1 cdylib as a Component-Model artifact
 # before deploy. forge-runtime W3 cutover (2026-05-15) made the
 # runtime reject core modules — only Components instantiate. The

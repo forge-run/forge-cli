@@ -99,9 +99,7 @@ async fn list() -> Result<()> {
         // them lets the operator find their workspaces; the
         // unfiltered case (no `forge tenant use`) already returns
         // everything anyway, so this isn't an information leak.
-        rows.retain(|r| {
-            r.envelope.tenant_id.as_deref().is_none_or(|t| t == tid)
-        });
+        rows.retain(|r| r.envelope.tenant_id.as_deref().is_none_or(|t| t == tid));
     }
     if rows.is_empty() {
         if current_tenant.is_some() {
@@ -111,7 +109,9 @@ async fn list() -> Result<()> {
         }
         return Ok(());
     }
-    println!("WORKSPACE_ID     NODE                         TENANT                     FROZEN  GEN");
+    println!(
+        "WORKSPACE_ID     NODE                         TENANT                     FROZEN  GEN"
+    );
     for r in &rows {
         let active = current_ws.as_deref() == Some(&r.envelope.workspace_id);
         let marker = if active { "*" } else { " " };

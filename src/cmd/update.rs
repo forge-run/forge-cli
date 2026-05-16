@@ -56,10 +56,7 @@ fn drive(args: UpdateArgs, current_version: String) -> Result<()> {
     // (`forge-v0.2.3-…/`) because the release workflow names it
     // off `${GITHUB_REF_NAME}`. Bake the literal `v` into the
     // template so the lookup path matches the actual layout.
-    let bin_path_in_archive = format!(
-        "forge-v{{{{ version }}}}-{{{{ target }}}}/{}",
-        BIN_NAME
-    );
+    let bin_path_in_archive = format!("forge-v{{{{ version }}}}-{{{{ target }}}}/{}", BIN_NAME);
     update
         .repo_owner(REPO_OWNER)
         .repo_name(REPO_NAME)

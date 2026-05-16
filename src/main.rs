@@ -126,6 +126,12 @@ enum Cmd {
     #[command(subcommand)]
     Tenant(cmd::tenant::TenantCmd),
 
+    /// Phase E.3 — tenant domain claims + ACME validation flow.
+    /// Operator-only (direct-to-CP via FORGE_CP_URL + FORGE_ADMIN_TOKEN
+    /// env vars). Portal-proxied customer-facing flow lands in Phase F.
+    #[command(subcommand)]
+    Domain(cmd::domain::DomainCmd),
+
     /// List + select workspaces visible to the active portal
     /// session, scoped to the active tenant. Setting a workspace
     /// here lets every other CLI command (`schema apply`,
@@ -187,6 +193,7 @@ async fn main() -> Result<()> {
         Cmd::Sso(s) => cmd::sso::run(s, cli.portal_url).await,
         Cmd::Update(args) => cmd::update::run(args).await,
         Cmd::Tenant(t) => cmd::tenant::run(t).await,
+        Cmd::Domain(d) => cmd::domain::run(d).await,
         Cmd::Ws(w) => cmd::ws::run(w).await,
         Cmd::Ops => {
             anyhow::bail!(

@@ -49,6 +49,28 @@ pub struct DeployArgs {
     #[arg(long)]
     wasm: Vec<PathBuf>,
 
+    /// Phase E.4 — path to `app.json` for the v0.10 substrate.
+    /// When set, the deploy uploads a Phase-D-style app bundle
+    /// alongside the legacy service manifest. Validation: the
+    /// app.json is parsed via `forge_schema::validate_app_manifest`
+    /// pre-upload; any error aborts the deploy.
+    #[arg(long)]
+    app_manifest: Option<PathBuf>,
+
+    /// Phase E.4 — directory containing `*.page.{json,html,css,rs}`
+    /// files. Defaults to `pages/` relative to the
+    /// `--app-manifest` directory. Each page is validated via
+    /// `forge_schema::validate_page_manifest`.
+    #[arg(long)]
+    pages_dir: Option<PathBuf>,
+
+    /// Phase E.4 — directory containing `*.component.{json,html,css,rs}`
+    /// files. Defaults to `components/` relative to the
+    /// `--app-manifest` directory. Each component is validated
+    /// via `forge_schema::validate_component_manifest`.
+    #[arg(long)]
+    components_dir: Option<PathBuf>,
+
     /// Print the response as JSON instead of human-friendly text.
     #[arg(long)]
     json: bool,
@@ -89,6 +111,19 @@ struct DeployedService {
 struct DeployResponse {
     services: Vec<DeployedService>,
     registry_version: u64,
+    /// Phase E.5 — present only when the deploy carried an
+    /// `app_bundle` section (i.e., the customer passed
+    /// `--app-manifest`). Mirrors forge-runtime's
+    /// `AppBundleSummary` shape.
+    #[serde(default)]
+    app_bundle: Option<DeployAppBundleSummary>,
+}
+
+#[derive(Debug, Deserialize)]
+struct DeployAppBundleSummary {
+    app_name: String,
+    pages: usize,
+    components: usize,
 }
 
 pub async fn run(args: DeployArgs, client: &ForgeClient) -> Result<()> {
@@ -141,9 +176,21 @@ pub async fn run(args: DeployArgs, client: &ForgeClient) -> Result<()> {
         }));
     }
 
+    // Phase E.4 — substrate app bundle (optional). When
+    // `--app-manifest` is set, validate the app.json + every
+    // page.json + component.json before upload. Aborts on any
+    // validation error so a bad bundle never reaches the
+    // runtime's ingest path.
+    let app_bundle = build_app_bundle(&args).await?;
+
     let payload = serde_json::json!({
         "services": manifest.services,
         "wasm_modules": wasm_modules,
+        // Phase E.4 — extended bundle shape. forge-runtime's
+        // manage_routes deploy ingest (E.5) reads this section
+        // when present; legacy deploys (no app.json) omit it
+        // and the runtime skips the new ingest path.
+        "app_bundle": app_bundle,
     });
 
     let resp: DeployResponse = client
@@ -181,6 +228,12 @@ pub async fn run(args: DeployArgs, client: &ForgeClient) -> Result<()> {
                 s.action,
             );
         }
+        if let Some(bundle) = resp.app_bundle.as_ref() {
+            eprintln!(
+                "deployed app `{}` with {} page(s), {} component(s)",
+                bundle.app_name, bundle.pages, bundle.components,
+            );
+        }
     }
     Ok(())
 }
@@ -195,5 +248,653 @@ fn map_err(e: ForgeError) -> anyhow::Error {
         }
         ForgeError::Http { status, body } => anyhow::anyhow!("{status}: {body}"),
         other => anyhow::anyhow!(other),
+    }
+}
+
+// ─── Phase E.4 — app-bundle assembly + validation ───────────────
+
+/// Build the optional `app_bundle` payload section. Returns
+/// `Value::Null` when `--app-manifest` is unset (legacy deploys).
+/// Aborts the deploy when any validation fails — the runtime's
+/// ingest path trusts the CLI for substrate validation, so a
+/// bad bundle here would mean a runtime hard-fail mid-ingest.
+async fn build_app_bundle(args: &DeployArgs) -> Result<serde_json::Value> {
+    let Some(app_path) = args.app_manifest.as_ref() else {
+        return Ok(serde_json::Value::Null);
+    };
+    let app_dir = app_path
+        .parent()
+        .map(|p| p.to_path_buf())
+        .unwrap_or_else(|| PathBuf::from("."));
+
+    // ── app.json ───────────────────────────────────────────────
+    let app_bytes = std::fs::read(app_path)
+        .with_context(|| format!("reading app manifest {}", app_path.display()))?;
+    let app_manifest: forge_schema::AppManifest = serde_json::from_slice(&app_bytes)
+        .with_context(|| format!("parsing app manifest {}", app_path.display()))?;
+    let errors = forge_schema::validate_app_manifest(&app_manifest);
+    if !errors.is_empty() {
+        anyhow::bail!(
+            "app manifest validation failed at {}:\n{}",
+            app_path.display(),
+            errors
+                .iter()
+                .map(|e| format!("  - {e}"))
+                .collect::<Vec<_>>()
+                .join("\n"),
+        );
+    }
+
+    // ── pages/ ─────────────────────────────────────────────────
+    let pages_dir = args
+        .pages_dir
+        .clone()
+        .unwrap_or_else(|| app_dir.join("pages"));
+    let pages = collect_page_jsons(&pages_dir)?;
+
+    // ── components/ ────────────────────────────────────────────
+    let components_dir = args
+        .components_dir
+        .clone()
+        .unwrap_or_else(|| app_dir.join("components"));
+    let components = collect_component_jsons(&components_dir)?;
+
+    // ── Cross-validate `{{ component("name", ...) }}` invocations
+    // against the app + (eventually) tenant + built-in scope. The
+    // CLI fails fast when a page or component references an
+    // unknown name so a bad bundle never reaches the runtime's
+    // ingest path.
+    cross_validate_component_invocations(&pages, &components)?;
+
+    // ── Read forge-web/build's asset-manifest.json (Phase F gap #2)
+    // so the runtime can inject the right `<link>` / `<script>`
+    // tags into every page render. Without this every v2 page
+    // renders unstyled. Missing manifest is benign — older apps
+    // that don't ship one fall back to whatever shell config
+    // app.json provides directly.
+    let head_extras = build_head_extras_from_asset_manifest(&app_dir)?;
+
+    // ── Phase E.4 (gap-close) — cross-check tenant_claims against
+    // forge-cp's validated-domain catalog if operator credentials
+    // are available. Without them (customer-mode CLI), we skip
+    // the check and trust the runtime to catch unregistered
+    // claims downstream.
+    if let Err(err) = cross_validate_tenant_claims(&app_manifest).await {
+        anyhow::bail!("tenant_claims validation failed: {err}");
+    }
+
+    Ok(serde_json::json!({
+        "app_manifest": app_manifest,
+        "pages": pages,
+        "components": components,
+        // Phase F gap #2 — pre-built head_extras string the runtime
+        // injects into ShellConfig.head_extras on every page render.
+        // Carries `<link rel="stylesheet">` + vendor / app JS tags
+        // based on the build-time hashed bundle hrefs.
+        "head_extras": head_extras,
+    }))
+}
+
+/// Phase F gap #2 — build a head_extras string from the project's
+/// `static/asset-manifest.json` (emitted by forge-web/build). The
+/// manifest carries hashed hrefs the runtime needs to inject into
+/// every page render. Returns an empty string when the manifest
+/// is absent (legacy apps without the substrate build pipeline).
+fn build_head_extras_from_asset_manifest(app_dir: &std::path::Path) -> Result<String> {
+    let manifest_path = app_dir.join("static").join("asset-manifest.json");
+    if !manifest_path.exists() {
+        return Ok(String::new());
+    }
+    let body = std::fs::read(&manifest_path)
+        .with_context(|| format!("read {}", manifest_path.display()))?;
+    let map: std::collections::BTreeMap<String, String> = serde_json::from_slice(&body)
+        .with_context(|| format!("parse {}", manifest_path.display()))?;
+    let mut out = String::new();
+    if let Some(href) = map.get("css_href") {
+        out.push_str(&format!(
+            "<link rel=\"stylesheet\" href=\"{}\">",
+            escape_html_attr(href),
+        ));
+    }
+    if let Some(href) = map.get("vendor_htmx_href") {
+        out.push_str(&format!(
+            "<script src=\"{}\" defer></script>",
+            escape_html_attr(href),
+        ));
+    }
+    if let Some(href) = map.get("js_href") {
+        out.push_str(&format!(
+            "<script src=\"{}\" defer></script>",
+            escape_html_attr(href),
+        ));
+    }
+    Ok(out)
+}
+
+/// HTML-attribute escape. Hashed asset hrefs come from
+/// forge-web/build's own writer (no user input) — escape anyway
+/// as defense-in-depth so a malicious manifest can't break out of
+/// the `href="…"` attribute context.
+fn escape_html_attr(s: &str) -> String {
+    s.chars()
+        .flat_map(|c| match c {
+            '"' => "&quot;".chars().collect::<Vec<_>>(),
+            '&' => "&amp;".chars().collect(),
+            '<' => "&lt;".chars().collect(),
+            '>' => "&gt;".chars().collect(),
+            other => vec![other],
+        })
+        .collect()
+}
+
+/// Phase E.4 (gap-close) — walk every page/component template body
+/// for `component("<name>", ...)` invocations and assert each
+/// referenced name resolves against the bundle's components set
+/// or a built-in cascade qualifier (`@forge/...`, `@tenant/...`).
+///
+/// Limitations:
+/// - We don't have access to the resolved built-in + tenant
+///   component catalog at deploy time, so we accept any
+///   qualified name and only fail on **unqualified** names that
+///   don't exist in the app's `components/` directory. That
+///   catches the common "typo'd component name" footgun while
+///   leaving qualified references to the runtime's cascade
+///   resolver.
+/// - Regex-based parser. Templates with literal
+///   `{{ "component(" }}` strings would trip a false-positive,
+///   but minijinja's `{{ … }}` braces wrap the call so a literal
+///   string would be `'component('` inside a template-string
+///   constant — vanishingly rare and easy for the customer to
+///   refactor.
+fn cross_validate_component_invocations(
+    pages: &[BundledPage],
+    components: &[BundledComponent],
+) -> Result<()> {
+    use regex::Regex;
+    // `component("name", …)` or `component('name', …)` — match the
+    // bare global-function form minijinja registers.
+    let re = Regex::new(r#"\bcomponent\s*\(\s*["']([^"']+)["']"#)
+        .context("compile component-invocation regex")?;
+
+    let known: std::collections::HashSet<&str> =
+        components.iter().map(|c| c.name.as_str()).collect();
+
+    let mut report = Vec::new();
+    for page in pages {
+        for capture in re.captures_iter(&page.template_body) {
+            let name = capture.get(1).unwrap().as_str();
+            if name.starts_with('@') || known.contains(name) {
+                continue;
+            }
+            report.push(format!(
+                "page `{}` invokes unknown component `{}`",
+                page.name, name,
+            ));
+        }
+    }
+    for component in components {
+        for capture in re.captures_iter(&component.template_body) {
+            let name = capture.get(1).unwrap().as_str();
+            if name.starts_with('@') || known.contains(name) {
+                continue;
+            }
+            report.push(format!(
+                "component `{}` invokes unknown component `{}`",
+                component.name, name,
+            ));
+        }
+    }
+    if !report.is_empty() {
+        anyhow::bail!(
+            "component cross-validation failed:\n{}\n\
+             Hint: declare the component under `components/`, or qualify the \
+             call with `@forge/<name>` / `@tenant/<name>` when referencing a \
+             built-in or tenant-shared component.",
+            report
+                .iter()
+                .map(|l| format!("  - {l}"))
+                .collect::<Vec<_>>()
+                .join("\n"),
+        );
+    }
+    Ok(())
+}
+
+/// Phase E.4 (gap-close) — cross-check `app.json.tenant_claims`'s
+/// referenced domains against forge-cp's validated-domain catalog.
+///
+/// Best-effort: when `FORGE_CP_URL` + `FORGE_ADMIN_TOKEN` are set
+/// (operator mode), the CLI calls the CP and fails fast if any
+/// claimed domain is missing or not in `cert_status == "issued"`.
+/// Without credentials (customer-mode CLI), the check is skipped
+/// with a single-line warning so deploys remain unblocked by the
+/// absence of operator config.
+async fn cross_validate_tenant_claims(manifest: &forge_schema::AppManifest) -> Result<()> {
+    let domains: Vec<&String> = manifest
+        .tenant_claims
+        .domains
+        .iter()
+        .filter(|d| !d.is_empty())
+        .collect();
+    if domains.is_empty() {
+        return Ok(());
+    }
+    // Operator mode requires three env vars: CP base URL, admin
+    // bearer, and the tenant whose domain catalog to consult.
+    // tenant_id can't come from the manifest — app.json doesn't
+    // carry tenant identity (it's resolved from the workspace
+    // envelope at runtime). The operator passes FORGE_TENANT_ID
+    // explicitly when running deploy in cross-check mode.
+    let (Ok(base), Ok(bearer), Ok(tenant_id)) = (
+        std::env::var("FORGE_CP_URL"),
+        std::env::var("FORGE_ADMIN_TOKEN"),
+        std::env::var("FORGE_TENANT_ID"),
+    ) else {
+        eprintln!(
+            "warning: app.json declares {} tenant_claims.domains entries but \
+             FORGE_CP_URL / FORGE_ADMIN_TOKEN / FORGE_TENANT_ID are unset — \
+             skipping deploy-time validation. The runtime will reject \
+             unregistered claims when the routing-table swap lands.",
+            domains.len(),
+        );
+        return Ok(());
+    };
+    let base = base.trim_end_matches('/');
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(15))
+        .build()
+        .context("build http client")?;
+    let url = format!("{base}/admin/tenants/{tenant_id}/domains");
+    let resp = client
+        .get(&url)
+        .bearer_auth(&bearer)
+        .send()
+        .await
+        .with_context(|| format!("GET {url}"))?;
+    if !resp.status().is_success() {
+        let s = resp.status();
+        let body = resp.text().await.unwrap_or_default();
+        anyhow::bail!("forge-cp {s}: {body}");
+    }
+    #[derive(serde::Deserialize)]
+    struct DomainRow {
+        hostname: String,
+        cert_status: String,
+    }
+    let catalog: Vec<DomainRow> = resp
+        .json()
+        .await
+        .context("decode validated-domains catalog")?;
+    let issued: std::collections::HashSet<&str> = catalog
+        .iter()
+        .filter(|d| d.cert_status == "issued")
+        .map(|d| d.hostname.as_str())
+        .collect();
+    let mut missing = Vec::new();
+    for domain in &domains {
+        if !issued.contains(domain.as_str()) {
+            missing.push(domain.as_str());
+        }
+    }
+    if !missing.is_empty() {
+        anyhow::bail!(
+            "tenant `{tenant_id}` hasn't validated these claimed domains: {missing:?}.\n\
+             Run `forge domain add <hostname>` + provision the DNS TXT record + \
+             `forge domain validate <hostname>` for each before redeploying."
+        );
+    }
+    Ok(())
+}
+
+#[derive(Debug, serde::Serialize)]
+struct BundledPage {
+    name: String,
+    manifest: forge_schema::PageManifest,
+    template_body: String,
+    css_body: String,
+}
+
+#[derive(Debug, serde::Serialize)]
+struct BundledComponent {
+    name: String,
+    manifest: forge_schema::ComponentManifest,
+    template_body: String,
+    css_body: String,
+}
+
+fn collect_page_jsons(dir: &PathBuf) -> Result<Vec<BundledPage>> {
+    if !dir.exists() {
+        return Ok(Vec::new());
+    }
+    let mut out = Vec::new();
+    for entry in walkdir::WalkDir::new(dir).follow_links(false) {
+        let entry = entry.with_context(|| format!("walking {}", dir.display()))?;
+        let path = entry.path();
+        if !path.is_file() {
+            continue;
+        }
+        let fname = match path.file_name().and_then(|s| s.to_str()) {
+            Some(f) => f,
+            None => continue,
+        };
+        let Some(stem) = fname.strip_suffix(".page.json") else {
+            continue;
+        };
+        let raw = std::fs::read(path).with_context(|| format!("read {}", path.display()))?;
+        let manifest: forge_schema::PageManifest =
+            serde_json::from_slice(&raw).with_context(|| format!("parse {}", path.display()))?;
+        let errors = forge_schema::validate_page_manifest(&manifest);
+        if !errors.is_empty() {
+            anyhow::bail!(
+                "page `{stem}` at {} failed validation:\n{}",
+                path.display(),
+                errors
+                    .iter()
+                    .map(|e| format!("  - {e}"))
+                    .collect::<Vec<_>>()
+                    .join("\n"),
+            );
+        }
+        // Sibling template + css (optional).
+        let parent = path.parent().unwrap_or_else(|| std::path::Path::new("."));
+        let template_path = parent.join(format!("{stem}.page.html"));
+        let css_path = parent.join(format!("{stem}.page.css"));
+        let template_body = if template_path.exists() {
+            std::fs::read_to_string(&template_path)
+                .with_context(|| format!("read {}", template_path.display()))?
+        } else {
+            String::new()
+        };
+        let css_body = if css_path.exists() {
+            std::fs::read_to_string(&css_path)
+                .with_context(|| format!("read {}", css_path.display()))?
+        } else {
+            String::new()
+        };
+        out.push(BundledPage {
+            name: stem.to_string(),
+            manifest,
+            template_body,
+            css_body,
+        });
+    }
+    out.sort_by(|a, b| a.name.cmp(&b.name));
+    Ok(out)
+}
+
+fn collect_component_jsons(dir: &PathBuf) -> Result<Vec<BundledComponent>> {
+    if !dir.exists() {
+        return Ok(Vec::new());
+    }
+    let mut out = Vec::new();
+    for entry in walkdir::WalkDir::new(dir).follow_links(false) {
+        let entry = entry.with_context(|| format!("walking {}", dir.display()))?;
+        let path = entry.path();
+        if !path.is_file() {
+            continue;
+        }
+        let fname = match path.file_name().and_then(|s| s.to_str()) {
+            Some(f) => f,
+            None => continue,
+        };
+        let Some(stem) = fname.strip_suffix(".component.json") else {
+            continue;
+        };
+        let raw = std::fs::read(path).with_context(|| format!("read {}", path.display()))?;
+        let manifest: forge_schema::ComponentManifest =
+            serde_json::from_slice(&raw).with_context(|| format!("parse {}", path.display()))?;
+        let errors = forge_schema::validate_component_manifest(&manifest);
+        if !errors.is_empty() {
+            anyhow::bail!(
+                "component `{stem}` at {} failed validation:\n{}",
+                path.display(),
+                errors
+                    .iter()
+                    .map(|e| format!("  - {e}"))
+                    .collect::<Vec<_>>()
+                    .join("\n"),
+            );
+        }
+        let parent = path.parent().unwrap_or_else(|| std::path::Path::new("."));
+        let template_path = parent.join(format!("{stem}.component.html"));
+        let css_path = parent.join(format!("{stem}.component.css"));
+        let template_body = if template_path.exists() {
+            std::fs::read_to_string(&template_path)
+                .with_context(|| format!("read {}", template_path.display()))?
+        } else {
+            String::new()
+        };
+        let css_body = if css_path.exists() {
+            std::fs::read_to_string(&css_path)
+                .with_context(|| format!("read {}", css_path.display()))?
+        } else {
+            String::new()
+        };
+        out.push(BundledComponent {
+            name: stem.to_string(),
+            manifest,
+            template_body,
+            css_body,
+        });
+    }
+    out.sort_by(|a, b| a.name.cmp(&b.name));
+    Ok(out)
+}
+
+#[cfg(test)]
+mod app_bundle_tests {
+    use super::*;
+    use tempfile::TempDir;
+
+    fn write(root: &std::path::Path, rel: &str, body: &str) {
+        let path = root.join(rel);
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(path, body).unwrap();
+    }
+
+    fn deploy_args(app_manifest: Option<PathBuf>) -> DeployArgs {
+        DeployArgs {
+            manifest: PathBuf::from("/unused"),
+            wasm: Vec::new(),
+            app_manifest,
+            pages_dir: None,
+            components_dir: None,
+            json: false,
+        }
+    }
+
+    #[tokio::test]
+    async fn missing_app_manifest_returns_null_bundle() {
+        let args = deploy_args(None);
+        let bundle = build_app_bundle(&args).await.unwrap();
+        assert!(bundle.is_null());
+    }
+
+    #[tokio::test]
+    async fn valid_app_with_no_pages_or_components_round_trips() {
+        let tmp = TempDir::new().unwrap();
+        let app_path = tmp.path().join("app.json");
+        write(
+            tmp.path(),
+            "app.json",
+            r#"{
+                "schema_version":"0.1",
+                "app":{"name":"hello","version":"1.0.0"},
+                "shell":{},
+                "routing_claim":{"host":"@default","path":"/"},
+                "tenant_claims":{}
+            }"#,
+        );
+        let args = deploy_args(Some(app_path.clone()));
+        let bundle = build_app_bundle(&args).await.expect("valid");
+        assert_eq!(bundle["app_manifest"]["app"]["name"], "hello");
+        assert_eq!(bundle["pages"].as_array().unwrap().len(), 0);
+        assert_eq!(bundle["components"].as_array().unwrap().len(), 0);
+    }
+
+    #[tokio::test]
+    async fn invalid_app_manifest_aborts_deploy() {
+        let tmp = TempDir::new().unwrap();
+        // Routing-claim path must start with `/` — forge-schema
+        // rejects with InvalidRoutePath.
+        write(
+            tmp.path(),
+            "app.json",
+            r#"{
+                "schema_version":"0.1",
+                "app":{"name":"hello","version":"1.0.0"},
+                "shell":{},
+                "routing_claim":{"host":"@default","path":"missing-slash"},
+                "tenant_claims":{}
+            }"#,
+        );
+        let args = deploy_args(Some(tmp.path().join("app.json")));
+        let err = build_app_bundle(&args).await.unwrap_err();
+        let msg = format!("{err:#}");
+        assert!(
+            msg.contains("InvalidRoutePath") || msg.contains("must start with"),
+            "got: {msg}"
+        );
+    }
+
+    #[tokio::test]
+    async fn invalid_page_manifest_aborts_deploy() {
+        let tmp = TempDir::new().unwrap();
+        write(
+            tmp.path(),
+            "app.json",
+            r#"{
+                "schema_version":"0.1",
+                "app":{"name":"hello","version":"1.0.0"},
+                "shell":{},
+                "routing_claim":{"host":"@default","path":"/"},
+                "tenant_claims":{}
+            }"#,
+        );
+        // Bad page: invalid HTTP method.
+        write(
+            tmp.path(),
+            "pages/bad.page.json",
+            r#"{"route":{"method":"FETCH","path":"/bad"},"template":{"path":"bad.page.html"}}"#,
+        );
+        write(tmp.path(), "pages/bad.page.html", "<div></div>");
+        let args = deploy_args(Some(tmp.path().join("app.json")));
+        let err = build_app_bundle(&args).await.unwrap_err();
+        let msg = format!("{err:#}");
+        assert!(
+            msg.contains("FETCH") || msg.contains("InvalidRouteMethod"),
+            "got: {msg}",
+        );
+    }
+
+    #[tokio::test]
+    async fn valid_pages_and_components_bundled() {
+        let tmp = TempDir::new().unwrap();
+        write(
+            tmp.path(),
+            "app.json",
+            r#"{
+                "schema_version":"0.1",
+                "app":{"name":"hello","version":"1.0.0"},
+                "shell":{},
+                "routing_claim":{"host":"@default","path":"/"},
+                "tenant_claims":{}
+            }"#,
+        );
+        write(
+            tmp.path(),
+            "pages/landing.page.json",
+            r#"{"name":"landing","route":{"path":"/"},"template":{"path":"landing.page.html"}}"#,
+        );
+        write(tmp.path(), "pages/landing.page.html", "<h1>hi</h1>");
+        write(
+            tmp.path(),
+            "components/card.component.json",
+            // PropsSchema is `#[serde(transparent)]` — the outer
+            // `props` field is the BTreeMap directly.
+            r#"{"name":"card","props":{}}"#,
+        );
+        write(tmp.path(), "components/card.component.html", "<div></div>");
+        let args = deploy_args(Some(tmp.path().join("app.json")));
+        let bundle = build_app_bundle(&args).await.expect("valid");
+        let pages = bundle["pages"].as_array().unwrap();
+        assert_eq!(pages.len(), 1);
+        assert_eq!(pages[0]["name"], "landing");
+        let components = bundle["components"].as_array().unwrap();
+        assert_eq!(components.len(), 1);
+        assert_eq!(components[0]["name"], "card");
+    }
+
+    #[tokio::test]
+    async fn page_invoking_unknown_component_fails_cross_validation() {
+        let tmp = TempDir::new().unwrap();
+        write(
+            tmp.path(),
+            "app.json",
+            r#"{
+                "schema_version":"0.1",
+                "app":{"name":"hello","version":"1.0.0"},
+                "shell":{},
+                "routing_claim":{"host":"@default","path":"/"},
+                "tenant_claims":{}
+            }"#,
+        );
+        write(
+            tmp.path(),
+            "pages/landing.page.json",
+            r#"{"name":"landing","route":{"path":"/"},"template":{"path":"landing.page.html"}}"#,
+        );
+        // Page invokes `mystery-card` which the components/ dir
+        // doesn't define.
+        write(
+            tmp.path(),
+            "pages/landing.page.html",
+            r#"<div>{{ component("mystery-card") }}</div>"#,
+        );
+        write(
+            tmp.path(),
+            "components/card.component.json",
+            r#"{"name":"card","props":{}}"#,
+        );
+        write(tmp.path(), "components/card.component.html", "<div></div>");
+        let args = deploy_args(Some(tmp.path().join("app.json")));
+        let err = build_app_bundle(&args).await.unwrap_err();
+        let msg = format!("{err:#}");
+        assert!(
+            msg.contains("mystery-card") && msg.contains("unknown component"),
+            "got: {msg}",
+        );
+    }
+
+    #[tokio::test]
+    async fn qualified_component_invocations_pass_cross_validation() {
+        // `@forge/card` is a built-in cascade qualifier — the CLI
+        // can't reach the runtime's built-in catalog so it accepts
+        // any `@`-qualified name and trusts the runtime's resolver.
+        let tmp = TempDir::new().unwrap();
+        write(
+            tmp.path(),
+            "app.json",
+            r#"{
+                "schema_version":"0.1",
+                "app":{"name":"hello","version":"1.0.0"},
+                "shell":{},
+                "routing_claim":{"host":"@default","path":"/"},
+                "tenant_claims":{}
+            }"#,
+        );
+        write(
+            tmp.path(),
+            "pages/landing.page.json",
+            r#"{"name":"landing","route":{"path":"/"},"template":{"path":"landing.page.html"}}"#,
+        );
+        write(
+            tmp.path(),
+            "pages/landing.page.html",
+            r#"<div>{{ component('@forge/card', {title: 'hi'}) }}</div>"#,
+        );
+        let args = deploy_args(Some(tmp.path().join("app.json")));
+        let bundle = build_app_bundle(&args).await.expect("valid");
+        assert_eq!(bundle["app_manifest"]["app"]["name"], "hello");
     }
 }

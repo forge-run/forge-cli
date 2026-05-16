@@ -143,9 +143,9 @@ async fn login(args: LoginArgs, cli_portal_url: Option<String>) -> Result<()> {
         // so a failure here is a soft warning, not a hard error.
         match webbrowser::open(&grant.verification_uri) {
             Ok(()) => eprintln!("(opened in your default browser)"),
-            Err(e) => eprintln!(
-                "(couldn't open browser automatically — open the URL manually: {e})",
-            ),
+            Err(e) => {
+                eprintln!("(couldn't open browser automatically — open the URL manually: {e})",)
+            }
         }
     }
     eprintln!(
