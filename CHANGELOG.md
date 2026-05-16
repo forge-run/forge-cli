@@ -6,6 +6,16 @@ for downloadable binaries and platform-specific tarballs.
 
 ## [Unreleased]
 
+## [0.2.5] - 2026-05-16
+
+### Changed
+
+- No code changes. Patch release exists to verify the forward
+  `forge update` path (v0.2.4 → v0.2.5) end-to-end against the
+  GitHub release pipeline — the swap path's first opportunity to
+  prove itself, since each prior version had a self-update bug
+  that v0.2.4 finally fixed in code.
+
 ## [0.2.4] - 2026-05-16
 
 ### Fixed
@@ -130,7 +140,8 @@ common platforms.
 
 Pre-public versions. See `git log` for granular history.
 
-[Unreleased]: https://github.com/forge-run/forge-cli/compare/v0.2.4...HEAD
+[Unreleased]: https://github.com/forge-run/forge-cli/compare/v0.2.5...HEAD
+[0.2.5]: https://github.com/forge-run/forge-cli/compare/v0.2.4...v0.2.5
 [0.2.4]: https://github.com/forge-run/forge-cli/compare/v0.2.3...v0.2.4
 [0.2.3]: https://github.com/forge-run/forge-cli/compare/v0.2.2...v0.2.3
 [0.2.2]: https://github.com/forge-run/forge-cli/compare/v0.2.1...v0.2.2
