@@ -169,6 +169,22 @@ pub async fn run(args: DeployArgs, client: &ForgeClient) -> Result<()> {
             })?;
         let bytes = std::fs::read(&resolved)
             .with_context(|| format!("reading wasm {}", resolved.display()))?;
+        // Phase F follow-up — auto-wrap core modules as Components.
+        // Previously only `forge build` did this; if a customer ran
+        // a raw `cargo build` then `forge deploy`, the runtime would
+        // 500 with "wasm artifact is a core module" because forge-
+        // runtime's W3 cutover rejects non-Component artifacts.
+        // Auto-wrapping makes that failure mode impossible.
+        let bytes = if crate::cmd::build::is_component(&bytes) {
+            bytes
+        } else {
+            eprintln!(
+                "wrapping {} as Component (was a core module — forge-runtime W3 requires Component Model)",
+                resolved.display()
+            );
+            crate::cmd::build::wrap_as_component(&bytes)
+                .with_context(|| format!("wit-component wrap of {}", resolved.display()))?
+        };
         wasm_modules.push(serde_json::json!({
             "service_namespace": entry.service_namespace,
             "service_name": entry.service_name,

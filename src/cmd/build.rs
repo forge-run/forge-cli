@@ -134,7 +134,7 @@ pub async fn run(args: BuildArgs) -> Result<()> {
 /// core module (0x01). The wasm magic at bytes 0..4 is `\0asm` in
 /// both; the next 4 bytes encode `version | layer` little-endian.
 /// Core: `01 00 00 00`. Component: `0d 00 01 00`.
-fn is_component(bytes: &[u8]) -> bool {
+pub(crate) fn is_component(bytes: &[u8]) -> bool {
     bytes.len() >= 8 && bytes[4..8] == [0x0d, 0x00, 0x01, 0x00]
 }
 
@@ -142,7 +142,7 @@ fn is_component(bytes: &[u8]) -> bool {
 /// `wit-component` with the WASI Preview-1 reactor adapter (which
 /// satisfies the wasi_snapshot_preview1 imports the cdylib makes).
 /// Adapter blob ships inside `wasi-preview1-component-adapter-provider`.
-fn wrap_as_component(core: &[u8]) -> Result<Vec<u8>> {
+pub(crate) fn wrap_as_component(core: &[u8]) -> Result<Vec<u8>> {
     let adapter = wasi_preview1_component_adapter_provider::WASI_SNAPSHOT_PREVIEW1_REACTOR_ADAPTER;
     let bytes = wit_component::ComponentEncoder::default()
         .module(core)
