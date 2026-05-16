@@ -6,6 +6,17 @@ for downloadable binaries and platform-specific tarballs.
 
 ## [Unreleased]
 
+## [0.2.4] - 2026-05-16
+
+### Fixed
+
+- `forge update` was reaching for
+  `forge-0.2.3-<target>/forge` inside the tarball, but the
+  release workflow wraps the binary inside
+  `forge-v0.2.3-<target>/` (v-prefixed, from `${GITHUB_REF_NAME}`).
+  Bake the literal `v` into the `bin_path_in_archive` template
+  so the lookup matches the actual tarball layout.
+
 ## [0.2.3] - 2026-05-16
 
 ### Fixed
@@ -119,7 +130,8 @@ common platforms.
 
 Pre-public versions. See `git log` for granular history.
 
-[Unreleased]: https://github.com/forge-run/forge-cli/compare/v0.2.3...HEAD
+[Unreleased]: https://github.com/forge-run/forge-cli/compare/v0.2.4...HEAD
+[0.2.4]: https://github.com/forge-run/forge-cli/compare/v0.2.3...v0.2.4
 [0.2.3]: https://github.com/forge-run/forge-cli/compare/v0.2.2...v0.2.3
 [0.2.2]: https://github.com/forge-run/forge-cli/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/forge-run/forge-cli/compare/v0.2.0...v0.2.1

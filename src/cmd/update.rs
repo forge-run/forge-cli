@@ -49,11 +49,15 @@ pub async fn run(args: UpdateArgs) -> Result<()> {
 fn drive(args: UpdateArgs, current_version: String) -> Result<()> {
     let mut update = self_update::backends::github::Update::configure();
     // The release workflow packages each binary inside a
-    // `forge-<tag>-<target>/` directory (so the tarball is
-    // self-describing on extract). Tell self_update to look
-    // inside that wrapper for the binary.
+    // `forge-v<version>-<target>/` directory (so the tarball is
+    // self-describing on extract). self_update's `{{ version }}`
+    // template variable substitutes the bare semver (`0.2.3`),
+    // but our wrapper directory uses the v-prefixed tag name
+    // (`forge-v0.2.3-…/`) because the release workflow names it
+    // off `${GITHUB_REF_NAME}`. Bake the literal `v` into the
+    // template so the lookup path matches the actual layout.
     let bin_path_in_archive = format!(
-        "forge-{{{{ version }}}}-{{{{ target }}}}/{}",
+        "forge-v{{{{ version }}}}-{{{{ target }}}}/{}",
         BIN_NAME
     );
     update
