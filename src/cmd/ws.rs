@@ -91,7 +91,17 @@ async fn list() -> Result<()> {
     // the active tenant so the listing matches what the operator
     // expects after `forge tenant use`.
     if let Some(tid) = current_tenant.as_deref() {
-        rows.retain(|r| r.envelope.tenant_id.as_deref() == Some(tid));
+        // Keep rows whose envelope tenant_id matches, OR whose
+        // tenant_id is null — legacy envelopes that predate the
+        // wire-crate's `ExecutionEnvelope.tenant_id` field round-
+        // trip with null here even if the workspace IS attached
+        // to a tenant via the portal's `workspaces` table. Showing
+        // them lets the operator find their workspaces; the
+        // unfiltered case (no `forge tenant use`) already returns
+        // everything anyway, so this isn't an information leak.
+        rows.retain(|r| {
+            r.envelope.tenant_id.as_deref().is_none_or(|t| t == tid)
+        });
     }
     if rows.is_empty() {
         if current_tenant.is_some() {
@@ -116,7 +126,11 @@ async fn list() -> Result<()> {
             .map(|g| g.to_string())
             .unwrap_or_else(|| "-".into());
         let node = r.assigned_node_id.as_deref().unwrap_or("(unassigned)");
-        let tenant = r.envelope.tenant_id.as_deref().unwrap_or("(none)");
+        // `(tenant=?)` flags the legacy-envelope case where the
+        // CP build is older than the wire-crate's tenant_id field
+        // — operator should re-set tenant on the envelope (or
+        // upgrade the CP) so the filter behaves predictably.
+        let tenant = r.envelope.tenant_id.as_deref().unwrap_or("(tenant=?)");
         println!(
             "{marker}{ws:<15} {node:<28} {tenant:<26} {frozen:<7} {gen}",
             ws = r.envelope.workspace_id,

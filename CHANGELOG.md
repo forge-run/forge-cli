@@ -6,6 +6,20 @@ for downloadable binaries and platform-specific tarballs.
 
 ## [Unreleased]
 
+## [0.2.7] - 2026-05-16
+
+### Fixed
+
+- `forge ws list` was filtering out every workspace whose CP
+  envelope carried `tenant_id: null`. This is the legacy case
+  where the deployed control-plane predates the wire-crate's
+  `ExecutionEnvelope.tenant_id` field — the field strips on
+  round-trip even when the envelope's _other_ tenant_id source
+  (portal `workspaces` table) is correct. Keep null-tenant rows
+  visible under any active-tenant filter and flag them as
+  `(tenant=?)` in the listing so the operator notices the
+  upstream drift.
+
 ## [0.2.6] - 2026-05-16
 
 ### Fixed
@@ -151,7 +165,8 @@ common platforms.
 
 Pre-public versions. See `git log` for granular history.
 
-[Unreleased]: https://github.com/forge-run/forge-cli/compare/v0.2.6...HEAD
+[Unreleased]: https://github.com/forge-run/forge-cli/compare/v0.2.7...HEAD
+[0.2.7]: https://github.com/forge-run/forge-cli/compare/v0.2.6...v0.2.7
 [0.2.6]: https://github.com/forge-run/forge-cli/compare/v0.2.5...v0.2.6
 [0.2.5]: https://github.com/forge-run/forge-cli/compare/v0.2.4...v0.2.5
 [0.2.4]: https://github.com/forge-run/forge-cli/compare/v0.2.3...v0.2.4
