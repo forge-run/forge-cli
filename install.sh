@@ -1,7 +1,7 @@
 #!/usr/bin/env sh
 # install.sh — one-liner installer for the `forge` CLI.
 #
-#   curl -sSf https://raw.githubusercontent.com/forge-run/forge-cli/main/install.sh | sh
+#   curl -sSfL https://install.forge.run | sh
 #
 # Detects platform via `uname`, downloads the matching binary from
 # the latest GitHub Release, verifies sha256, drops `forge` into
@@ -125,8 +125,30 @@ mkdir -p "$INSTALL_DIR"
 mv "$EXTRACTED" "$INSTALL_DIR/forge"
 chmod 0755 "$INSTALL_DIR/forge"
 
+# macOS Gatekeeper sets `com.apple.quarantine` on every file
+# downloaded via curl. Stripping it here means the binary runs
+# without the "cannot be opened" dialog on first invocation.
+# `xattr -d` is silent on success; the `|| true` covers
+# `attribute not found` on non-quarantined paths (e.g. Linux,
+# or a macOS user who already has Gatekeeper disabled).
+if [ "$OS" = "Darwin" ] && command -v xattr >/dev/null 2>&1; then
+    xattr -d com.apple.quarantine "$INSTALL_DIR/forge" 2>/dev/null || true
+fi
+
+# Re-run the freshly-installed binary's --version. Capture
+# output + exit code so a Gatekeeper / linker / glibc-version
+# failure surfaces clearly instead of the previous behaviour
+# (silent empty "installed " line, set -e didn't abort because
+# the failure was inside a command substitution).
+INSTALLED_VERSION=$("$INSTALL_DIR/forge" --version 2>/dev/null || true)
+if [ -z "$INSTALLED_VERSION" ]; then
+    err "binary installed at $INSTALL_DIR/forge but failed to run \`forge --version\`. \
+This usually means a platform-mismatch / missing-libc / Gatekeeper-block. \
+Try \`$INSTALL_DIR/forge --version\` interactively to see the error."
+fi
+
 info ""
-info "installed $($INSTALL_DIR/forge --version)"
+info "installed $INSTALLED_VERSION"
 info "  binary:   $INSTALL_DIR/forge"
 info ""
 
@@ -144,12 +166,12 @@ case ":$PATH:" in
         ;;
 esac
 
-# macOS unsigned-binary heads-up: Gatekeeper will quarantine the
-# binary on first run. The right-click → Open dance bypasses it;
-# Apple Developer ID signing is a future improvement.
+# macOS unsigned-binary heads-up: the quarantine attribute has
+# already been stripped above so the binary runs without the
+# Gatekeeper dialog. Surface the workaround anyway, in case the
+# xattr command wasn't available (older sh, locked-down corp box,
+# etc.) and the strip silently no-op'd.
 if [ "$OS" = "Darwin" ]; then
-    info ""
-    info "macOS note: on first run, if you see 'cannot be opened because the"
-    info "developer cannot be verified', remove the quarantine flag with:"
-    info "  xattr -d com.apple.quarantine $INSTALL_DIR/forge"
+    info "(macOS: if 'forge' is blocked by Gatekeeper on first run, run:"
+    info "       xattr -d com.apple.quarantine $INSTALL_DIR/forge)"
 fi
