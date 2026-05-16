@@ -74,7 +74,7 @@ esac
 # Resolve `latest` to a concrete tag via the GH API. Pinned tag
 # (FORGE_CLI_VERSION) skips the API call.
 if [ "$VERSION" = "latest" ]; then
-    info "resolving latest release…"
+    info "resolving latest release..."
     # Anonymous API call — 60/hour ratelimit per IP is fine for an
     # install path that fires once per laptop.
     API_URL="https://api.github.com/repos/$REPO/releases/latest"
@@ -93,15 +93,15 @@ CHECKSUMS_URL="https://github.com/$REPO/releases/download/$VERSION/checksums.sha
 TMPDIR=$(mktemp -d)
 trap 'rm -rf "$TMPDIR"' EXIT
 
-info "downloading $ARCHIVE…"
+info "downloading $ARCHIVE..."
 curl -sSfL -o "$TMPDIR/$ARCHIVE" "$ARCHIVE_URL" \
     || err "download failed: $ARCHIVE_URL"
 
-info "downloading checksums…"
+info "downloading checksums..."
 curl -sSfL -o "$TMPDIR/checksums.sha256" "$CHECKSUMS_URL" \
     || err "checksums download failed: $CHECKSUMS_URL"
 
-info "verifying sha256…"
+info "verifying sha256..."
 # Pull just the line for our archive out of the combined
 # checksums file, then re-run shasum in $TMPDIR so the relative
 # path matches.
@@ -113,7 +113,7 @@ ACTUAL=$(cd "$TMPDIR" && $SHA256_CMD "$ARCHIVE" | awk '{print $1}')
 [ "$EXPECTED" = "$ACTUAL" ] \
     || err "sha256 mismatch — expected $EXPECTED, got $ACTUAL. Re-run install or report at https://github.com/$REPO/issues"
 
-info "extracting…"
+info "extracting..."
 tar -C "$TMPDIR" -xzf "$TMPDIR/$ARCHIVE"
 # The archive contains a single directory `forge-<tag>-<target>/`
 # with `forge`, LICENSE-*, README.md inside.
