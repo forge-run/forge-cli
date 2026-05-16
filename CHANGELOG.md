@@ -4,7 +4,46 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This file mirrors the GitHub release notes; consult the release page
 for downloadable binaries and platform-specific tarballs.
 
-## [Unreleased] — Phase E (2026-05-16)
+## [Unreleased] — Phase G + downstream-wave (2026-05-16)
+
+### Added
+
+- **`forge dev`** — file-watcher inner-loop driver. Watches
+  `pages/`, `components/`, `src/`, `templates/`, `static/`,
+  `app.json`, `service.json` via `notify-debouncer-full`
+  (default 500ms debounce). On change runs `forge build` +
+  `forge deploy [--app-manifest]` (+ `forge static upload` when
+  a `static/` dir is present). Re-enters the running binary via
+  `current_exe()` so child invocations match the parent CLI
+  version. Flags: `--project-dir`, `--manifest`,
+  `--app-manifest`, `--wasm`, `--debounce-ms`, `--skip-initial`.
+- **`forge pages`** — list `pages/**/*.page.json` artifacts in
+  a route table with auth tier, capabilities, rendering shape,
+  sibling-file flags. Supports `--json`. Rendering column reads
+  kebab-case (`buffered-html`) for legibility.
+- **`forge components`** — list `components/**/*.component.json`
+  with prop counts (total + required), slot counts, behavior
+  triggers, sibling-file flags. Supports `--json`.
+- **`forge brand`** — print app-local branding overrides from
+  `app.json` plus the emitted `:root { --brand-*: …; }` block.
+  Flags: `--css-only`, `--json`.
+- **`forge branch {new,list,test,promote,discard}`** — ephemeral
+  workspace branches CLI. Mirrors `forge domain`'s direct-to-CP
+  auth pattern (`FORGE_CP_URL` + `FORGE_ADMIN_TOKEN`). CP-side
+  endpoints return 501 today; CLI surfaces the substrate-pending
+  state verbatim. Destructive verbs (promote, discard) require
+  `--yes` to confirm.
+- **8 new tests** for the inspection commands (pages walker
+  recursion + sibling detection, components props counting,
+  branding default emission, PascalCase → kebab-case
+  conversion). CLI suite grows from 32 → 34.
+
+### Changed
+
+- `notify = "8"` + `notify-debouncer-full = "0.6"` added to
+  `[dependencies]` for the watcher.
+
+## [Phase E LIVE] (2026-05-16)
 
 ### Added
 

@@ -132,6 +132,34 @@ enum Cmd {
     #[command(subcommand)]
     Domain(cmd::domain::DomainCmd),
 
+    /// Phase G.1 — watch the project tree and redeploy on change.
+    /// Foreground process; runs `forge build` + `forge deploy`
+    /// (+ `forge static upload`) when a `.page.json`, `.component.css`,
+    /// template, or `.rs` file is saved. Ctrl-C to exit.
+    Dev(cmd::dev::DevArgs),
+
+    /// Phase G.2 — list the project's pages with their routes,
+    /// auth tier, capabilities, and rendering tier. Reads
+    /// `pages/*.page.json` locally; no runtime roundtrip.
+    Pages(cmd::pages::PagesArgs),
+
+    /// Phase G.2 — list the project's app-scope components with
+    /// prop counts, slot counts, and behavior triggers. Reads
+    /// `components/*.component.json` locally.
+    Components(cmd::components::ComponentsArgs),
+
+    /// Phase G.2 — print the app-local branding overrides from
+    /// `app.json` plus the CSS-variable emission the runtime will
+    /// inline at render time.
+    Brand(cmd::brand::BrandArgs),
+
+    /// Ephemeral workspace branches (agent CI/CD primitive).
+    /// Fork the active workspace's substrate, run experimental
+    /// changes against the branch, promote-or-discard.
+    /// See [[project_ephemeral_branches]] in memory for context.
+    #[command(subcommand)]
+    Branch(cmd::branch::BranchCmd),
+
     /// List + select workspaces visible to the active portal
     /// session, scoped to the active tenant. Setting a workspace
     /// here lets every other CLI command (`schema apply`,
@@ -194,6 +222,11 @@ async fn main() -> Result<()> {
         Cmd::Update(args) => cmd::update::run(args).await,
         Cmd::Tenant(t) => cmd::tenant::run(t).await,
         Cmd::Domain(d) => cmd::domain::run(d).await,
+        Cmd::Dev(args) => cmd::dev::run(args).await,
+        Cmd::Pages(args) => cmd::pages::run(args).await,
+        Cmd::Components(args) => cmd::components::run(args).await,
+        Cmd::Brand(args) => cmd::brand::run(args).await,
+        Cmd::Branch(b) => cmd::branch::run(b).await,
         Cmd::Ws(w) => cmd::ws::run(w).await,
         Cmd::Ops => {
             anyhow::bail!(
