@@ -116,6 +116,12 @@ enum Cmd {
     #[command(subcommand)]
     Sso(cmd::sso::SsoCmd),
 
+    /// Self-update from the GitHub release pipeline. Downloads
+    /// the latest release for this platform, verifies sha256,
+    /// atomic-swaps the running binary in place. Pass `--check`
+    /// to query without applying.
+    Update(cmd::update::UpdateArgs),
+
     /// List and select tenants visible to the active portal session.
     #[command(subcommand)]
     Tenant(cmd::tenant::TenantCmd),
@@ -179,6 +185,7 @@ async fn main() -> Result<()> {
             cmd::logs::run(args, &client).await
         }
         Cmd::Sso(s) => cmd::sso::run(s, cli.portal_url).await,
+        Cmd::Update(args) => cmd::update::run(args).await,
         Cmd::Tenant(t) => cmd::tenant::run(t).await,
         Cmd::Ws(w) => cmd::ws::run(w).await,
         Cmd::Ops => {

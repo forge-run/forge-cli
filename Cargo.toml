@@ -40,6 +40,12 @@ wasi-preview1-component-adapter-provider = "37.0.3"
 # browser. Cross-platform; failures (no DISPLAY, no default
 # browser) fall back to the printed-URL-and-code UX.
 webbrowser = "1"
+# `forge update` self-update: download a newer release from GH,
+# verify sha256, atomic-swap the running binary in place. Rustls
+# backend matches the rest of the CLI's TLS story (no system
+# OpenSSL dep). `compression-flate2` decodes the .tar.gz tarballs
+# the release workflow produces.
+self_update = { version = "0.42", default-features = false, features = ["rustls", "compression-flate2", "archive-tar"] }
 
 [dev-dependencies]
 tempfile = "3"
