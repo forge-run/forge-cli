@@ -38,19 +38,25 @@ pub async fn run(cmd: WsCmd) -> Result<()> {
     }
 }
 
+/// cp-admin returns one row per workspace with the canonical
+/// envelope nested under `envelope` and the assignment fields at
+/// the top level. We don't decode the whole envelope — just the
+/// shape we need to render the list. `workspace_id` lives inside
+/// the envelope (and `tenant_id` too); we pull them up at the row
+/// level via a custom `Deserialize` impl backed by serde_json on
+/// the lazy fields.
 #[derive(Debug, Deserialize)]
 struct CpWorkspaceRow {
-    workspace_id: String,
-    #[serde(default)]
-    tenant_id: Option<String>,
     #[serde(default)]
     assigned_node_id: Option<String>,
-    #[serde(default)]
-    envelope: Option<EnvelopeBrief>,
+    envelope: EnvelopeBrief,
 }
 
 #[derive(Debug, Deserialize)]
 struct EnvelopeBrief {
+    workspace_id: String,
+    #[serde(default)]
+    tenant_id: Option<String>,
     #[serde(default)]
     frozen: Option<bool>,
     #[serde(default)]
@@ -85,7 +91,7 @@ async fn list() -> Result<()> {
     // the active tenant so the listing matches what the operator
     // expects after `forge tenant use`.
     if let Some(tid) = current_tenant.as_deref() {
-        rows.retain(|r| r.tenant_id.as_deref() == Some(tid));
+        rows.retain(|r| r.envelope.tenant_id.as_deref() == Some(tid));
     }
     if rows.is_empty() {
         if current_tenant.is_some() {
@@ -97,25 +103,23 @@ async fn list() -> Result<()> {
     }
     println!("WORKSPACE_ID     NODE                         TENANT                     FROZEN  GEN");
     for r in &rows {
-        let active = current_ws.as_deref() == Some(&r.workspace_id);
+        let active = current_ws.as_deref() == Some(&r.envelope.workspace_id);
         let marker = if active { "*" } else { " " };
         let frozen = r
             .envelope
-            .as_ref()
-            .and_then(|e| e.frozen)
+            .frozen
             .map(|b| if b { "yes" } else { "-" })
             .unwrap_or("-");
         let generation = r
             .envelope
-            .as_ref()
-            .and_then(|e| e.generation)
+            .generation
             .map(|g| g.to_string())
             .unwrap_or_else(|| "-".into());
         let node = r.assigned_node_id.as_deref().unwrap_or("(unassigned)");
-        let tenant = r.tenant_id.as_deref().unwrap_or("(none)");
+        let tenant = r.envelope.tenant_id.as_deref().unwrap_or("(none)");
         println!(
             "{marker}{ws:<15} {node:<28} {tenant:<26} {frozen:<7} {gen}",
-            ws = r.workspace_id,
+            ws = r.envelope.workspace_id,
             gen = generation,
         );
     }

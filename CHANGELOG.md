@@ -6,6 +6,17 @@ for downloadable binaries and platform-specific tarballs.
 
 ## [Unreleased]
 
+## [0.2.6] - 2026-05-16
+
+### Fixed
+
+- `forge ws list` was failing with `missing field workspace_id`
+  because the portal's `/api/v1/cp-admin/workspaces` response
+  nests `workspace_id` under `envelope.workspace_id` (and same
+  for `tenant_id`). The CLI was decoding it at the top level.
+  Move the field-pulls onto the inner `EnvelopeBrief` struct so
+  the decoder matches the actual wire shape.
+
 ## [0.2.5] - 2026-05-16
 
 ### Changed
@@ -140,7 +151,8 @@ common platforms.
 
 Pre-public versions. See `git log` for granular history.
 
-[Unreleased]: https://github.com/forge-run/forge-cli/compare/v0.2.5...HEAD
+[Unreleased]: https://github.com/forge-run/forge-cli/compare/v0.2.6...HEAD
+[0.2.6]: https://github.com/forge-run/forge-cli/compare/v0.2.5...v0.2.6
 [0.2.5]: https://github.com/forge-run/forge-cli/compare/v0.2.4...v0.2.5
 [0.2.4]: https://github.com/forge-run/forge-cli/compare/v0.2.3...v0.2.4
 [0.2.3]: https://github.com/forge-run/forge-cli/compare/v0.2.2...v0.2.3
