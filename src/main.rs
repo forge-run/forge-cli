@@ -61,13 +61,12 @@ struct Cli {
 
 #[derive(Debug, Subcommand)]
 enum Cmd {
-    /// [DEPRECATED] Authenticate this CLI to a workspace via
-    /// browser-based device flow (RFC 8628). Use `forge sso login`
-    /// for federated mode (ADR 0021) — that's the path every
-    /// operator should be on. Direct-mode `forge login` is
-    /// retained as the documented break-glass for when the
-    /// portal is unreachable; passing `--portal-url` (or setting
-    /// `FORGE_PORTAL_URL`) makes it delegate to `forge sso login`.
+    /// Authenticate this CLI via browser-based device flow.
+    /// Federated mode (ADR 0021) is the default — `forge login`
+    /// with no flags delegates to `forge sso login` against
+    /// `https://app.forge.run`. Pass `--base-url <url>` to opt
+    /// into direct mode (the deprecated break-glass for when the
+    /// portal is unreachable).
     Login(cmd::login::LoginArgs),
 
     /// Revoke the saved bearer + refresh token and clear the

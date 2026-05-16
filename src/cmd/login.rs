@@ -43,14 +43,16 @@ pub struct LoginArgs {
     /// Profile name to write the resulting token under. Defaults
     /// to the global `--profile`, then the config file's
     /// `default_profile`, then the literal `"default"`.
-    /// Direct-mode only — federated mode (the default for new
-    /// users) keys off `[portal]` instead of named profiles.
+    /// Direct-mode only — federated mode (the default) keys off
+    /// `[portal]` instead of named profiles.
     #[arg(long)]
     profile_override: Option<String>,
 
-    /// Run the federated-mode login flow against this portal URL.
-    /// Equivalent to `forge sso login --portal-url <url>`. When
-    /// set, --base-url and --profile-override are ignored. ADR 0021.
+    /// Override the portal URL used for federated login. Falls
+    /// back to the global `--portal-url` flag, `FORGE_PORTAL_URL`,
+    /// and finally `https://app.forge.run`. Federated mode is the
+    /// default; pass --base-url to opt into direct mode (the
+    /// break-glass).
     #[arg(long)]
     portal_url: Option<String>,
 }
@@ -81,16 +83,17 @@ pub async fn run(
     cli_profile: Option<String>,
     cli_portal_url: Option<String>,
 ) -> Result<()> {
-    // Federated mode (ADR 0021): when --portal-url is supplied
-    // (locally or globally), or when FORGE_PORTAL_URL is set,
-    // delegate to the portal device flow. The legacy direct-mode
-    // path runs only when no portal URL is in scope.
-    if let Some(portal_url) = args.portal_url.clone().or(cli_portal_url) {
-        eprintln!("federated mode: running portal device flow against {portal_url}");
+    // ADR 0021: federated mode is the default. Direct mode runs
+    // only when the operator explicitly opts in with --base-url
+    // (the break-glass for unreachable-portal scenarios). The
+    // common case — `forge login` with no flags — delegates to
+    // `forge sso login` against the saved or default portal URL.
+    let portal_url = args.portal_url.clone().or(cli_portal_url);
+    let want_direct_mode = cli_base_url.is_some() && portal_url.is_none();
+
+    if !want_direct_mode {
         return crate::cmd::sso::run(
-            crate::cmd::sso::SsoCmd::Login(crate::cmd::sso::LoginArgs {
-                portal_url: Some(portal_url),
-            }),
+            crate::cmd::sso::SsoCmd::Login(crate::cmd::sso::LoginArgs { portal_url }),
             None,
         )
         .await;
@@ -107,10 +110,10 @@ pub async fn run(
     // login` for federated access. Print to stderr so scripts
     // that parse stdout keep working unchanged.
     eprintln!(
-        "warning: direct-mode `forge login` is deprecated (ADR 0021). \
-         Use `forge sso login` for portal-mediated access; \
-         `forge login --portal-url <url>` delegates to it automatically. \
-         This command remains available as a break-glass path."
+        "warning: direct-mode `forge login --base-url …` is deprecated (ADR 0021). \
+         The default `forge login` now delegates to `forge sso login` (portal-mediated \
+         federated access). Pass --base-url only as a break-glass when the portal is \
+         unreachable."
     );
     let effective_profile = args.profile_override.clone().or(cli_profile.clone());
     let (base_url, profile) = resolve_for_login(cli_base_url, effective_profile)?;
