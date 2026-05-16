@@ -6,6 +6,16 @@ for downloadable binaries and platform-specific tarballs.
 
 ## [Unreleased]
 
+## [0.2.3] - 2026-05-16
+
+### Fixed
+
+- `forge update --force` was failing with `404 - for: …/releases/tags/0.2.2`.
+  The crate's `get_latest_release()` returns the bare semver
+  string (`0.2.2`) but our GH release tags include the `v` prefix
+  (`v0.2.2`), so the tag lookup 404'd. Format the prefix
+  explicitly when targeting a tag.
+
 ## [0.2.2] - 2026-05-16
 
 ### Fixed
@@ -109,7 +119,8 @@ common platforms.
 
 Pre-public versions. See `git log` for granular history.
 
-[Unreleased]: https://github.com/forge-run/forge-cli/compare/v0.2.2...HEAD
+[Unreleased]: https://github.com/forge-run/forge-cli/compare/v0.2.3...HEAD
+[0.2.3]: https://github.com/forge-run/forge-cli/compare/v0.2.2...v0.2.3
 [0.2.2]: https://github.com/forge-run/forge-cli/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/forge-run/forge-cli/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/forge-run/forge-cli/releases/tag/v0.2.0

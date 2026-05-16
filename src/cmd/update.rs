@@ -76,12 +76,22 @@ fn drive(args: UpdateArgs, current_version: String) -> Result<()> {
         // crate exposes `target_version_tag` to force a specific
         // tag; we re-target the latest tag explicitly so even a
         // same-version download fires.
+        //
+        // get_latest_release returns `version: "0.2.2"` (semver-
+        // shaped, no v prefix), but our GH tags include the `v`
+        // (per Cargo + rust convention). target_version_tag does
+        // a tag lookup against the API, so prefix here.
         let latest = update
             .build()
             .map_err(|e| anyhow::anyhow!("configure self-update: {e}"))?
             .get_latest_release()
             .map_err(|e| anyhow::anyhow!("look up latest release: {e}"))?;
-        update.target_version_tag(&latest.version);
+        let tag = if latest.version.starts_with('v') {
+            latest.version.clone()
+        } else {
+            format!("v{}", latest.version)
+        };
+        update.target_version_tag(&tag);
     }
     let updater = update
         .build()
