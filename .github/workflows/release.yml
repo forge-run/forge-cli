@@ -32,8 +32,15 @@ jobs:
           - target: aarch64-apple-darwin
             runs_on: macos-latest
             archive_os: macos
+          # x86_64-apple-darwin is cross-compiled from the
+          # Apple Silicon runner because GitHub's `macos-13`
+          # Intel pool has been chronically queue-starved
+          # (39+ min waits with the job never starting). The
+          # Apple Silicon `macos-latest` image has rustc that
+          # can target x86_64-apple-darwin with the right
+          # toolchain target installed, and is plentiful.
           - target: x86_64-apple-darwin
-            runs_on: macos-13
+            runs_on: macos-latest
             archive_os: macos
           - target: aarch64-unknown-linux-gnu
             runs_on: ubuntu-22.04-arm
