@@ -366,6 +366,26 @@ fn build_head_extras_from_asset_manifest(app_dir: &std::path::Path) -> Result<St
     let map: std::collections::BTreeMap<String, String> = serde_json::from_slice(&body)
         .with_context(|| format!("parse {}", manifest_path.display()))?;
     let mut out = String::new();
+
+    // Customer-authored <head> extras. When the app ships a
+    // `static/head-extras.html` file, prepend its contents to the
+    // runtime-emitted head_extras. Apps use this for preconnect
+    // hints, third-party font stylesheets, meta description /
+    // theme-color / robots / OpenGraph / Twitter card, canonical
+    // URLs — anything that doesn't fit the built-in CSS / favicon /
+    // vendor-script pattern below.
+    //
+    // Ordered first so customer tags ship in source order and the
+    // runtime-managed `<link rel="stylesheet">` lands last (lets the
+    // customer's preconnect hints race the bundle fetch).
+    let head_extras_html = app_dir.join("static").join("head-extras.html");
+    if head_extras_html.exists() {
+        let extra = std::fs::read_to_string(&head_extras_html)
+            .with_context(|| format!("read {}", head_extras_html.display()))?;
+        let stripped = strip_html_comments(&extra);
+        out.push_str(stripped.trim());
+    }
+
     if let Some(href) = map.get("css_href") {
         out.push_str(&format!(
             "<link rel=\"stylesheet\" href=\"{}\">",
@@ -393,6 +413,30 @@ fn build_head_extras_from_asset_manifest(app_dir: &std::path::Path) -> Result<St
         ));
     }
     Ok(out)
+}
+
+/// Strip HTML comments (`<!-- ... -->`) from a head-extras snippet.
+/// Used by [`build_head_extras_from_asset_manifest`] so an authoring
+/// file can carry doc comments without the bundle wearing them.
+/// Naive scanner; safe for the head-extras use case (no `<script>`
+/// bodies, no `<![CDATA[`).
+fn strip_html_comments(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    let mut rest = s;
+    while let Some(start) = rest.find("<!--") {
+        out.push_str(&rest[..start]);
+        match rest[start + 4..].find("-->") {
+            Some(end) => {
+                rest = &rest[start + 4 + end + 3..];
+            }
+            None => {
+                rest = "";
+                break;
+            }
+        }
+    }
+    out.push_str(rest);
+    out
 }
 
 /// HTML-attribute escape. Hashed asset hrefs come from
@@ -586,6 +630,36 @@ struct BundledComponent {
     css_body: String,
 }
 
+/// Parse a `forge-schema` manifest from JSON bytes with a friendlier
+/// version-skew hint. When serde reports `unknown variant ...`, the
+/// CLI's bundled `forge-schema` (compile-time path-dep) is older
+/// than the manifest's schema; reinstalling the CLI usually fixes it.
+fn parse_schema_json<T>(raw: &[u8], path: &std::path::Path, kind: &str) -> Result<T>
+where
+    T: serde::de::DeserializeOwned,
+{
+    match serde_json::from_slice::<T>(raw) {
+        Ok(v) => Ok(v),
+        Err(e) => {
+            let msg = e.to_string();
+            if msg.contains("unknown variant") || msg.contains("unknown field") {
+                anyhow::bail!(
+                    "parse {kind} at {}: {e}\n\n\
+                     hint: \"unknown variant / field\" errors usually mean your `forge` CLI \
+                     was built against an older `forge-schema` than this manifest. \
+                     Reinstall the CLI:\n  \
+                     cd $(dirname $(which forge))/../../Documents/forge-cli 2>/dev/null || cd ../forge-cli\n  \
+                     cargo install --path . --locked\n  \
+                     # If `which forge` points at ~/.local/bin/forge, overwrite that copy too:\n  \
+                     cp ~/.cargo/bin/forge ~/.local/bin/forge",
+                    path.display()
+                );
+            }
+            Err(anyhow::anyhow!("parse {} at {}: {e}", kind, path.display()))
+        }
+    }
+}
+
 fn collect_page_jsons(dir: &PathBuf) -> Result<Vec<BundledPage>> {
     if !dir.exists() {
         return Ok(Vec::new());
@@ -606,7 +680,7 @@ fn collect_page_jsons(dir: &PathBuf) -> Result<Vec<BundledPage>> {
         };
         let raw = std::fs::read(path).with_context(|| format!("read {}", path.display()))?;
         let manifest: forge_schema::PageManifest =
-            serde_json::from_slice(&raw).with_context(|| format!("parse {}", path.display()))?;
+            parse_schema_json(&raw, path, "page manifest")?;
         let errors = forge_schema::validate_page_manifest(&manifest);
         if !errors.is_empty() {
             anyhow::bail!(
@@ -666,7 +740,7 @@ fn collect_component_jsons(dir: &PathBuf) -> Result<Vec<BundledComponent>> {
         };
         let raw = std::fs::read(path).with_context(|| format!("read {}", path.display()))?;
         let manifest: forge_schema::ComponentManifest =
-            serde_json::from_slice(&raw).with_context(|| format!("parse {}", path.display()))?;
+            parse_schema_json(&raw, path, "component manifest")?;
         let errors = forge_schema::validate_component_manifest(&manifest);
         if !errors.is_empty() {
             anyhow::bail!(
