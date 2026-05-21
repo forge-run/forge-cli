@@ -23,6 +23,46 @@ use serde::{Deserialize, Serialize};
 
 use crate::config;
 
+/// Local-machine hostname. `HOSTNAME` env first (set on most shells),
+/// then shell-out to the `hostname` command. Returns None when both
+/// fail (headless / minimal environments). The browser approval
+/// surface displays this as "you're authorising this machine" so the
+/// user can verify they're approving their own device.
+fn detect_hostname() -> Option<String> {
+    if let Ok(h) = std::env::var("HOSTNAME") {
+        if !h.trim().is_empty() {
+            return Some(h.trim().to_string());
+        }
+    }
+    std::process::Command::new("hostname")
+        .output()
+        .ok()
+        .and_then(|o| String::from_utf8(o.stdout).ok())
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+}
+
+/// macOS hardware model identifier (e.g., "MacBookPro18,3"). Read
+/// via `sysctl -n hw.model`. Linux / Windows skip this — DMI lookups
+/// vary and `/sys/.../product_name` is often "To be filled by O.E.M."
+/// or root-only. The browser surface degrades to platform + arch
+/// when the model is absent.
+#[cfg(target_os = "macos")]
+fn detect_model() -> Option<String> {
+    std::process::Command::new("sysctl")
+        .args(["-n", "hw.model"])
+        .output()
+        .ok()
+        .and_then(|o| String::from_utf8(o.stdout).ok())
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+}
+
+#[cfg(not(target_os = "macos"))]
+fn detect_model() -> Option<String> {
+    None
+}
+
 #[derive(Debug, Subcommand)]
 pub enum SsoCmd {
     /// Run the portal-side device flow and save the resulting
@@ -119,10 +159,36 @@ async fn login(args: LoginArgs, cli_portal_url: Option<String>) -> Result<()> {
         interval: u64,
     }
     let authorize_url = format!("{portal_base}/api/v1/auth/device/authorize");
-    let resp = client
+    // Stamp client fingerprint headers so the browser approval surface
+    // can later display "you ran this on a MacBook in San Francisco"
+    // before the user clicks Approve. Runtime reads these on the
+    // POST and persists them as `client_metadata` on the device-flow
+    // grant; storage's `device_request` op surfaces them back to the
+    // browser. All headers are optional from the server's POV — older
+    // CLIs / non-CF deployments degrade gracefully.
+    let mut req = client
         .post(&authorize_url)
+        .header(
+            "user-agent",
+            format!(
+                "forge-cli/{} ({}; {})",
+                env!("CARGO_PKG_VERSION"),
+                std::env::consts::OS,
+                std::env::consts::ARCH,
+            ),
+        )
+        .header("x-forge-cli-platform", std::env::consts::OS)
+        .header("x-forge-cli-arch", std::env::consts::ARCH)
+        .header("x-forge-cli-version", env!("CARGO_PKG_VERSION"))
         .header("content-type", "application/json")
-        .body("{}")
+        .body("{}");
+    if let Some(h) = detect_hostname() {
+        req = req.header("x-forge-cli-hostname", h);
+    }
+    if let Some(m) = detect_model() {
+        req = req.header("x-forge-cli-model", m);
+    }
+    let resp = req
         .send()
         .await
         .with_context(|| format!("POST {authorize_url}"))?;

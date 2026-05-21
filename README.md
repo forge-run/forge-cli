@@ -54,8 +54,84 @@ After `ws use`, every other command (`schema apply`, `deploy`, `logs`, `static u
 | `forge tokens list` | List active tokens for the active workspace. |
 | `forge tokens revoke <hash>` | Revoke a token by its hash prefix. |
 | `forge update` | Self-update from GitHub releases. `--check` reports availability without applying; `--force` re-installs the current version. |
+| `forge dev` | Watch the project tree and re-run `forge build` + `forge deploy` (+ `forge static upload`) on every save. Inner-loop driver for the agent + human authoring path. |
+| `forge pages` | List `pages/**/*.page.json` artifacts in a routing table — auth tier, capabilities, rendering shape, sibling-file flags. `--json` for machine-readable output. |
+| `forge components` | List `components/**/*.component.json` artifacts with prop counts (total + required), slot counts, behavior triggers, sibling-file flags. `--json` supported. |
+| `forge brand` | Print app-local branding overrides from `app.json` plus the emitted `:root { --brand-*: …; }` CSS-variable block. `--css-only` for piping into a stylesheet; `--json` for tooling. |
+| `forge branch new <name>` | Fork the active workspace's substrate snapshot into a new ephemeral workspace. Pass `--source <ws-id>` to choose the source. |
+| `forge branch list` | List ephemeral branches under the active tenant. `--source <ws-id>` filters by source workspace. |
+| `forge branch test <id>` | Run the standard build + test pipeline against an ephemeral branch. Surfaces a job-id for log polling. |
+| `forge branch promote <id> --yes` | Promote a branch's substrate back to its source workspace (destructive — requires `--yes`). |
+| `forge branch discard <id> --yes` | Destroy a branch and free its storage snapshot (destructive — requires `--yes`). |
+| `forge domain {add\|list\|status\|policy\|validate}` | Claim a hostname for the active tenant, poll ACME validation, update claim policy (Strict / Open). Operator path; requires `FORGE_CP_URL` + `FORGE_ADMIN_TOKEN`. |
 
 See `forge <command> --help` for the full flag set on any subcommand.
+
+### `forge dev` — inner-loop driver
+
+```sh
+forge dev                                    # default: watches cwd, 500ms debounce
+forge dev --project-dir my-app/              # override project root
+forge dev --debounce-ms 200                  # tighter debounce for fast typing
+forge dev --skip-initial                     # don't run an immediate deploy on startup
+```
+
+Watches `pages/`, `components/`, `src/`, `templates/`, `static/`, `app.json`, `service.json`. On change it shells out to the same `forge` binary it's running under (`current_exe()`), so child invocations match the parent CLI version. Ctrl-C exits cleanly.
+
+The static-upload step is best-effort: if the upload fails after a successful deploy, the watcher prints a warning and keeps running (the deploy itself already landed; assets become reachable on next upload).
+
+### `forge pages` / `forge components` / `forge brand`
+
+These are local-only inspection commands — they parse the on-disk substrate artifacts via `forge_schema::validate_*` and print a table. No runtime roundtrip; no `forge login` needed.
+
+```sh
+forge pages                                  # default: ./pages
+forge pages --project-dir ../shop-template/
+forge pages --json | jq '.[] | select(.auth == "admin")'
+
+forge components --json | jq '.[].name'
+
+forge brand                                  # human-readable + CSS block
+forge brand --css-only > brand.css           # pipe-friendly
+forge brand --json
+```
+
+Use these during migration from v1-style portals to the v0.10 substrate to confirm the manifest parses, every page route resolves, every prop schema validates, and the resolved brand cascade matches expectations before deploying.
+
+### `forge branch` — ephemeral workspace branches
+
+Direct-to-CP admin operations. Authentication mirrors `forge domain`:
+
+```sh
+export FORGE_CP_URL=https://cp.internal.forge.run
+export FORGE_ADMIN_TOKEN=…
+```
+
+Then:
+
+```sh
+forge branch new feature-x --source ws-abc123    # fork ws-abc123 → new ephemeral workspace
+forge branch list                                # all branches under the active tenant
+forge branch list --source ws-abc123             # filtered to one source
+forge branch test br-…                           # run build + tests against the branch
+forge branch promote br-… --yes                  # merge branch substrate → source (destructive)
+forge branch discard br-… --yes                  # destroy the branch snapshot
+```
+
+Branches are the agent CI/CD primitive: fork, run experimental changes, promote-or-discard. CP handlers return `501 not_implemented` until the substrate-snapshot work lands; the CLI surfaces the response verbatim so the substrate-pending state is visible.
+
+### `forge domain` — tenant domain claims
+
+```sh
+forge domain add shop.acme.example                                # claim + start ACME
+forge domain add '*.acme.example' --policy open                   # wildcard, open subdomain claims
+forge domain list                                                 # validated + pending
+forge domain status shop.acme.example                             # poll ACME state
+forge domain validate shop.acme.example                           # nudge validation (after DNS TXT)
+forge domain policy shop.acme.example open                        # flip claim policy
+```
+
+Same `FORGE_CP_URL` + `FORGE_ADMIN_TOKEN` env vars as `forge branch`.
 
 ## Global flags + env vars
 
