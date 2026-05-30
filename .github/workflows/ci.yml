@@ -33,6 +33,16 @@ jobs:
           token: ${{ secrets.FORGE_CROSS_REPO_TOKEN }}
           path: forge-sdk
 
+      # forge-cli has a `forge-schema = { path = "../forge-schema" }` dep —
+      # the schema crate must be checked out as a sibling or the build/test
+      # can't resolve it (this is why CI + release were both red).
+      - name: Checkout forge-schema
+        uses: actions/checkout@v4
+        with:
+          repository: forge-run/forge-schema
+          token: ${{ secrets.FORGE_CROSS_REPO_TOKEN }}
+          path: forge-schema
+
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:

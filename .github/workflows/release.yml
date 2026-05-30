@@ -49,8 +49,22 @@ jobs:
             runs_on: ubuntu-latest
             archive_os: linux
     steps:
-      - name: Checkout
+      # forge-cli has a `forge-schema = { path = "../forge-schema" }` dep,
+      # so the schema crate must be checked out as a SIBLING for the build
+      # to resolve. actions/checkout can't write outside $GITHUB_WORKSPACE,
+      # so we use the same nested layout as ci.yml (forge-cli + siblings as
+      # subdirs, build from `working-directory: forge-cli`).
+      - name: Checkout forge-cli
         uses: actions/checkout@v4
+        with:
+          path: forge-cli
+
+      - name: Checkout forge-schema
+        uses: actions/checkout@v4
+        with:
+          repository: forge-run/forge-schema
+          token: ${{ secrets.FORGE_CROSS_REPO_TOKEN }}
+          path: forge-schema
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -59,12 +73,15 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
         with:
+          workspaces: forge-cli
           key: ${{ matrix.target }}
 
       - name: Build release binary
+        working-directory: forge-cli
         run: cargo build --release --locked --target ${{ matrix.target }} --bin forge
 
       - name: Package
+        working-directory: forge-cli
         shell: bash
         run: |
           set -euo pipefail
@@ -87,7 +104,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: forge-${{ matrix.target }}
-          path: dist/forge-*.tar.gz*
+          # dist/ now lives under forge-cli/ (nested checkout layout).
+          path: forge-cli/dist/forge-*.tar.gz*
           retention-days: 1
 
   release:
