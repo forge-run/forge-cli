@@ -167,6 +167,22 @@ fn manifest_artifact(path: impl Into<String>, kind: &str, bytes: &[u8]) -> serde
     })
 }
 
+/// Like [`manifest_artifact`] but also carries the verbatim source so the
+/// deploy-history surface can compute a *semantic* diff (which op / route
+/// / RLS / branding key changed inside the file). Only used for the small
+/// structured manifests (app.json, service.json) — wasm/static stay
+/// hash-only via [`manifest_artifact`].
+fn manifest_artifact_with_content(path: impl Into<String>, kind: &str, bytes: &[u8]) -> serde_json::Value {
+    let mut a = manifest_artifact(path, kind, bytes);
+    if let Some(obj) = a.as_object_mut() {
+        obj.insert(
+            "content".into(),
+            serde_json::Value::String(String::from_utf8_lossy(bytes).into_owned()),
+        );
+    }
+    a
+}
+
 pub async fn run(args: DeployArgs, client: &ForgeClient) -> Result<()> {
     let manifest_bytes = std::fs::read(&args.manifest)
         .with_context(|| format!("reading manifest {}", args.manifest.display()))?;
@@ -260,7 +276,7 @@ pub async fn run(args: DeployArgs, client: &ForgeClient) -> Result<()> {
     // no-op detection). Path scheme: `wasm:<ns>::<name>` for modules,
     // `service.json` for the manifest — stable keys the diff joins on.
     manifest_artifacts.extend(wasm_artifacts);
-    manifest_artifacts.push(manifest_artifact("service.json", "service_manifest", &manifest_bytes));
+    manifest_artifacts.push(manifest_artifact_with_content("service.json", "service_manifest", &manifest_bytes));
     // Deterministic order so the manifest row-set is stable across runs
     // (the diff joins on `path`, but a stable order keeps the stored
     // rows + any human-facing dump reproducible).
@@ -386,7 +402,7 @@ async fn build_app_bundle(args: &DeployArgs) -> Result<(serde_json::Value, Vec<s
     // ── app.json ───────────────────────────────────────────────
     let app_bytes = std::fs::read(app_path)
         .with_context(|| format!("reading app manifest {}", app_path.display()))?;
-    artifacts.push(manifest_artifact("app.json", "app_manifest", &app_bytes));
+    artifacts.push(manifest_artifact_with_content("app.json", "app_manifest", &app_bytes));
     let app_manifest: forge_schema::AppManifest = serde_json::from_slice(&app_bytes)
         .with_context(|| format!("parsing app manifest {}", app_path.display()))?;
     let errors = forge_schema::validate_app_manifest(&app_manifest);
