@@ -173,12 +173,25 @@ fn manifest_artifact(path: impl Into<String>, kind: &str, bytes: &[u8]) -> serde
 /// structured manifests (app.json, service.json) — wasm/static stay
 /// hash-only via [`manifest_artifact`].
 fn manifest_artifact_with_content(path: impl Into<String>, kind: &str, bytes: &[u8]) -> serde_json::Value {
-    let mut a = manifest_artifact(path, kind, bytes);
+    manifest_artifact_with_explicit_content(path, kind, bytes, &String::from_utf8_lossy(bytes))
+}
+
+/// Like [`manifest_artifact_with_content`] but lets the persisted `content`
+/// differ from the hashed bytes. Used for pages: the `content_hash` covers
+/// the full logical unit (page.json + template + css) so any edit re-hashes
+/// and shows in the file diff, while the stored `content` is just the small
+/// page.json manifest — enough for the services/pages navigator + the
+/// op↔page binding graph to introspect a page's route, auth tier, and the
+/// ops it consumes, without bloating the manifest table with template+css.
+fn manifest_artifact_with_explicit_content(
+    path: impl Into<String>,
+    kind: &str,
+    hash_bytes: &[u8],
+    content: &str,
+) -> serde_json::Value {
+    let mut a = manifest_artifact(path, kind, hash_bytes);
     if let Some(obj) = a.as_object_mut() {
-        obj.insert(
-            "content".into(),
-            serde_json::Value::String(String::from_utf8_lossy(bytes).into_owned()),
-        );
+        obj.insert("content".into(), serde_json::Value::String(content.to_string()));
     }
     a
 }
@@ -463,10 +476,18 @@ async fn build_app_bundle(args: &DeployArgs) -> Result<(serde_json::Value, Vec<s
     // build-hashed CSS already encodes its content in the filename, but
     // hashing the bytes is the canonical, uniform form).
     for page in &pages {
-        artifacts.push(manifest_artifact(
+        // Hash the full logical unit (json+html+css) so any edit re-hashes
+        // and shows in the deploy diff; persist only the small page.json
+        // manifest as `content` for the services/pages navigator's route +
+        // auth + op-binding introspection.
+        let unit = logical_unit_bytes(&page.manifest, &page.template_body, &page.css_body)?;
+        let page_json =
+            serde_json::to_string(&page.manifest).context("serialize page manifest for content")?;
+        artifacts.push(manifest_artifact_with_explicit_content(
             format!("pages/{}.page", page.name),
             "page",
-            &logical_unit_bytes(&page.manifest, &page.template_body, &page.css_body)?,
+            &unit,
+            &page_json,
         ));
     }
     for component in &components {
