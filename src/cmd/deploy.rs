@@ -153,6 +153,20 @@ fn git_context(dir: &std::path::Path) -> (Option<String>, Option<String>, Option
     (branch, head_sha, ahead)
 }
 
+/// blake3-hash an artifact's bytes into a manifest row:
+/// `{path, content_hash, size, kind}`. The content-addressing primitive
+/// the deploy-history diff is built on — an unchanged artifact across
+/// deploys keeps the same hash, so diffing two deploys reduces to a set
+/// difference over their `(path, content_hash)` pairs.
+fn manifest_artifact(path: impl Into<String>, kind: &str, bytes: &[u8]) -> serde_json::Value {
+    serde_json::json!({
+        "path": path.into(),
+        "content_hash": blake3::hash(bytes).to_hex().to_string(),
+        "size": bytes.len() as i64,
+        "kind": kind,
+    })
+}
+
 pub async fn run(args: DeployArgs, client: &ForgeClient) -> Result<()> {
     let manifest_bytes = std::fs::read(&args.manifest)
         .with_context(|| format!("reading manifest {}", args.manifest.display()))?;
@@ -180,6 +194,9 @@ pub async fn run(args: DeployArgs, client: &ForgeClient) -> Result<()> {
         .collect();
 
     let mut wasm_modules = Vec::with_capacity(manifest.wasm_modules.len());
+    // Content-addressed manifest rows for the wasm modules, collected
+    // as each module's final (Component-wrapped) bytes are resolved.
+    let mut wasm_artifacts: Vec<serde_json::Value> = Vec::with_capacity(manifest.wasm_modules.len());
     for entry in &manifest.wasm_modules {
         let resolved = wasm_by_name
             .get(&entry.service_name)
@@ -212,6 +229,13 @@ pub async fn run(args: DeployArgs, client: &ForgeClient) -> Result<()> {
             crate::cmd::build::wrap_as_component(&bytes)
                 .with_context(|| format!("wit-component wrap of {}", resolved.display()))?
         };
+        // Hash the final (post-wrap) bytes — the exact content the
+        // runtime stores — before `bytes` moves into the payload.
+        wasm_artifacts.push(manifest_artifact(
+            format!("wasm:{}::{}", entry.service_namespace, entry.service_name),
+            "wasm",
+            &bytes,
+        ));
         wasm_modules.push(serde_json::json!({
             "service_namespace": entry.service_namespace,
             "service_name": entry.service_name,
@@ -223,19 +247,39 @@ pub async fn run(args: DeployArgs, client: &ForgeClient) -> Result<()> {
     // `--app-manifest` is set, validate the app.json + every
     // page.json + component.json before upload. Aborts on any
     // validation error so a bad bundle never reaches the
-    // runtime's ingest path.
-    let app_bundle = build_app_bundle(&args).await?;
+    // runtime's ingest path. The second tuple element is the
+    // content-addressed manifest rows for the bundle's artifacts
+    // (app.json + pages + components + static assets).
+    let (app_bundle, mut manifest_artifacts) = build_app_bundle(&args).await?;
+
+    // Manifest-as-unit-of-deploy — fold the wasm + service-manifest
+    // artifacts into the bundle's artifact set. The runtime persists the
+    // whole set to `_deployment_manifests` keyed on the deploy id, so the
+    // deploy-history surface can diff two deploys by their (path,
+    // content_hash) row-sets (file / logical-unit / semantic diff +
+    // no-op detection). Path scheme: `wasm:<ns>::<name>` for modules,
+    // `service.json` for the manifest — stable keys the diff joins on.
+    manifest_artifacts.extend(wasm_artifacts);
+    manifest_artifacts.push(manifest_artifact("service.json", "service_manifest", &manifest_bytes));
+    // Deterministic order so the manifest row-set is stable across runs
+    // (the diff joins on `path`, but a stable order keeps the stored
+    // rows + any human-facing dump reproducible).
+    manifest_artifacts.sort_by(|a, b| {
+        a.get("path").and_then(|p| p.as_str()).unwrap_or("")
+            .cmp(b.get("path").and_then(|p| p.as_str()).unwrap_or(""))
+    });
 
     // Git provenance for the deploy record (branch / sha / commits-ahead).
     // The runtime pulls these off the body before the strict decode.
     let (git_branch, git_sha, git_ahead) = git_context(&manifest_dir);
 
     // Git provenance — the runtime strips these from the body before its
-    // strict DeployServicesRequest decode. branch/head_sha are accepted
-    // by the live runtime today; commits_ahead_main is gated behind
-    // SEND_COMMITS_AHEAD until the runtime that strips it ships (an
-    // unmodelled key — even null — would fail the old runtime's decode).
-    const SEND_COMMITS_AHEAD: bool = false;
+    // strict DeployServicesRequest decode. branch/head_sha + the manifest
+    // are accepted by forge-runtime ≥ v0.32.44; commits_ahead_main ships
+    // in the same runtime, so SEND_COMMITS_AHEAD flips true in lockstep.
+    // (An unmodelled key — even null — would fail an older runtime's
+    // decode, which is why it was gated.)
+    const SEND_COMMITS_AHEAD: bool = true;
     let mut payload = serde_json::json!({
         "services": manifest.services,
         "wasm_modules": wasm_modules,
@@ -246,6 +290,12 @@ pub async fn run(args: DeployArgs, client: &ForgeClient) -> Result<()> {
         "app_bundle": app_bundle,
         "branch": git_branch,
         "head_sha": git_sha,
+        // Manifest-as-unit-of-deploy — content-addressed artifact set.
+        // forge-runtime ≥ v0.32.44 strips this before the strict decode
+        // and writes it to `_deployment_manifests` on a successful
+        // deploy. The strict decode rejects unknown keys, so this CLI
+        // requires that runtime (same release as commits_ahead_main).
+        "manifest": manifest_artifacts,
     });
     if SEND_COMMITS_AHEAD {
         if let Some(obj) = payload.as_object_mut() {
@@ -318,18 +368,25 @@ fn map_err(e: ForgeError) -> anyhow::Error {
 /// Aborts the deploy when any validation fails — the runtime's
 /// ingest path trusts the CLI for substrate validation, so a
 /// bad bundle here would mean a runtime hard-fail mid-ingest.
-async fn build_app_bundle(args: &DeployArgs) -> Result<serde_json::Value> {
+async fn build_app_bundle(args: &DeployArgs) -> Result<(serde_json::Value, Vec<serde_json::Value>)> {
     let Some(app_path) = args.app_manifest.as_ref() else {
-        return Ok(serde_json::Value::Null);
+        return Ok((serde_json::Value::Null, Vec::new()));
     };
     let app_dir = app_path
         .parent()
         .map(|p| p.to_path_buf())
         .unwrap_or_else(|| PathBuf::from("."));
 
+    // Content-addressed manifest rows for every bundle artifact —
+    // app.json + each page (json+html+css as one logical unit) + each
+    // component + every static asset. Returned alongside the bundle so
+    // the runtime can persist them to `_deployment_manifests`.
+    let mut artifacts: Vec<serde_json::Value> = Vec::new();
+
     // ── app.json ───────────────────────────────────────────────
     let app_bytes = std::fs::read(app_path)
         .with_context(|| format!("reading app manifest {}", app_path.display()))?;
+    artifacts.push(manifest_artifact("app.json", "app_manifest", &app_bytes));
     let app_manifest: forge_schema::AppManifest = serde_json::from_slice(&app_bytes)
         .with_context(|| format!("parsing app manifest {}", app_path.display()))?;
     let errors = forge_schema::validate_app_manifest(&app_manifest);
@@ -383,7 +440,29 @@ async fn build_app_bundle(args: &DeployArgs) -> Result<serde_json::Value> {
         anyhow::bail!("tenant_claims validation failed: {err}");
     }
 
-    Ok(serde_json::json!({
+    // Manifest rows for the bundle's logical units. A "page" is three
+    // sibling files (json + html + css) deployed as one unit, so its
+    // content hash covers all three — an edit to any one re-hashes the
+    // page. Same for components. Static assets hash per-file (the
+    // build-hashed CSS already encodes its content in the filename, but
+    // hashing the bytes is the canonical, uniform form).
+    for page in &pages {
+        artifacts.push(manifest_artifact(
+            format!("pages/{}.page", page.name),
+            "page",
+            &logical_unit_bytes(&page.manifest, &page.template_body, &page.css_body)?,
+        ));
+    }
+    for component in &components {
+        artifacts.push(manifest_artifact(
+            format!("components/{}.component", component.name),
+            "component",
+            &logical_unit_bytes(&component.manifest, &component.template_body, &component.css_body)?,
+        ));
+    }
+    collect_static_artifacts(&app_dir, &mut artifacts)?;
+
+    let bundle = serde_json::json!({
         "app_manifest": app_manifest,
         "pages": pages,
         "components": components,
@@ -392,7 +471,63 @@ async fn build_app_bundle(args: &DeployArgs) -> Result<serde_json::Value> {
         // Carries `<link rel="stylesheet">` + vendor / app JS tags
         // based on the build-time hashed bundle hrefs.
         "head_extras": head_extras,
-    }))
+    });
+    Ok((bundle, artifacts))
+}
+
+/// Canonical byte sequence for a logical unit (page / component) made
+/// of a manifest struct + sibling template + css. Serializes the
+/// manifest deterministically (serde struct field order is fixed) and
+/// length-delimits the three parts so two units can't collide by
+/// shifting bytes across the template/css boundary.
+fn logical_unit_bytes<M: serde::Serialize>(
+    manifest: &M,
+    template_body: &str,
+    css_body: &str,
+) -> Result<Vec<u8>> {
+    let manifest_json = serde_json::to_vec(manifest).context("serialize logical-unit manifest")?;
+    let mut buf = Vec::with_capacity(manifest_json.len() + template_body.len() + css_body.len() + 24);
+    for part in [
+        manifest_json.as_slice(),
+        template_body.as_bytes(),
+        css_body.as_bytes(),
+    ] {
+        buf.extend_from_slice(&(part.len() as u64).to_le_bytes());
+        buf.extend_from_slice(part);
+    }
+    Ok(buf)
+}
+
+/// Hash every file under `static/` into the manifest. Static assets
+/// (hashed CSS, favicon, vendor JS, images) are part of the deployed
+/// surface — a CSS change that re-hashes the bundle should show up in
+/// the deploy diff even when no page/component/wasm changed. Walks
+/// recursively; the path key is the slash-joined path relative to
+/// `app_dir` (e.g. `static/app.ab12cd.css`). Missing dir is benign.
+fn collect_static_artifacts(
+    app_dir: &std::path::Path,
+    artifacts: &mut Vec<serde_json::Value>,
+) -> Result<()> {
+    let static_dir = app_dir.join("static");
+    if !static_dir.exists() {
+        return Ok(());
+    }
+    for entry in walkdir::WalkDir::new(&static_dir).follow_links(false) {
+        let entry = entry.with_context(|| format!("walking {}", static_dir.display()))?;
+        let path = entry.path();
+        if !path.is_file() {
+            continue;
+        }
+        let rel = path.strip_prefix(app_dir).unwrap_or(path);
+        let key = rel
+            .components()
+            .filter_map(|c| c.as_os_str().to_str())
+            .collect::<Vec<_>>()
+            .join("/");
+        let bytes = std::fs::read(path).with_context(|| format!("read {}", path.display()))?;
+        artifacts.push(manifest_artifact(key, "static_asset", &bytes));
+    }
+    Ok(())
 }
 
 /// Phase F gap #2 — build a head_extras string from the project's

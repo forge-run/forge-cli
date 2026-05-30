@@ -1,6 +1,6 @@
 [package]
 name = "forge-cli"
-version = "0.2.10"
+version = "0.2.11"
 edition = "2024"
 publish = false
 license = "MIT OR Apache-2.0"
@@ -28,6 +28,12 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", default-features = false, features = ["env-filter", "fmt"] }
 walkdir = "2.5.0"
 base64 = "0.22.1"
+# Manifest-as-unit-of-deploy — content-address every deployed
+# artifact (wasm / page / component / manifest / static asset) so the
+# deploy-history surface can diff two deploys by their (path,
+# content_hash) row-sets. blake3 is the substrate's existing CAS hash
+# (forge-storage snapshot.rs); reuse it for a consistent primitive.
+blake3 = "1"
 # Phase E.4 — minimal regex for cross-validating component()
 # invocations in template bodies before deploy. `default-features
 # = false` drops unicode tables (~250KB) we don't need for our
