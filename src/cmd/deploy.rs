@@ -126,6 +126,33 @@ struct DeployAppBundleSummary {
     components: usize,
 }
 
+/// Best-effort git provenance for the deploy source directory. Shells
+/// out to `git` (no extra dep); returns (branch, head_sha,
+/// commits_ahead_of_default). All None when it isn't a git repo or git
+/// is unavailable — the deploy still proceeds, the row just records null.
+fn git_context(dir: &std::path::Path) -> (Option<String>, Option<String>, Option<i64>) {
+    fn git(dir: &std::path::Path, args: &[&str]) -> Option<String> {
+        let out = std::process::Command::new("git")
+            .arg("-C")
+            .arg(dir)
+            .args(args)
+            .output()
+            .ok()?;
+        if !out.status.success() {
+            return None;
+        }
+        let s = String::from_utf8_lossy(&out.stdout).trim().to_string();
+        (!s.is_empty()).then_some(s)
+    }
+    let branch = git(dir, &["rev-parse", "--abbrev-ref", "HEAD"]);
+    let head_sha = git(dir, &["rev-parse", "HEAD"]);
+    // Commits on HEAD not on the default branch (0 when on main/master).
+    let ahead = git(dir, &["rev-list", "--count", "main..HEAD"])
+        .or_else(|| git(dir, &["rev-list", "--count", "master..HEAD"]))
+        .and_then(|s| s.parse::<i64>().ok());
+    (branch, head_sha, ahead)
+}
+
 pub async fn run(args: DeployArgs, client: &ForgeClient) -> Result<()> {
     let manifest_bytes = std::fs::read(&args.manifest)
         .with_context(|| format!("reading manifest {}", args.manifest.display()))?;
@@ -199,7 +226,17 @@ pub async fn run(args: DeployArgs, client: &ForgeClient) -> Result<()> {
     // runtime's ingest path.
     let app_bundle = build_app_bundle(&args).await?;
 
-    let payload = serde_json::json!({
+    // Git provenance for the deploy record (branch / sha / commits-ahead).
+    // The runtime pulls these off the body before the strict decode.
+    let (git_branch, git_sha, git_ahead) = git_context(&manifest_dir);
+
+    // Git provenance — the runtime strips these from the body before its
+    // strict DeployServicesRequest decode. branch/head_sha are accepted
+    // by the live runtime today; commits_ahead_main is gated behind
+    // SEND_COMMITS_AHEAD until the runtime that strips it ships (an
+    // unmodelled key — even null — would fail the old runtime's decode).
+    const SEND_COMMITS_AHEAD: bool = false;
+    let mut payload = serde_json::json!({
         "services": manifest.services,
         "wasm_modules": wasm_modules,
         // Phase E.4 — extended bundle shape. forge-runtime's
@@ -207,7 +244,14 @@ pub async fn run(args: DeployArgs, client: &ForgeClient) -> Result<()> {
         // when present; legacy deploys (no app.json) omit it
         // and the runtime skips the new ingest path.
         "app_bundle": app_bundle,
+        "branch": git_branch,
+        "head_sha": git_sha,
     });
+    if SEND_COMMITS_AHEAD {
+        if let Some(obj) = payload.as_object_mut() {
+            obj.insert("commits_ahead_main".into(), serde_json::json!(git_ahead));
+        }
+    }
 
     let resp: DeployResponse = client
         .post_json("/api/v1/manage/wasm/deploy", &payload)
