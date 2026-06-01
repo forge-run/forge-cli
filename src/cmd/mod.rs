@@ -13,6 +13,7 @@ pub mod logout;
 pub mod logs;
 pub mod new;
 pub mod schema;
+pub mod ship;
 pub mod sso;
 pub mod static_cmd;
 pub mod tenant;

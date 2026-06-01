@@ -95,6 +95,12 @@ enum Cmd {
     /// workspace.
     Deploy(cmd::deploy::DeployArgs),
 
+    /// Upload static assets, THEN deploy — in the correct order, from one
+    /// command. Use this instead of running `static upload` and `deploy`
+    /// separately: deploying first can leave the edge caching a 404 for a
+    /// freshly-hashed asset URL.
+    Ship(cmd::ship::ShipArgs),
+
     /// Tail recent request log entries from the workspace.
     Logs(cmd::logs::LogsArgs),
 
@@ -206,6 +212,11 @@ async fn main() -> Result<()> {
             let cfg = config::resolve(cli.base_url, cli.token, cli.profile)?;
             let client = client::ForgeClient::new(cfg)?;
             cmd::deploy::run(d, &client).await
+        }
+        Cmd::Ship(s) => {
+            let cfg = config::resolve(cli.base_url, cli.token, cli.profile)?;
+            let client = client::ForgeClient::new(cfg)?;
+            cmd::ship::run(s, &client).await
         }
         Cmd::New(args) => cmd::new::run(args).await,
         Cmd::Static(s) => {
