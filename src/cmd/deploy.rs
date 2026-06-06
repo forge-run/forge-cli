@@ -1027,13 +1027,14 @@ mod app_bundle_tests {
             pages_dir: None,
             components_dir: None,
             json: false,
+            allow_app_replace: false,
         }
     }
 
     #[tokio::test]
     async fn missing_app_manifest_returns_null_bundle() {
         let args = deploy_args(None);
-        let bundle = build_app_bundle(&args).await.unwrap();
+        let (bundle, _) = build_app_bundle(&args).await.unwrap();
         assert!(bundle.is_null());
     }
 
@@ -1053,7 +1054,7 @@ mod app_bundle_tests {
             }"#,
         );
         let args = deploy_args(Some(app_path.clone()));
-        let bundle = build_app_bundle(&args).await.expect("valid");
+        let (bundle, _) = build_app_bundle(&args).await.expect("valid");
         assert_eq!(bundle["app_manifest"]["app"]["name"], "hello");
         assert_eq!(bundle["pages"].as_array().unwrap().len(), 0);
         assert_eq!(bundle["components"].as_array().unwrap().len(), 0);
@@ -1143,7 +1144,7 @@ mod app_bundle_tests {
         );
         write(tmp.path(), "components/card.component.html", "<div></div>");
         let args = deploy_args(Some(tmp.path().join("app.json")));
-        let bundle = build_app_bundle(&args).await.expect("valid");
+        let (bundle, _) = build_app_bundle(&args).await.expect("valid");
         let pages = bundle["pages"].as_array().unwrap();
         assert_eq!(pages.len(), 1);
         assert_eq!(pages[0]["name"], "landing");
@@ -1221,7 +1222,7 @@ mod app_bundle_tests {
             r#"<div>{{ component('@forge/card', {title: 'hi'}) }}</div>"#,
         );
         let args = deploy_args(Some(tmp.path().join("app.json")));
-        let bundle = build_app_bundle(&args).await.expect("valid");
+        let (bundle, _) = build_app_bundle(&args).await.expect("valid");
         assert_eq!(bundle["app_manifest"]["app"]["name"], "hello");
     }
 }
