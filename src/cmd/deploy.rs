@@ -74,6 +74,14 @@ pub struct DeployArgs {
     /// Print the response as JSON instead of human-friendly text.
     #[arg(long)]
     json: bool,
+
+    /// Override the runtime's app-identity admission gate to REPLACE the
+    /// workspace's current app with a different one (a different `app.name`).
+    /// Off by default: the runtime rejects a mismatched-app deploy with a 409
+    /// because it's almost always a mis-targeted deploy. Set this ONLY for an
+    /// intentional app replacement.
+    #[arg(long)]
+    allow_app_replace: bool,
 }
 
 /// Manifest shape on disk. `wasm_bytes` is OMITTED in the file —
@@ -329,6 +337,11 @@ pub async fn run(args: DeployArgs, client: &ForgeClient) -> Result<()> {
     if SEND_COMMITS_AHEAD {
         if let Some(obj) = payload.as_object_mut() {
             obj.insert("commits_ahead_main".into(), serde_json::json!(git_ahead));
+        }
+    }
+    if args.allow_app_replace {
+        if let Some(obj) = payload.as_object_mut() {
+            obj.insert("allow_app_identity_change".into(), serde_json::json!(true));
         }
     }
 
