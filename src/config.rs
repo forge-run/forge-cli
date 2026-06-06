@@ -180,63 +180,12 @@ pub fn resolve(
     // Federated mode first: the home config holds the portal
     // session, project config can't override it (the portal is
     // user-laptop state, not repo state).
-    let portal_entry = home.as_ref().and_then(|c| c.portal.as_ref()).cloned();
-    let current_entry = home.as_ref().and_then(|c| c.current.as_ref()).cloned();
-
-    if let Some(portal) = portal_entry {
-        let portal_session = PortalSession {
-            base_url: portal.base_url.trim_end_matches('/').to_string(),
-            bearer: portal.bearer,
-            refresh_token: portal.refresh_token,
-            email: portal.email,
-        };
-        // Workspace selection: --base-url + --token override
-        // [current] selection; otherwise read [current].workspace_id.
-        let selected_ws = cli_base_url
-            .as_ref()
-            .and(cli_token.as_ref())
-            .map(|_| None) // both flags present → treat as direct override
-            .unwrap_or_else(|| current_entry.as_ref().and_then(|c| c.workspace_id.clone()));
-
-        if let (Some(bu), Some(tok)) = (cli_base_url.clone(), cli_token.clone()) {
-            // Explicit override — use the supplied bearer but still
-            // pass the portal session along so the client can refresh
-            // if the explicit bearer 401s and the operator happens to
-            // be targeting [current].workspace_id.
-            return Ok(ResolvedConfig {
-                base_url: bu.trim_end_matches('/').to_string(),
-                token: tok,
-                portal: Some(portal_session),
-                workspace_id: current_entry.as_ref().and_then(|c| c.workspace_id.clone()),
-            });
+    if let Some(home) = home.as_ref() {
+        if home.portal.is_some() {
+            // Pure resolution lives in `resolve_federated` so it's unit-
+            // testable without touching disk.
+            return resolve_federated(home, cli_base_url, cli_token);
         }
-
-        let workspace_id = selected_ws.ok_or_else(|| {
-            anyhow::anyhow!(
-                "federated mode: no workspace selected. Run `forge ws use <workspace_id>` or pass \
-             both --base-url and --token to override.",
-            )
-        })?;
-        let cache_entry = home
-            .as_ref()
-            .and_then(|c| c.cache.workspaces.get(&workspace_id))
-            .cloned();
-        let (base_url, token) = match cache_entry {
-            Some(e) => (e.api_url.trim_end_matches('/').to_string(), e.bearer),
-            None => {
-                // No cache yet — derive the conventional URL and
-                // let the 401-retry mint on first request. Empty
-                // token works because every request will 401.
-                let derived = format!("https://{workspace_id}.forge.run");
-                (derived, String::new())
-            }
-        };
-        return Ok(ResolvedConfig {
-            base_url,
-            token,
-            portal: Some(portal_session),
-            workspace_id: Some(workspace_id),
-        });
     }
 
     // Direct mode (legacy). Pick the profile to read defaults
@@ -275,6 +224,177 @@ pub fn resolve(
         token,
         portal: None,
         workspace_id: None,
+    })
+}
+
+/// Pure federated-mode resolution. Operates on an already-loaded home
+/// `ConfigFile` whose `[portal]` section is present (caller checks).
+/// Split out of [`resolve`] so the `--base-url` precedence rules can be
+/// unit-tested without writing `~/.forge/config.toml`.
+///
+/// Precedence (highest first):
+/// 1. `--base-url` + `--token` → full direct override (use both).
+/// 2. `--base-url` alone → request goes to the typed URL, NEVER the
+///    active workspace's cached api_url. A cached bearer is reused only
+///    when its api_url host matches the typed URL; otherwise the token
+///    is empty and the client's 401-retry mints fresh (when the host
+///    maps to a known workspace) or surfaces a plain 401.
+/// 3. neither → fall back to `[current].workspace_id` + its cache.
+fn resolve_federated(
+    home: &ConfigFile,
+    cli_base_url: Option<String>,
+    cli_token: Option<String>,
+) -> Result<ResolvedConfig> {
+    let portal = home.portal.as_ref().expect("caller checked portal present");
+    let portal_session = PortalSession {
+        base_url: portal.base_url.trim_end_matches('/').to_string(),
+        bearer: portal.bearer.clone(),
+        refresh_token: portal.refresh_token.clone(),
+        email: portal.email.clone(),
+    };
+    let current_ws = home.current.as_ref().and_then(|c| c.workspace_id.clone());
+
+    // (1) Explicit --base-url + --token: full direct override.
+    if let (Some(bu), Some(tok)) = (cli_base_url.clone(), cli_token) {
+        let base_url = bu.trim_end_matches('/').to_string();
+        // Only carry workspace_id (the federation target) when the
+        // override URL actually points at that workspace's host —
+        // otherwise a 401 would re-mint a bearer for the WRONG host.
+        let workspace_id = workspace_for_target(&base_url, current_ws.as_deref(), Some(home));
+        return Ok(ResolvedConfig {
+            base_url,
+            token: tok,
+            portal: Some(portal_session),
+            workspace_id,
+        });
+    }
+
+    // (2) Explicit --base-url WITHOUT --token. The flag MUST take
+    // precedence over the active workspace's cached api_url — never
+    // silently redirect the request to [current]'s host. We also must
+    // NOT attach a cached bearer scoped to a *different* host; reuse the
+    // cache only when its api_url host matches the typed URL, otherwise
+    // start tokenless and let the 401-retry mint fresh against the
+    // matching workspace (or surface a plain 401 if none matches).
+    if let Some(bu) = cli_base_url {
+        let base_url = bu.trim_end_matches('/').to_string();
+        let target_ws = workspace_for_target(&base_url, current_ws.as_deref(), Some(home));
+
+        // Reuse the cached bearer only if it belongs to this host.
+        let token = target_ws
+            .as_ref()
+            .and_then(|wid| home.cache.workspaces.get(wid))
+            .filter(|e| same_host(&e.api_url, &base_url))
+            .map(|e| e.bearer.clone())
+            .unwrap_or_default();
+
+        // Observability: if the typed URL overrode the active
+        // workspace's cached api_url, say so on stderr so the operator
+        // can see the request isn't going to [current].
+        if let Some(cur) = current_ws.as_deref() {
+            let active_host = home
+                .cache
+                .workspaces
+                .get(cur)
+                .map(|e| e.api_url.trim_end_matches('/').to_string())
+                .unwrap_or_else(|| format!("https://{cur}.forge.run"));
+            if !same_host(&active_host, &base_url) {
+                eprintln!(
+                    "note: --base-url ({base_url}) overrides active workspace {cur} \
+                     ({active_host}); request goes to --base-url.",
+                );
+            }
+        }
+
+        return Ok(ResolvedConfig {
+            base_url,
+            token,
+            portal: Some(portal_session),
+            workspace_id: target_ws,
+        });
+    }
+
+    // (3) No explicit --base-url: fall back to the active workspace.
+    let workspace_id = current_ws.ok_or_else(|| {
+        anyhow::anyhow!(
+            "federated mode: no workspace selected. Run `forge ws use <workspace_id>` or pass \
+             both --base-url and --token to override.",
+        )
+    })?;
+    let cache_entry = home.cache.workspaces.get(&workspace_id).cloned();
+    let (base_url, token) = match cache_entry {
+        Some(e) => (e.api_url.trim_end_matches('/').to_string(), e.bearer),
+        None => {
+            // No cache yet — derive the conventional URL and let the
+            // 401-retry mint on first request. Empty token works
+            // because every request will 401.
+            let derived = format!("https://{workspace_id}.forge.run");
+            (derived, String::new())
+        }
+    };
+    Ok(ResolvedConfig {
+        base_url,
+        token,
+        portal: Some(portal_session),
+        workspace_id: Some(workspace_id),
+    })
+}
+
+/// Compare two URLs by scheme + host + port, ignoring path / trailing
+/// slash / case. Used to decide whether an explicit `--base-url` points
+/// at the same edge as a cached workspace bearer (so the bearer is safe
+/// to reuse) — never reuse one host's credential against another.
+fn same_host(a: &str, b: &str) -> bool {
+    fn origin(u: &str) -> String {
+        let s = u.trim();
+        // Strip scheme.
+        let after_scheme = match s.find("://") {
+            Some(i) => &s[i + 3..],
+            None => s,
+        };
+        // Authority is everything up to the first '/'.
+        let authority = after_scheme.split('/').next().unwrap_or("");
+        // Keep scheme so http vs https don't collide.
+        let scheme = match s.find("://") {
+            Some(i) => &s[..i],
+            None => "",
+        };
+        format!("{}://{}", scheme.to_ascii_lowercase(), authority.to_ascii_lowercase())
+    }
+    origin(a) == origin(b)
+}
+
+/// Given an explicit target `base_url`, decide which (if any) cached
+/// workspace it corresponds to — for the purpose of carrying a
+/// federation `workspace_id` that a 401-retry can mint against. We only
+/// return a workspace whose host actually matches the target:
+///
+/// - If the active `[current]` workspace's host (cached api_url, or the
+///   conventional `https://<wid>.forge.run`) matches → that workspace.
+/// - Else, scan the cache for any workspace whose api_url matches.
+/// - Else `None` — the target is an unrelated host; federation would
+///   mint for the wrong workspace, so we carry no workspace and let a
+///   401 surface plainly (operator must pass --token).
+fn workspace_for_target(
+    base_url: &str,
+    current_ws: Option<&str>,
+    home: Option<&ConfigFile>,
+) -> Option<String> {
+    if let Some(cur) = current_ws {
+        let cached = home
+            .and_then(|c| c.cache.workspaces.get(cur))
+            .map(|e| e.api_url.clone());
+        let cur_host = cached.unwrap_or_else(|| format!("https://{cur}.forge.run"));
+        if same_host(&cur_host, base_url) {
+            return Some(cur.to_string());
+        }
+    }
+    home.and_then(|c| {
+        c.cache
+            .workspaces
+            .iter()
+            .find(|(_, e)| same_host(&e.api_url, base_url))
+            .map(|(wid, _)| wid.clone())
     })
 }
 
@@ -655,5 +775,148 @@ token = "fr_u_legacy"
         let cfg: ConfigFile = toml::from_str(toml_str).unwrap();
         assert!(cfg.portal.is_some());
         assert!(cfg.profile.contains_key("scratch"));
+    }
+
+    /// A federated config with an active `[current]` workspace and a
+    /// cached bearer for it. The portal points at app.forge.run; the
+    /// active workspace's cached api_url is the portal host (the exact
+    /// shape that caused the production incident — `[current]` is the
+    /// portal workspace).
+    fn incident_shaped_config() -> ConfigFile {
+        let toml_str = r#"
+config_version = 2
+
+[portal]
+base_url = "https://app.forge.run"
+bearer = "fr_u_portal"
+
+[current]
+tenant_id = "00000000-0000-0000-0000-000000000000"
+workspace_id = "ws-portal01"
+
+[cache.workspaces."ws-portal01"]
+api_url = "https://app.forge.run"
+bearer = "fr_f_portal_cached"
+expires_at = "2099-01-01T00:00:00Z"
+"#;
+        toml::from_str(toml_str).unwrap()
+    }
+
+    /// THE REGRESSION GUARD. An explicit `--base-url` pointing at a
+    /// DIFFERENT host than the active `[current]` workspace must:
+    ///   - send the request to the typed URL (not the cached api_url), and
+    ///   - NOT attach the cached bearer scoped to the portal workspace.
+    /// Previously `--base-url` alone was silently ignored and the
+    /// request (with the portal bearer) hit the portal workspace.
+    #[test]
+    fn explicit_base_url_overrides_cached_current_and_drops_mismatched_bearer() {
+        let cfg = incident_shaped_config();
+        let resolved = resolve_federated(
+            &cfg,
+            Some("https://ws-target99.forge.run".to_string()),
+            None,
+        )
+        .unwrap();
+
+        // 1. Request goes to the typed URL, NOT the cached portal api_url.
+        assert_eq!(resolved.base_url, "https://ws-target99.forge.run");
+        assert_ne!(resolved.base_url, "https://app.forge.run");
+
+        // 2. The portal-scoped cached bearer must NOT be reused against
+        //    the unrelated target host.
+        assert_eq!(resolved.token, "");
+        assert_ne!(resolved.token, "fr_f_portal_cached");
+
+        // 3. No workspace maps to the typed host, so no federation
+        //    target is carried (a 401 surfaces plainly rather than
+        //    minting for the wrong workspace). The portal session is
+        //    still available for explicit-token overrides elsewhere.
+        assert_eq!(resolved.workspace_id, None);
+        assert!(resolved.portal.is_some());
+    }
+
+    /// When `--base-url` matches a cached workspace's host, the cached
+    /// bearer IS reused (no needless re-mint) and that workspace is the
+    /// federation target.
+    #[test]
+    fn explicit_base_url_matching_cache_reuses_bearer() {
+        let cfg = incident_shaped_config();
+        // Trailing slash + matching host → should still match the cache.
+        let resolved =
+            resolve_federated(&cfg, Some("https://app.forge.run/".to_string()), None).unwrap();
+        assert_eq!(resolved.base_url, "https://app.forge.run");
+        assert_eq!(resolved.token, "fr_f_portal_cached");
+        assert_eq!(resolved.workspace_id.as_deref(), Some("ws-portal01"));
+    }
+
+    /// `--base-url` + `--token` is a full direct override: both are
+    /// honored verbatim.
+    #[test]
+    fn explicit_base_url_and_token_full_override() {
+        let cfg = incident_shaped_config();
+        let resolved = resolve_federated(
+            &cfg,
+            Some("https://ws-target99.forge.run".to_string()),
+            Some("fr_u_typed".to_string()),
+        )
+        .unwrap();
+        assert_eq!(resolved.base_url, "https://ws-target99.forge.run");
+        assert_eq!(resolved.token, "fr_u_typed");
+        // Unrelated host → no mismatched federation target carried.
+        assert_eq!(resolved.workspace_id, None);
+    }
+
+    /// With NO explicit `--base-url`, behaviour is unchanged: resolve to
+    /// the active `[current]` workspace and its cached bearer.
+    #[test]
+    fn no_base_url_falls_back_to_current_workspace() {
+        let cfg = incident_shaped_config();
+        let resolved = resolve_federated(&cfg, None, None).unwrap();
+        assert_eq!(resolved.base_url, "https://app.forge.run");
+        assert_eq!(resolved.token, "fr_f_portal_cached");
+        assert_eq!(resolved.workspace_id.as_deref(), Some("ws-portal01"));
+    }
+
+    /// `--base-url` matching a NON-current cached workspace reuses that
+    /// workspace's bearer and targets it for federation — proving the
+    /// host match is what gates bearer reuse, not the `[current]`
+    /// selection.
+    #[test]
+    fn explicit_base_url_matching_other_cached_workspace() {
+        let mut cfg = incident_shaped_config();
+        cfg.cache.workspaces.insert(
+            "ws-other42".to_string(),
+            WorkspaceCacheEntry {
+                api_url: "https://ws-other42.forge.run".to_string(),
+                bearer: "fr_f_other_cached".to_string(),
+                expires_at: "2099-01-01T00:00:00Z".to_string(),
+            },
+        );
+        let resolved =
+            resolve_federated(&cfg, Some("https://ws-other42.forge.run".to_string()), None)
+                .unwrap();
+        assert_eq!(resolved.base_url, "https://ws-other42.forge.run");
+        assert_eq!(resolved.token, "fr_f_other_cached");
+        assert_eq!(resolved.workspace_id.as_deref(), Some("ws-other42"));
+    }
+
+    #[test]
+    fn same_host_ignores_path_slash_and_case() {
+        assert!(same_host(
+            "https://app.forge.run",
+            "https://app.forge.run/"
+        ));
+        assert!(same_host(
+            "https://App.Forge.Run/api/v1/x",
+            "https://app.forge.run"
+        ));
+        assert!(!same_host(
+            "https://app.forge.run",
+            "https://ws-target99.forge.run"
+        ));
+        // scheme matters
+        assert!(!same_host("http://localhost:8080", "https://localhost:8080"));
+        // port matters
+        assert!(!same_host("http://localhost:8080", "http://localhost:9090"));
     }
 }
