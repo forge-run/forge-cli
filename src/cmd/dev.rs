@@ -76,14 +76,44 @@ pub struct DevArgs {
     /// matches local source before the first file change.
     #[arg(long)]
     skip_initial: bool,
+
+    /// Watch + rebuild + **deploy** to the workspace on each change
+    /// (the original loop, requires a runtime). Without this flag,
+    /// `forge dev` renders the project **locally** and serves it on
+    /// localhost — no runtime, no deploy (DX plan WS2).
+    #[arg(long)]
+    deploy: bool,
+
+    /// Local-render dev server port. Default 7878.
+    #[arg(long, default_value_t = 7878)]
+    port: u16,
+
+    /// Open the local dev server in a browser on startup.
+    #[arg(long)]
+    open: bool,
+
+    /// Restrict the local server to pages on this host surface
+    /// (e.g. `app`, `docs`, `marketing`). Pages with no declared
+    /// `surface` are always served. Mirrors the runtime's per-host
+    /// surface scoping, which Caddy provides in production.
+    #[arg(long)]
+    surface: Option<String>,
 }
 
 pub async fn run(args: DevArgs) -> Result<()> {
     let project_dir = args
         .project_dir
+        .clone()
         .unwrap_or_else(|| PathBuf::from("."))
         .canonicalize()
         .context("resolving --project-dir")?;
+
+    // Default: local render + serve, no runtime (DX plan WS2). The
+    // `--deploy` flag opts into the original watch-and-deploy loop.
+    if !args.deploy {
+        return crate::cmd::dev_local::run_local(project_dir, args.port, args.open, args.surface)
+            .await;
+    }
 
     let manifest = args
         .manifest

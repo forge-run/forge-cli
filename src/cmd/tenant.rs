@@ -72,7 +72,7 @@ async fn list() -> Result<()> {
     }
     println!("TENANT_ID                                KIND       TIER         NAME");
     for r in &rows {
-        let active = current_tenant.as_deref() == Some(&r.id);
+        let active = current_tenant.as_deref() == Some(r.id.as_str());
         let marker = if active { "*" } else { " " };
         let kind = r.kind.as_deref().unwrap_or("-");
         let tier = r.tier.as_deref().unwrap_or("-");

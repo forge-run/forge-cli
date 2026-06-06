@@ -6,6 +6,7 @@ pub mod build;
 pub mod components;
 pub mod deploy;
 pub mod dev;
+pub mod dev_local;
 pub mod domain;
 pub mod pages;
 pub mod login;

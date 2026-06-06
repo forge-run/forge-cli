@@ -21,7 +21,7 @@ clap = { version = "4", features = ["derive", "env"] }
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "rustls-tls-native-roots", "json"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-tokio = { version = "1", features = ["rt-multi-thread", "macros", "fs"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "fs", "net", "io-util", "sync", "time"] }
 toml = "0.9"
 thiserror = "2"
 tracing = "0.1"
@@ -66,6 +66,14 @@ self_update = { version = "0.42", default-features = false, features = ["rustls"
 # trigger N rebuilds.
 notify = "8"
 notify-debouncer-full = "0.6"
+# `forge dev` local-render loop (DX plan WS2): render pages locally
+# through the extracted render engine, with no runtime. The build
+# walkers produce the component/page records + scoped CSS; the render
+# engine turns them into HTML; forge-ui supplies the built-in
+# components a project references (`@forge/card` etc.).
+forge-web-build = { path = "../forge-web/build" }
+forge-web-render = { path = "../forge-web/render" }
+forge-ui = { path = "../forge-ui" }
 
 [dev-dependencies]
 tempfile = "3"
