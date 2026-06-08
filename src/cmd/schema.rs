@@ -41,6 +41,14 @@ pub struct ApplyArgs {
     #[arg(long)]
     file: PathBuf,
 
+    /// Allow a DESTRUCTIVE change — one that drops relationships, row-security
+    /// policies, or columns relative to the table's current schema. Off by
+    /// default: the server refuses such a transition (it's almost always an
+    /// accidental partial/minimal schema, the class of bug that silently wiped
+    /// relationships + RLS). Set this ONLY for an intentional removal.
+    #[arg(long)]
+    allow_destructive: bool,
+
     /// Print the response as JSON instead of human-friendly text.
     #[arg(long)]
     json: bool,
@@ -49,6 +57,7 @@ pub struct ApplyArgs {
 #[derive(Debug, Serialize)]
 struct ApplyRequest {
     schema: serde_json::Value,
+    allow_destructive: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -75,7 +84,10 @@ async fn apply(args: ApplyArgs, client: &ForgeClient) -> Result<()> {
         .and_then(|v| v.as_str())
         .map(|s| s.to_string());
 
-    let req = ApplyRequest { schema };
+    let req = ApplyRequest {
+        schema,
+        allow_destructive: args.allow_destructive,
+    };
     let resp: ApplyResponse = client
         .post_json("/api/v1/manage/schema/apply", &req)
         .await
