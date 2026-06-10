@@ -29,10 +29,33 @@ pub struct ShipArgs {
     pub deploy: deploy::DeployArgs,
 }
 
+/// One ordered step in a `ship` run. Extracted so the load-bearing
+/// invariant — a static upload ALWAYS precedes the deploy — is
+/// unit-testable without a live client. Reordering these steps is the
+/// exact regression `ship` exists to prevent.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum ShipStep {
+    UploadStatic,
+    Deploy,
+}
+
+/// Pure plan for a `ship` invocation: the steps `run` will execute, in
+/// order. Upload is included only when not suppressed (`--no-static`)
+/// and the static dir actually exists; `Deploy` is always last.
+pub(crate) fn ship_plan(no_static: bool, static_dir_exists: bool) -> Vec<ShipStep> {
+    let mut steps = Vec::new();
+    if !no_static && static_dir_exists {
+        steps.push(ShipStep::UploadStatic);
+    }
+    steps.push(ShipStep::Deploy);
+    steps
+}
+
 pub async fn run(args: ShipArgs, client: &ForgeClient) -> Result<()> {
-    if args.no_static {
-        eprintln!("ship: --no-static set, skipping static upload");
-    } else if args.static_dir.exists() {
+    let dir_exists = args.static_dir.exists();
+    let steps = ship_plan(args.no_static, dir_exists);
+
+    if steps.contains(&ShipStep::UploadStatic) {
         eprintln!(
             "ship: uploading static assets from {} …",
             args.static_dir.display()
@@ -41,6 +64,8 @@ pub async fn run(args: ShipArgs, client: &ForgeClient) -> Result<()> {
             args.static_dir.clone(),
         ));
         static_cmd::run(cmd, client).await?;
+    } else if args.no_static {
+        eprintln!("ship: --no-static set, skipping static upload");
     } else {
         eprintln!(
             "ship: static dir {} not found — skipping upload (pass --static-dir to override)",
@@ -50,4 +75,45 @@ pub async fn run(args: ShipArgs, client: &ForgeClient) -> Result<()> {
 
     eprintln!("ship: deploying …");
     deploy::run(args.deploy, client).await
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn plan_uploads_static_before_deploy() {
+        let steps = ship_plan(false, true);
+        assert_eq!(steps, vec![ShipStep::UploadStatic, ShipStep::Deploy]);
+        // The invariant the command exists to enforce: upload precedes
+        // deploy, never the other way around.
+        let up = steps.iter().position(|s| *s == ShipStep::UploadStatic).unwrap();
+        let dep = steps.iter().position(|s| *s == ShipStep::Deploy).unwrap();
+        assert!(up < dep, "static upload must precede deploy");
+    }
+
+    #[test]
+    fn plan_skips_upload_with_no_static_flag() {
+        // --no-static deploys only, even when the static dir is present.
+        assert_eq!(ship_plan(true, true), vec![ShipStep::Deploy]);
+        assert_eq!(ship_plan(true, false), vec![ShipStep::Deploy]);
+    }
+
+    #[test]
+    fn plan_skips_upload_when_dir_absent() {
+        // App-only workloads with no static dir still deploy.
+        assert_eq!(ship_plan(false, false), vec![ShipStep::Deploy]);
+    }
+
+    #[test]
+    fn plan_always_deploys() {
+        for no_static in [false, true] {
+            for exists in [false, true] {
+                assert!(
+                    ship_plan(no_static, exists).contains(&ShipStep::Deploy),
+                    "deploy must always run (no_static={no_static}, exists={exists})"
+                );
+            }
+        }
+    }
 }
