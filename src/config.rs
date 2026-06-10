@@ -657,10 +657,35 @@ fn atomic_write(path: &Path, bytes: &[u8]) -> Result<()> {
         .parent()
         .ok_or_else(|| anyhow::anyhow!("{} has no parent", path.display()))?;
     let tmp = dir.join(format!(".forge-config-{}.tmp", std::process::id(),));
-    std::fs::write(&tmp, bytes).with_context(|| format!("writing {}", tmp.display()))?;
+    // Create the tmp at 0600 FROM THE START. `std::fs::write` would
+    // create it at the process umask (typically 0644 — world-readable),
+    // leaving the credential bytes exposed in the window before the
+    // post-rename chmod. The tmp carries its mode through the rename, so
+    // the final file is owner-only with no readable window.
+    write_private(&tmp, bytes).with_context(|| format!("writing {}", tmp.display()))?;
     std::fs::rename(&tmp, path)
         .with_context(|| format!("renaming {} → {}", tmp.display(), path.display()))?;
     Ok(())
+}
+
+#[cfg(unix)]
+fn write_private(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
+    use std::io::Write;
+    use std::os::unix::fs::OpenOptionsExt;
+    // Remove any stale same-PID tmp first so `mode` definitely applies
+    // (mode is honoured only on creation, not on an existing file).
+    let _ = std::fs::remove_file(path);
+    let mut f = std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .mode(0o600)
+        .open(path)?;
+    f.write_all(bytes)
+}
+
+#[cfg(not(unix))]
+fn write_private(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
+    std::fs::write(path, bytes)
 }
 
 #[cfg(unix)]
@@ -696,6 +721,22 @@ fn read_optional(path: PathBuf) -> Result<Option<ConfigFile>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(unix)]
+    #[test]
+    fn atomic_write_creates_owner_only_file_no_readable_window() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = std::env::temp_dir().join(format!("forge-cfg-test-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("config.toml");
+        atomic_write(&path, b"token = \"fr_u_secret\"").unwrap();
+        let mode = std::fs::metadata(&path).unwrap().permissions().mode() & 0o777;
+        assert_eq!(
+            mode, 0o600,
+            "credential file must be owner-only (got {mode:o}) — no world-readable window",
+        );
+        std::fs::remove_dir_all(&dir).ok();
+    }
 
     /// Old-shape (v1) configs without `[portal]` still parse — the
     /// federated additions are all `#[serde(default)]` / Optional.
