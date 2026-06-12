@@ -85,6 +85,10 @@ enum Cmd {
     /// `secrets: [...]` grants.
     #[command(subcommand)]
     Secrets(cmd::secrets::SecretsCmd),
+    /// Workspace email/notifications admin (identity, templates,
+    /// suppressions, deliveries).
+    #[command(subcommand)]
+    Email(cmd::email::EmailCmd),
 
     /// Apply schema definitions to the workspace.
     #[command(subcommand)]
@@ -208,6 +212,11 @@ async fn main() -> Result<()> {
             let cfg = config::resolve(cli.base_url, cli.token, cli.profile)?;
             let client = client::ForgeClient::new(cfg)?;
             cmd::secrets::run(s, &client).await
+        }
+        Cmd::Email(e) => {
+            let cfg = config::resolve(cli.base_url, cli.token, cli.profile)?;
+            let client = client::ForgeClient::new(cfg)?;
+            cmd::email::run(e, &client).await
         }
         Cmd::Schema(s) => {
             let cfg = config::resolve(cli.base_url, cli.token, cli.profile)?;

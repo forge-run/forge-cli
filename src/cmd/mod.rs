@@ -13,6 +13,7 @@ pub mod logs;
 pub mod new;
 pub mod pages;
 pub mod schema;
+pub mod email;
 pub mod secrets;
 pub mod ship;
 pub mod sso;
