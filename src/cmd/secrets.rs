@@ -44,6 +44,12 @@ pub struct SetArgs {
     #[arg(long)]
     value_file: Option<std::path::PathBuf>,
 
+    /// Rotation grace window in seconds: the outgoing value keeps
+    /// serving via the `versions()` host fn until the window closes.
+    /// Only meaningful when the name already exists. Capped server-side.
+    #[arg(long)]
+    grace: Option<u64>,
+
     /// Print the response as JSON.
     #[arg(long)]
     json: bool,
@@ -70,6 +76,8 @@ pub struct RmArgs {
 struct SetRequest {
     name: String,
     value: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    grace_secs: Option<u64>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -148,6 +156,7 @@ async fn set(args: SetArgs, client: &ForgeClient) -> Result<()> {
     let req = SetRequest {
         name: args.name,
         value,
+        grace_secs: args.grace,
     };
     let resp: SetResponse = client
         .post_json("/api/v1/manage/secrets/set", &req)
