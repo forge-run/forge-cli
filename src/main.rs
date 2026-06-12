@@ -80,6 +80,12 @@ enum Cmd {
     #[command(subcommand)]
     Tokens(cmd::tokens::TokensCmd),
 
+    /// Manage workspace secrets (set / list / rm). Values are
+    /// encrypted server-side; ops read them via manifest-declared
+    /// `secrets: [...]` grants.
+    #[command(subcommand)]
+    Secrets(cmd::secrets::SecretsCmd),
+
     /// Apply schema definitions to the workspace.
     #[command(subcommand)]
     Schema(cmd::schema::SchemaCmd),
@@ -197,6 +203,11 @@ async fn main() -> Result<()> {
             let cfg = config::resolve(cli.base_url, cli.token, cli.profile)?;
             let client = client::ForgeClient::new(cfg)?;
             cmd::tokens::run(t, &client).await
+        }
+        Cmd::Secrets(s) => {
+            let cfg = config::resolve(cli.base_url, cli.token, cli.profile)?;
+            let client = client::ForgeClient::new(cfg)?;
+            cmd::secrets::run(s, &client).await
         }
         Cmd::Schema(s) => {
             let cfg = config::resolve(cli.base_url, cli.token, cli.profile)?;
