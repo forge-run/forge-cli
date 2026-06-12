@@ -68,7 +68,10 @@ pub async fn run(args: ComponentsArgs) -> Result<()> {
     }
 
     if rows.is_empty() {
-        eprintln!("no *.component.json files under {}", components_dir.display());
+        eprintln!(
+            "no *.component.json files under {}",
+            components_dir.display()
+        );
         return Ok(());
     }
 
@@ -204,12 +207,7 @@ fn walk_components(root: &Path, dir: &Path, rows: &mut Vec<ComponentRow>) -> Res
             .map(|p| p.to_string_lossy().into_owned())
             .unwrap_or_else(|_| path.to_string_lossy().into_owned());
 
-        let props_required = manifest
-            .props
-            .props
-            .values()
-            .filter(|p| p.required)
-            .count();
+        let props_required = manifest.props.props.values().filter(|p| p.required).count();
 
         rows.push(ComponentRow {
             name: manifest.name.clone(),

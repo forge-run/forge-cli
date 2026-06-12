@@ -13,7 +13,7 @@
 
 use std::io::Read;
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use clap::{Args, Subcommand};
 use serde::{Deserialize, Serialize};
 
@@ -114,8 +114,9 @@ pub async fn run(cmd: SecretsCmd, client: &ForgeClient) -> Result<()> {
 
 async fn set(args: SetArgs, client: &ForgeClient) -> Result<()> {
     let mut value = match &args.value_file {
-        Some(path) => std::fs::read_to_string(path)
-            .with_context(|| format!("reading {}", path.display()))?,
+        Some(path) => {
+            std::fs::read_to_string(path).with_context(|| format!("reading {}", path.display()))?
+        }
         None => {
             // Refuse an interactive TTY: a value typed at a visible
             // prompt lands in terminal scrollback. Pipe it instead.
@@ -188,7 +189,10 @@ async fn list(args: ListArgs, client: &ForgeClient) -> Result<()> {
         eprintln!("no secrets set in this workspace");
         return Ok(());
     }
-    println!("{:<32} {:>7}  {:<20}  {}", "NAME", "VERSION", "ROTATED", "STATUS");
+    println!(
+        "{:<32} {:>7}  {:<20}  {}",
+        "NAME", "VERSION", "ROTATED", "STATUS"
+    );
     for s in &resp.secrets {
         println!(
             "{:<32} {:>7}  {:<20}  {}",
@@ -215,7 +219,10 @@ async fn rm(args: RmArgs, client: &ForgeClient) -> Result<()> {
             }))?
         );
     } else {
-        eprintln!("retired `{}` — ops now read it as not-found; `set` re-activates it.", resp.name);
+        eprintln!(
+            "retired `{}` — ops now read it as not-found; `set` re-activates it.",
+            resp.name
+        );
     }
     Ok(())
 }

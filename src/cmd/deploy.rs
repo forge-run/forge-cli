@@ -180,7 +180,11 @@ fn manifest_artifact(path: impl Into<String>, kind: &str, bytes: &[u8]) -> serde
 /// / RLS / branding key changed inside the file). Only used for the small
 /// structured manifests (app.json, service.json) — wasm/static stay
 /// hash-only via [`manifest_artifact`].
-fn manifest_artifact_with_content(path: impl Into<String>, kind: &str, bytes: &[u8]) -> serde_json::Value {
+fn manifest_artifact_with_content(
+    path: impl Into<String>,
+    kind: &str,
+    bytes: &[u8],
+) -> serde_json::Value {
     manifest_artifact_with_explicit_content(path, kind, bytes, &String::from_utf8_lossy(bytes))
 }
 
@@ -199,7 +203,10 @@ fn manifest_artifact_with_explicit_content(
 ) -> serde_json::Value {
     let mut a = manifest_artifact(path, kind, hash_bytes);
     if let Some(obj) = a.as_object_mut() {
-        obj.insert("content".into(), serde_json::Value::String(content.to_string()));
+        obj.insert(
+            "content".into(),
+            serde_json::Value::String(content.to_string()),
+        );
     }
     a
 }
@@ -233,7 +240,8 @@ pub async fn run(args: DeployArgs, client: &ForgeClient) -> Result<()> {
     let mut wasm_modules = Vec::with_capacity(manifest.wasm_modules.len());
     // Content-addressed manifest rows for the wasm modules, collected
     // as each module's final (Component-wrapped) bytes are resolved.
-    let mut wasm_artifacts: Vec<serde_json::Value> = Vec::with_capacity(manifest.wasm_modules.len());
+    let mut wasm_artifacts: Vec<serde_json::Value> =
+        Vec::with_capacity(manifest.wasm_modules.len());
     for entry in &manifest.wasm_modules {
         let resolved = wasm_by_name
             .get(&entry.service_name)
@@ -297,12 +305,18 @@ pub async fn run(args: DeployArgs, client: &ForgeClient) -> Result<()> {
     // no-op detection). Path scheme: `wasm:<ns>::<name>` for modules,
     // `service.json` for the manifest — stable keys the diff joins on.
     manifest_artifacts.extend(wasm_artifacts);
-    manifest_artifacts.push(manifest_artifact_with_content("service.json", "service_manifest", &manifest_bytes));
+    manifest_artifacts.push(manifest_artifact_with_content(
+        "service.json",
+        "service_manifest",
+        &manifest_bytes,
+    ));
     // Deterministic order so the manifest row-set is stable across runs
     // (the diff joins on `path`, but a stable order keeps the stored
     // rows + any human-facing dump reproducible).
     manifest_artifacts.sort_by(|a, b| {
-        a.get("path").and_then(|p| p.as_str()).unwrap_or("")
+        a.get("path")
+            .and_then(|p| p.as_str())
+            .unwrap_or("")
             .cmp(b.get("path").and_then(|p| p.as_str()).unwrap_or(""))
     });
 
@@ -410,7 +424,9 @@ fn map_err(e: ForgeError) -> anyhow::Error {
 /// Aborts the deploy when any validation fails — the runtime's
 /// ingest path trusts the CLI for substrate validation, so a
 /// bad bundle here would mean a runtime hard-fail mid-ingest.
-async fn build_app_bundle(args: &DeployArgs) -> Result<(serde_json::Value, Vec<serde_json::Value>)> {
+async fn build_app_bundle(
+    args: &DeployArgs,
+) -> Result<(serde_json::Value, Vec<serde_json::Value>)> {
     let Some(app_path) = args.app_manifest.as_ref() else {
         return Ok((serde_json::Value::Null, Vec::new()));
     };
@@ -428,7 +444,11 @@ async fn build_app_bundle(args: &DeployArgs) -> Result<(serde_json::Value, Vec<s
     // ── app.json ───────────────────────────────────────────────
     let app_bytes = std::fs::read(app_path)
         .with_context(|| format!("reading app manifest {}", app_path.display()))?;
-    artifacts.push(manifest_artifact_with_content("app.json", "app_manifest", &app_bytes));
+    artifacts.push(manifest_artifact_with_content(
+        "app.json",
+        "app_manifest",
+        &app_bytes,
+    ));
     let app_manifest: forge_schema::AppManifest = serde_json::from_slice(&app_bytes)
         .with_context(|| format!("parsing app manifest {}", app_path.display()))?;
     let errors = forge_schema::validate_app_manifest(&app_manifest);
@@ -507,7 +527,11 @@ async fn build_app_bundle(args: &DeployArgs) -> Result<(serde_json::Value, Vec<s
         artifacts.push(manifest_artifact(
             format!("components/{}.component", component.name),
             "component",
-            &logical_unit_bytes(&component.manifest, &component.template_body, &component.css_body)?,
+            &logical_unit_bytes(
+                &component.manifest,
+                &component.template_body,
+                &component.css_body,
+            )?,
         ));
     }
     collect_static_artifacts(&app_dir, &mut artifacts)?;
@@ -536,7 +560,8 @@ fn logical_unit_bytes<M: serde::Serialize>(
     css_body: &str,
 ) -> Result<Vec<u8>> {
     let manifest_json = serde_json::to_vec(manifest).context("serialize logical-unit manifest")?;
-    let mut buf = Vec::with_capacity(manifest_json.len() + template_body.len() + css_body.len() + 24);
+    let mut buf =
+        Vec::with_capacity(manifest_json.len() + template_body.len() + css_body.len() + 24);
     for part in [
         manifest_json.as_slice(),
         template_body.as_bytes(),
@@ -908,8 +933,7 @@ fn collect_page_jsons(dir: &PathBuf) -> Result<Vec<BundledPage>> {
             continue;
         };
         let raw = std::fs::read(path).with_context(|| format!("read {}", path.display()))?;
-        let manifest: forge_schema::PageManifest =
-            parse_schema_json(&raw, path, "page manifest")?;
+        let manifest: forge_schema::PageManifest = parse_schema_json(&raw, path, "page manifest")?;
         let errors = forge_schema::validate_page_manifest(&manifest);
         if !errors.is_empty() {
             anyhow::bail!(

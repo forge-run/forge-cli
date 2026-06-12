@@ -60,9 +60,8 @@ pub async fn run(args: ShipArgs, client: &ForgeClient) -> Result<()> {
             "ship: uploading static assets from {} …",
             args.static_dir.display()
         );
-        let cmd = static_cmd::StaticCmd::Upload(static_cmd::UploadArgs::for_dir(
-            args.static_dir.clone(),
-        ));
+        let cmd =
+            static_cmd::StaticCmd::Upload(static_cmd::UploadArgs::for_dir(args.static_dir.clone()));
         static_cmd::run(cmd, client).await?;
     } else if args.no_static {
         eprintln!("ship: --no-static set, skipping static upload");
@@ -87,7 +86,10 @@ mod tests {
         assert_eq!(steps, vec![ShipStep::UploadStatic, ShipStep::Deploy]);
         // The invariant the command exists to enforce: upload precedes
         // deploy, never the other way around.
-        let up = steps.iter().position(|s| *s == ShipStep::UploadStatic).unwrap();
+        let up = steps
+            .iter()
+            .position(|s| *s == ShipStep::UploadStatic)
+            .unwrap();
         let dep = steps.iter().position(|s| *s == ShipStep::Deploy).unwrap();
         assert!(up < dep, "static upload must precede deploy");
     }

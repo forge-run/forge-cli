@@ -69,10 +69,7 @@ pub async fn run(args: BrandArgs) -> Result<()> {
         }
     }
 
-    let tokens = manifest
-        .branding_overrides
-        .clone()
-        .unwrap_or_default();
+    let tokens = manifest.branding_overrides.clone().unwrap_or_default();
     let css_vars = tokens.to_css_variables();
 
     if args.json {
@@ -111,11 +108,7 @@ pub async fn run(args: BrandArgs) -> Result<()> {
 
 fn summarize_buckets(tokens: &BrandingTokens) {
     fn row(label: &str, set: bool) {
-        println!(
-            "  {:<11} {}",
-            label,
-            if set { "set" } else { "(inherit)" },
-        );
+        println!("  {:<11} {}", label, if set { "set" } else { "(inherit)" },);
     }
     println!("buckets:");
     row("colors", tokens.colors.is_some());
@@ -154,8 +147,7 @@ mod tests {
         // Smoke — the parse path must accept a minimal app.json
         // and emit the empty branding summary without panicking.
         let manifest_bytes = std::fs::read(tmp.path().join("app.json")).unwrap();
-        let manifest: forge_schema::AppManifest =
-            serde_json::from_slice(&manifest_bytes).unwrap();
+        let manifest: forge_schema::AppManifest = serde_json::from_slice(&manifest_bytes).unwrap();
         let tokens = manifest.branding_overrides.unwrap_or_default();
         assert!(tokens.to_css_variables().is_empty());
     }

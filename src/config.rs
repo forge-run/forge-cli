@@ -359,7 +359,11 @@ fn same_host(a: &str, b: &str) -> bool {
             Some(i) => &s[..i],
             None => "",
         };
-        format!("{}://{}", scheme.to_ascii_lowercase(), authority.to_ascii_lowercase())
+        format!(
+            "{}://{}",
+            scheme.to_ascii_lowercase(),
+            authority.to_ascii_lowercase()
+        )
     }
     origin(a) == origin(b)
 }
@@ -943,10 +947,7 @@ expires_at = "2099-01-01T00:00:00Z"
 
     #[test]
     fn same_host_ignores_path_slash_and_case() {
-        assert!(same_host(
-            "https://app.forge.run",
-            "https://app.forge.run/"
-        ));
+        assert!(same_host("https://app.forge.run", "https://app.forge.run/"));
         assert!(same_host(
             "https://App.Forge.Run/api/v1/x",
             "https://app.forge.run"
@@ -956,7 +957,10 @@ expires_at = "2099-01-01T00:00:00Z"
             "https://ws-target99.forge.run"
         ));
         // scheme matters
-        assert!(!same_host("http://localhost:8080", "https://localhost:8080"));
+        assert!(!same_host(
+            "http://localhost:8080",
+            "https://localhost:8080"
+        ));
         // port matters
         assert!(!same_host("http://localhost:8080", "http://localhost:9090"));
     }

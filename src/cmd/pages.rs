@@ -278,28 +278,12 @@ fn pascal_to_kebab(s: &str) -> String {
 }
 
 fn print_table(rows: &[PageRow]) {
-    let w_route = rows
-        .iter()
-        .map(|r| r.route.len())
-        .max()
-        .unwrap_or(5)
-        .max(5);
-    let w_path = rows
-        .iter()
-        .map(|r| r.path.len())
-        .max()
-        .unwrap_or(4)
-        .max(4);
+    let w_route = rows.iter().map(|r| r.route.len()).max().unwrap_or(5).max(5);
+    let w_path = rows.iter().map(|r| r.path.len()).max().unwrap_or(4).max(4);
 
     println!(
         "{:<w_route$}  {:<5}  {:<11}  {:<3}  {:<3}  {:<3}  {:<w_path$}  CAPS",
-        "ROUTE",
-        "AUTH",
-        "RENDERING",
-        "RS",
-        "HTM",
-        "CSS",
-        "FILE",
+        "ROUTE", "AUTH", "RENDERING", "RS", "HTM", "CSS", "FILE",
     );
     println!(
         "{}  {}  {}  {}  {}  {}  {}  {}",

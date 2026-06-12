@@ -148,7 +148,7 @@ struct CreateBranchRequest {
 
 #[derive(Debug, Deserialize)]
 #[allow(dead_code)] // `created_at` parses but isn't surfaced in the
-                    // table view today.
+// table view today.
 struct BranchWire {
     id: String,
     source_workspace_id: String,
@@ -246,9 +246,7 @@ async fn promote(cp: &CpClient, args: PromoteArgs) -> Result<()> {
     if !args.yes {
         // Promote is destructive (replaces source workspace
         // substrate). Require explicit confirmation.
-        anyhow::bail!(
-            "promote replaces the source workspace's substrate. Pass --yes to confirm."
-        );
+        anyhow::bail!("promote replaces the source workspace's substrate. Pass --yes to confirm.");
     }
     let url = format!("{}/admin/branches/{}/promote", cp.base_url, args.branch_id);
     let resp = cp

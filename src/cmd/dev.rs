@@ -119,23 +119,24 @@ pub async fn run(args: DevArgs) -> Result<()> {
 
     if !args.skip_initial {
         eprintln!("initial build + deploy...");
-        if let Err(e) = build_and_deploy(&project_dir, &manifest, app_manifest.as_deref(), wasm.as_deref()) {
+        if let Err(e) = build_and_deploy(
+            &project_dir,
+            &manifest,
+            app_manifest.as_deref(),
+            wasm.as_deref(),
+        ) {
             eprintln!("initial deploy failed: {e:#}");
         }
         eprintln!();
     }
 
     let (tx, rx) = channel();
-    let mut debouncer = new_debouncer(
-        Duration::from_millis(args.debounce_ms),
-        None,
-        move |res| {
-            // Forward events to the main thread. We don't care
-            // *which* paths fired — any event in the watched set
-            // triggers a full rebuild.
-            let _ = tx.send(res);
-        },
-    )
+    let mut debouncer = new_debouncer(Duration::from_millis(args.debounce_ms), None, move |res| {
+        // Forward events to the main thread. We don't care
+        // *which* paths fired — any event in the watched set
+        // triggers a full rebuild.
+        let _ = tx.send(res);
+    })
     .context("creating file watcher")?;
 
     // Watch the load-bearing subtrees + top-level manifests. Each
@@ -177,8 +178,16 @@ pub async fn run(args: DevArgs) -> Result<()> {
         match res {
             Ok(events) => {
                 let n = events.len();
-                eprintln!("change detected ({n} event{}), rebuilding...", if n == 1 { "" } else { "s" });
-                match build_and_deploy(&project_dir, &manifest, app_manifest.as_deref(), wasm.as_deref()) {
+                eprintln!(
+                    "change detected ({n} event{}), rebuilding...",
+                    if n == 1 { "" } else { "s" }
+                );
+                match build_and_deploy(
+                    &project_dir,
+                    &manifest,
+                    app_manifest.as_deref(),
+                    wasm.as_deref(),
+                ) {
                     Ok(()) => eprintln!("deployed.\n"),
                     Err(e) => eprintln!("deploy failed: {e:#}\n"),
                 }
