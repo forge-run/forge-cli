@@ -120,6 +120,14 @@ fn summarize_buckets(tokens: &BrandingTokens) {
     println!("  {:<11} {}", "extra", tokens.extra.len());
 }
 
+fn print_css_block(css_vars: &[(String, String)]) {
+    println!(":root {{");
+    for (name, value) in css_vars {
+        println!("  {name}: {value};");
+    }
+    println!("}}");
+}
+
 #[cfg(test)]
 mod tests {
     use forge_schema::BrandingTokens;
@@ -151,12 +159,4 @@ mod tests {
         let tokens = manifest.branding_overrides.unwrap_or_default();
         assert!(tokens.to_css_variables().is_empty());
     }
-}
-
-fn print_css_block(css_vars: &[(String, String)]) {
-    println!(":root {{");
-    for (name, value) in css_vars {
-        println!("  {name}: {value};");
-    }
-    println!("}}");
 }

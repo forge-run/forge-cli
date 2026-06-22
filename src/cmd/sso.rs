@@ -29,10 +29,10 @@ use crate::config;
 /// surface displays this as "you're authorising this machine" so the
 /// user can verify they're approving their own device.
 fn detect_hostname() -> Option<String> {
-    if let Ok(h) = std::env::var("HOSTNAME") {
-        if !h.trim().is_empty() {
-            return Some(h.trim().to_string());
-        }
+    if let Ok(h) = std::env::var("HOSTNAME")
+        && !h.trim().is_empty()
+    {
+        return Some(h.trim().to_string());
     }
     std::process::Command::new("hostname")
         .output()

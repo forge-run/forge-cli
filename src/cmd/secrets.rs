@@ -198,10 +198,7 @@ async fn list(args: ListArgs, client: &ForgeClient) -> Result<()> {
         eprintln!("no secrets set in this workspace");
         return Ok(());
     }
-    println!(
-        "{:<32} {:>7}  {:<20}  {}",
-        "NAME", "VERSION", "ROTATED", "STATUS"
-    );
+    println!("{:<32} {:>7}  {:<20}  STATUS", "NAME", "VERSION", "ROTATED");
     for s in &resp.secrets {
         println!(
             "{:<32} {:>7}  {:<20}  {}",

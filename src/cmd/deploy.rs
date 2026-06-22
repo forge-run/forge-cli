@@ -348,15 +348,13 @@ pub async fn run(args: DeployArgs, client: &ForgeClient) -> Result<()> {
         // requires that runtime (same release as commits_ahead_main).
         "manifest": manifest_artifacts,
     });
-    if SEND_COMMITS_AHEAD {
-        if let Some(obj) = payload.as_object_mut() {
-            obj.insert("commits_ahead_main".into(), serde_json::json!(git_ahead));
-        }
+    if SEND_COMMITS_AHEAD && let Some(obj) = payload.as_object_mut() {
+        obj.insert("commits_ahead_main".into(), serde_json::json!(git_ahead));
     }
-    if args.allow_app_replace {
-        if let Some(obj) = payload.as_object_mut() {
-            obj.insert("allow_app_identity_change".into(), serde_json::json!(true));
-        }
+    if args.allow_app_replace
+        && let Some(obj) = payload.as_object_mut()
+    {
+        obj.insert("allow_app_identity_change".into(), serde_json::json!(true));
     }
 
     let resp: DeployResponse = client

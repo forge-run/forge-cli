@@ -120,58 +120,6 @@ struct ComponentRow {
     has_css: bool,
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use std::fs;
-    use tempfile::tempdir;
-
-    #[test]
-    fn walk_components_parses_props() {
-        let tmp = tempdir().unwrap();
-        let comps = tmp.path().join("components");
-        fs::create_dir_all(&comps).unwrap();
-        fs::write(
-            comps.join("c.component.json"),
-            r#"{
-                "schema_version": "0.1",
-                "name": "c",
-                "props": {
-                    "title":    { "type": "string", "required": true },
-                    "subtitle": { "type": "string" }
-                }
-            }"#,
-        )
-        .unwrap();
-        let mut rows = Vec::new();
-        walk_components(&comps, &comps, &mut rows).unwrap();
-        assert_eq!(rows.len(), 1);
-        assert_eq!(rows[0].name, "c");
-        assert_eq!(rows[0].props, 2);
-        assert_eq!(rows[0].props_required, 1);
-    }
-
-    #[test]
-    fn walk_components_detects_html_and_css_siblings() {
-        let tmp = tempdir().unwrap();
-        let comps = tmp.path().join("components");
-        fs::create_dir_all(&comps).unwrap();
-        fs::write(
-            comps.join("x.component.json"),
-            r#"{ "schema_version": "0.1", "name": "x", "props": {} }"#,
-        )
-        .unwrap();
-        fs::write(comps.join("x.component.html"), "").unwrap();
-        fs::write(comps.join("x.component.css"), "").unwrap();
-        let mut rows = Vec::new();
-        walk_components(&comps, &comps, &mut rows).unwrap();
-        assert_eq!(rows.len(), 1);
-        assert!(rows[0].has_template);
-        assert!(rows[0].has_css);
-        assert!(!rows[0].has_rust);
-    }
-}
-
 fn walk_components(root: &Path, dir: &Path, rows: &mut Vec<ComponentRow>) -> Result<()> {
     for entry in std::fs::read_dir(dir).with_context(|| format!("read_dir {}", dir.display()))? {
         let entry = entry?;
@@ -222,4 +170,56 @@ fn walk_components(root: &Path, dir: &Path, rows: &mut Vec<ComponentRow>) -> Res
         });
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+    use tempfile::tempdir;
+
+    #[test]
+    fn walk_components_parses_props() {
+        let tmp = tempdir().unwrap();
+        let comps = tmp.path().join("components");
+        fs::create_dir_all(&comps).unwrap();
+        fs::write(
+            comps.join("c.component.json"),
+            r#"{
+                "schema_version": "0.1",
+                "name": "c",
+                "props": {
+                    "title":    { "type": "string", "required": true },
+                    "subtitle": { "type": "string" }
+                }
+            }"#,
+        )
+        .unwrap();
+        let mut rows = Vec::new();
+        walk_components(&comps, &comps, &mut rows).unwrap();
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].name, "c");
+        assert_eq!(rows[0].props, 2);
+        assert_eq!(rows[0].props_required, 1);
+    }
+
+    #[test]
+    fn walk_components_detects_html_and_css_siblings() {
+        let tmp = tempdir().unwrap();
+        let comps = tmp.path().join("components");
+        fs::create_dir_all(&comps).unwrap();
+        fs::write(
+            comps.join("x.component.json"),
+            r#"{ "schema_version": "0.1", "name": "x", "props": {} }"#,
+        )
+        .unwrap();
+        fs::write(comps.join("x.component.html"), "").unwrap();
+        fs::write(comps.join("x.component.css"), "").unwrap();
+        let mut rows = Vec::new();
+        walk_components(&comps, &comps, &mut rows).unwrap();
+        assert_eq!(rows.len(), 1);
+        assert!(rows[0].has_template);
+        assert!(rows[0].has_css);
+        assert!(!rows[0].has_rust);
+    }
 }

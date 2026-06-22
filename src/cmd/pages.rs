@@ -155,6 +155,61 @@ fn walk_pages(root: &Path, dir: &Path, rows: &mut Vec<PageRow>) -> Result<()> {
     Ok(())
 }
 
+/// Convert PascalCase to lower-kebab-case for table cells.
+/// `BufferedHtml` → `buffered-html`; `StreamingHtml` →
+/// `streaming-html`; single-word ids pass through unchanged.
+fn pascal_to_kebab(s: &str) -> String {
+    let mut out = String::with_capacity(s.len() + 2);
+    for (i, c) in s.chars().enumerate() {
+        if c.is_ascii_uppercase() {
+            if i > 0 {
+                out.push('-');
+            }
+            out.push(c.to_ascii_lowercase());
+        } else {
+            out.push(c);
+        }
+    }
+    out
+}
+
+fn print_table(rows: &[PageRow]) {
+    let w_route = rows.iter().map(|r| r.route.len()).max().unwrap_or(5).max(5);
+    let w_path = rows.iter().map(|r| r.path.len()).max().unwrap_or(4).max(4);
+
+    println!(
+        "{:<w_route$}  {:<5}  {:<11}  {:<3}  {:<3}  {:<3}  {:<w_path$}  CAPS",
+        "ROUTE", "AUTH", "RENDERING", "RS", "HTM", "CSS", "FILE",
+    );
+    println!(
+        "{}  {}  {}  --  ---  ---  {}  ----",
+        "-".repeat(w_route),
+        "-".repeat(5),
+        "-".repeat(11),
+        "-".repeat(w_path),
+    );
+    for r in rows {
+        let caps = if r.caps.is_empty() {
+            "-".to_string()
+        } else {
+            r.caps.join(",")
+        };
+        println!(
+            "{:<w_route$}  {:<5}  {:<11}  {:<3}  {:<3}  {:<3}  {:<w_path$}  {}",
+            r.route,
+            r.auth,
+            r.rendering,
+            if r.has_rust { "y" } else { "-" },
+            if r.has_template { "y" } else { "-" },
+            if r.has_css { "y" } else { "-" },
+            r.path,
+            caps,
+        );
+    }
+    println!();
+    println!("{} page(s)", rows.len());
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -257,63 +312,4 @@ mod tests {
         assert!(rows[0].has_template);
         assert!(rows[0].has_css);
     }
-}
-
-/// Convert PascalCase to lower-kebab-case for table cells.
-/// `BufferedHtml` → `buffered-html`; `StreamingHtml` →
-/// `streaming-html`; single-word ids pass through unchanged.
-fn pascal_to_kebab(s: &str) -> String {
-    let mut out = String::with_capacity(s.len() + 2);
-    for (i, c) in s.chars().enumerate() {
-        if c.is_ascii_uppercase() {
-            if i > 0 {
-                out.push('-');
-            }
-            out.push(c.to_ascii_lowercase());
-        } else {
-            out.push(c);
-        }
-    }
-    out
-}
-
-fn print_table(rows: &[PageRow]) {
-    let w_route = rows.iter().map(|r| r.route.len()).max().unwrap_or(5).max(5);
-    let w_path = rows.iter().map(|r| r.path.len()).max().unwrap_or(4).max(4);
-
-    println!(
-        "{:<w_route$}  {:<5}  {:<11}  {:<3}  {:<3}  {:<3}  {:<w_path$}  CAPS",
-        "ROUTE", "AUTH", "RENDERING", "RS", "HTM", "CSS", "FILE",
-    );
-    println!(
-        "{}  {}  {}  {}  {}  {}  {}  {}",
-        "-".repeat(w_route),
-        "-".repeat(5),
-        "-".repeat(11),
-        "--",
-        "---",
-        "---",
-        "-".repeat(w_path),
-        "----",
-    );
-    for r in rows {
-        let caps = if r.caps.is_empty() {
-            "-".to_string()
-        } else {
-            r.caps.join(",")
-        };
-        println!(
-            "{:<w_route$}  {:<5}  {:<11}  {:<3}  {:<3}  {:<3}  {:<w_path$}  {}",
-            r.route,
-            r.auth,
-            r.rendering,
-            if r.has_rust { "y" } else { "-" },
-            if r.has_template { "y" } else { "-" },
-            if r.has_css { "y" } else { "-" },
-            r.path,
-            caps,
-        );
-    }
-    println!();
-    println!("{} page(s)", rows.len());
 }

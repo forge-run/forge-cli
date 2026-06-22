@@ -180,12 +180,12 @@ pub fn resolve(
     // Federated mode first: the home config holds the portal
     // session, project config can't override it (the portal is
     // user-laptop state, not repo state).
-    if let Some(home) = home.as_ref() {
-        if home.portal.is_some() {
-            // Pure resolution lives in `resolve_federated` so it's unit-
-            // testable without touching disk.
-            return resolve_federated(home, cli_base_url, cli_token);
-        }
+    if let Some(home) = home.as_ref()
+        && home.portal.is_some()
+    {
+        // Pure resolution lives in `resolve_federated` so it's unit-
+        // testable without touching disk.
+        return resolve_federated(home, cli_base_url, cli_token);
     }
 
     // Direct mode (legacy). Pick the profile to read defaults
@@ -851,6 +851,7 @@ expires_at = "2099-01-01T00:00:00Z"
     /// DIFFERENT host than the active `[current]` workspace must:
     ///   - send the request to the typed URL (not the cached api_url), and
     ///   - NOT attach the cached bearer scoped to the portal workspace.
+    ///
     /// Previously `--base-url` alone was silently ignored and the
     /// request (with the portal bearer) hit the portal workspace.
     #[test]
