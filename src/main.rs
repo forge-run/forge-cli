@@ -94,6 +94,12 @@ enum Cmd {
     #[command(subcommand)]
     Schema(cmd::schema::SchemaCmd),
 
+    /// Generate a typed client SDK from the workspace's registry.
+    /// `forge sdk generate` writes a self-contained TypeScript client
+    /// package (content-addressed to the registry version) to `--out`.
+    #[command(subcommand)]
+    Sdk(cmd::sdk::SdkCmd),
+
     /// Apply declarative operations to the workspace.
     #[command(hide = true)]
     Ops,
@@ -222,6 +228,11 @@ async fn main() -> Result<()> {
             let cfg = config::resolve(cli.base_url, cli.token, cli.profile)?;
             let client = client::ForgeClient::new(cfg)?;
             cmd::schema::run(s, &client).await
+        }
+        Cmd::Sdk(s) => {
+            let cfg = config::resolve(cli.base_url, cli.token, cli.profile)?;
+            let client = client::ForgeClient::new(cfg)?;
+            cmd::sdk::run(s, &client).await
         }
         Cmd::Build(b) => {
             // `build` doesn't talk to the network — it shells out
