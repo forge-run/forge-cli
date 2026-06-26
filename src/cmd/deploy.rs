@@ -72,6 +72,17 @@ pub struct DeployArgs {
     #[arg(long)]
     components_dir: Option<PathBuf>,
 
+    /// GitOps schema converge — directory of declarative table-schema JSON
+    /// (`*.json`, the same shape `forge schema apply` sends). Each file becomes
+    /// an inline `kind:"schema"` manifest row the runtime's converge applies
+    /// ADDITIVELY before the deploy (new table / add column/index/RLS / widen
+    /// type); a destructive delta is refused. Defaults to `schemas/` relative to
+    /// the `--app-manifest` directory (or the `--manifest` directory when no app
+    /// manifest is set). A defaulted dir that's absent is skipped; an explicit
+    /// `--schema-dir` that's missing is an error.
+    #[arg(long)]
+    schema_dir: Option<PathBuf>,
+
     /// Print the response as JSON instead of human-friendly text.
     #[arg(long)]
     json: bool,
@@ -303,6 +314,80 @@ fn manifest_artifact_with_explicit_content(
     a
 }
 
+/// GitOps schema converge — collect each `schemas/*.json` (the declarative DDL
+/// `forge schema apply` sends: `{name, archetype, columns, …}`) as an inline
+/// `kind:"schema"` manifest row. The runtime's converge applies these ADDITIVELY
+/// before the deploy; a destructive delta is refused. Content rides inline (the
+/// files are small JSON), like `service.json`, so NO artifact upload is needed —
+/// the rows land in both `--emit-manifest` output and the deploy's `manifest`.
+///
+/// Dir resolution mirrors `pages_dir`/`components_dir`: an explicit
+/// `--schema-dir`, else `schemas/` next to `--app-manifest` (or `--manifest`
+/// when no app manifest is set). A defaulted dir that's absent is simply skipped
+/// (a deploy may carry no schema); an explicit dir that's missing is an error.
+/// Each file is parsed here so a malformed schema fails fast in the CLI — the
+/// runtime trusts the CLI's pre-validation.
+fn collect_schema_artifacts(
+    args: &DeployArgs,
+    manifest_dir: &std::path::Path,
+) -> Result<Vec<serde_json::Value>> {
+    let (dir, explicit) = match args.schema_dir.as_ref() {
+        Some(d) => (d.clone(), true),
+        None => {
+            let base = args
+                .app_manifest
+                .as_ref()
+                .and_then(|p| p.parent())
+                .map(|p| p.to_path_buf())
+                .unwrap_or_else(|| manifest_dir.to_path_buf());
+            (base.join("schemas"), false)
+        }
+    };
+    if !dir.is_dir() {
+        if explicit {
+            anyhow::bail!("--schema-dir {} is not a directory", dir.display());
+        }
+        return Ok(Vec::new());
+    }
+
+    let mut files: Vec<PathBuf> = std::fs::read_dir(&dir)
+        .with_context(|| format!("reading schema dir {}", dir.display()))?
+        .filter_map(|e| e.ok().map(|e| e.path()))
+        .filter(|p| p.extension().and_then(|x| x.to_str()) == Some("json"))
+        .collect();
+    // Stable order so the manifest row-set (and its hash) is reproducible.
+    files.sort();
+
+    let mut out = Vec::with_capacity(files.len());
+    for path in files {
+        let bytes = std::fs::read(&path)
+            .with_context(|| format!("reading schema {}", path.display()))?;
+        let parsed: serde_json::Value = serde_json::from_slice(&bytes)
+            .with_context(|| format!("parsing schema {}", path.display()))?;
+        let has_name = parsed
+            .get("name")
+            .and_then(|v| v.as_str())
+            .map(|s| !s.is_empty())
+            .unwrap_or(false);
+        if !has_name {
+            anyhow::bail!(
+                "schema {} is missing a non-empty string `name` (the table name)",
+                path.display()
+            );
+        }
+        let file_name = path
+            .file_name()
+            .and_then(|f| f.to_str())
+            .unwrap_or("schema.json");
+        out.push(manifest_artifact_with_content(
+            format!("schemas/{file_name}"),
+            "schema",
+            &bytes,
+        ));
+    }
+    Ok(out)
+}
+
 pub async fn run(args: DeployArgs, client: &ForgeClient) -> Result<()> {
     let manifest_bytes = std::fs::read(&args.manifest)
         .with_context(|| format!("reading manifest {}", args.manifest.display()))?;
@@ -458,6 +543,12 @@ pub async fn run(args: DeployArgs, client: &ForgeClient) -> Result<()> {
         "service_manifest",
         &manifest_bytes,
     ));
+    // GitOps schema converge — fold in each `schemas/*.json` as an inline
+    // `kind:"schema"` row (see `collect_schema_artifacts`). The runtime's
+    // converge applies these additively BEFORE the deploy; destructive deltas
+    // are refused. They carry `content_hash`, so a schema edit changes the
+    // manifest hash → the reconcile loop converges → the schema applies.
+    manifest_artifacts.extend(collect_schema_artifacts(&args, &manifest_dir)?);
     // Deterministic order so the manifest row-set is stable across runs
     // (the diff joins on `path`, but a stable order keeps the stored
     // rows + any human-facing dump reproducible).
@@ -1360,6 +1451,7 @@ mod app_bundle_tests {
             app_manifest,
             pages_dir: None,
             components_dir: None,
+            schema_dir: None,
             json: false,
             allow_app_replace: false,
             inline_wasm: false,
@@ -1375,6 +1467,72 @@ mod app_bundle_tests {
         let args = deploy_args(None);
         let (bundle, _) = build_app_bundle(&args).await.unwrap();
         assert!(bundle.is_null());
+    }
+
+    #[test]
+    fn collect_schema_artifacts_emits_inline_schema_rows() {
+        let tmp = TempDir::new().unwrap();
+        let app_path = tmp.path().join("app.json");
+        write(tmp.path(), "app.json", "{}");
+        // Two schema files (collected in sorted order) + a non-JSON file ignored.
+        write(
+            tmp.path(),
+            "schemas/widgets.json",
+            r#"{"name":"widgets","archetype":"Base","columns":[]}"#,
+        );
+        write(
+            tmp.path(),
+            "schemas/gadgets.json",
+            r#"{"name":"gadgets","archetype":"Base","columns":[]}"#,
+        );
+        write(tmp.path(), "schemas/README.md", "not a schema");
+
+        let args = deploy_args(Some(app_path));
+        let rows = collect_schema_artifacts(&args, tmp.path()).expect("collect ok");
+        assert_eq!(rows.len(), 2, "only the two *.json schema files are rows");
+        // Sorted by path: gadgets before widgets.
+        assert_eq!(rows[0]["path"], "schemas/gadgets.json");
+        assert_eq!(rows[0]["kind"], "schema");
+        assert!(rows[0]["content"].is_string(), "schema rides inline as content");
+        assert!(rows[0]["content_hash"].is_string());
+        assert_eq!(rows[1]["path"], "schemas/widgets.json");
+    }
+
+    #[test]
+    fn collect_schema_artifacts_skips_absent_default_dir() {
+        // No schemas/ dir next to the app manifest ⇒ no rows, no error.
+        let tmp = TempDir::new().unwrap();
+        let app_path = tmp.path().join("app.json");
+        write(tmp.path(), "app.json", "{}");
+        let args = deploy_args(Some(app_path));
+        assert!(collect_schema_artifacts(&args, tmp.path()).unwrap().is_empty());
+    }
+
+    #[test]
+    fn collect_schema_artifacts_errors_on_missing_explicit_dir() {
+        // An explicit --schema-dir that doesn't exist is a hard error (a typo'd
+        // path must not silently drop the workspace's schema).
+        let tmp = TempDir::new().unwrap();
+        let mut args = deploy_args(None);
+        args.schema_dir = Some(tmp.path().join("nope"));
+        assert!(collect_schema_artifacts(&args, tmp.path()).is_err());
+    }
+
+    #[test]
+    fn collect_schema_artifacts_rejects_malformed_and_unnamed() {
+        let tmp = TempDir::new().unwrap();
+        // Malformed JSON fails fast.
+        write(tmp.path(), "schemas/bad.json", "{not json");
+        let mut args = deploy_args(None);
+        args.schema_dir = Some(tmp.path().join("schemas"));
+        assert!(collect_schema_artifacts(&args, tmp.path()).is_err());
+
+        // Valid JSON but no `name` is also rejected (the converge needs a table).
+        let tmp2 = TempDir::new().unwrap();
+        write(tmp2.path(), "schemas/nameless.json", r#"{"archetype":"Base"}"#);
+        let mut args2 = deploy_args(None);
+        args2.schema_dir = Some(tmp2.path().join("schemas"));
+        assert!(collect_schema_artifacts(&args2, tmp2.path()).is_err());
     }
 
     #[tokio::test]
