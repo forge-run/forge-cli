@@ -8,41 +8,62 @@
 //! - How to expose multiple ops in one service.
 //! - How input_schema / output_schema in `service.json` shape
 //!   the MCP tool's parameter signature.
-//! - How to return structured errors (the `Err` arm of the
-//!   handler return type lands as a `{ "error": "<msg>" }`
-//!   response that forge-runtime maps to a tool error).
+//! - How to return errors (the `Err` arm maps to an `op-error`
+//!   that forge-runtime translates into a tool/HTTP error).
+//!
+//! v0.2 shape: one `Guest::handle` entry point per module,
+//! registered with `export!`. Input + output cross the boundary
+//! as JSON strings.
 
-use forge_sdk::define_op;
+use forge_sdk_v2::{Guest, OpError, OpInput, OpOutput};
 use serde_json::Value;
 
-define_op! {
-    fn handle(input: Value) -> Result<Value, String> {
-        // Tiny dispatch on the `op` field so one WASM module
-        // serves multiple ops. (Forge-runtime invokes
-        // `forge_op` once per call regardless of which op the
-        // caller targeted; the wrapper threads the op name
-        // through the input by convention. Customers who only
-        // have one op skip this match.)
-        let op = input
+struct Calc;
+
+impl Guest for Calc {
+    fn handle(input: OpInput) -> Result<OpOutput, OpError> {
+        // Parse the JSON string the runtime hands us.
+        let value: Value = serde_json::from_str(&input.json)
+            .map_err(|e| OpError::BadRequest(format!("invalid json: {e}")))?;
+
+        // Tiny dispatch on the `__forge_op` field so one WASM
+        // module serves multiple ops. forge-runtime invokes
+        // `op.handle` once per call regardless of which op the
+        // caller targeted; the dispatcher threads the op name
+        // through the input by convention. Single-op modules skip
+        // this match.
+        let op = value
             .get("__forge_op")
             .and_then(Value::as_str)
             .unwrap_or("add");
-        match op {
-            "add" => add(&input),
-            "sub" => sub(&input),
-            other => Err(format!("unknown op `{other}`")),
-        }
+        let result = match op {
+            "add" => add(&value),
+            "sub" => sub(&value),
+            other => Err(OpError::BadRequest(format!("unknown op `{other}`"))),
+        }?;
+        Ok(OpOutput {
+            json: result.to_string(),
+        })
     }
 }
 
-fn add(input: &Value) -> Result<Value, String> {
-    let a = input.get("a").and_then(Value::as_f64).ok_or("missing `a`")?;
-    let b = input.get("b").and_then(Value::as_f64).ok_or("missing `b`")?;
+fn add(input: &Value) -> Result<Value, OpError> {
+    let a = number(input, "a")?;
+    let b = number(input, "b")?;
     Ok(serde_json::json!({"result": a + b}))
 }
 
-fn sub(input: &Value) -> Result<Value, String> {
-    let a = input.get("a").and_then(Value::as_f64).ok_or("missing `a`")?;
-    let b = input.get("b").and_then(Value::as_f64).ok_or("missing `b`")?;
+fn sub(input: &Value) -> Result<Value, OpError> {
+    let a = number(input, "a")?;
+    let b = number(input, "b")?;
     Ok(serde_json::json!({"result": a - b}))
 }
+
+fn number(input: &Value, key: &str) -> Result<f64, OpError> {
+    input
+        .get(key)
+        .and_then(Value::as_f64)
+        .ok_or_else(|| OpError::BadRequest(format!("missing `{key}`")))
+}
+
+forge_sdk_v2::export!(Calc with_types_in forge_sdk_v2);

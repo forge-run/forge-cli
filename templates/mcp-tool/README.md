@@ -13,7 +13,7 @@ forge build
 ## Deploy
 
 ```bash
-forge deploy --manifest service.json --wasm target/wasm32-wasip2/release/{{crate_name}}.wasm
+forge deploy --manifest service.json --wasm target/wasm32-wasip1/release/{{crate_name}}.wasm
 ```
 
 ## Invoke from an MCP client

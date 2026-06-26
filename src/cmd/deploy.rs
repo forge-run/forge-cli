@@ -106,6 +106,24 @@ pub struct DeployArgs {
     /// `POST /api/v1/manage/reconcile/promote` (promote the rolled-back state).
     #[arg(long)]
     force_unpin: bool,
+
+    /// GitOps authoring — write the computed manifest array (the
+    /// `[{path, content_hash, size, kind}, …]` rows this deploy content-
+    /// addresses) to PATH as pretty-printed JSON. This is the file a developer
+    /// commits as `forge.manifest.json`; on `git push`, forge-git reads it from
+    /// the commit tree and PUTs it to the workspace's desired-state, which the
+    /// reconcile loop converges. Emitted whether or not the deploy also applies,
+    /// so it pairs with `--no-apply` for a stage-only step.
+    #[arg(long, value_name = "PATH")]
+    emit_manifest: Option<PathBuf>,
+
+    /// GitOps staging — upload the artifacts to the content store (so the blobs
+    /// the manifest references are present) but SKIP the final apply, leaving
+    /// desired + live state untouched. Pair with `--emit-manifest` to stage a
+    /// deploy that a `git push` (or a later plain `forge deploy`) applies. With
+    /// `--inline-wasm` there are no separate uploads, so this just skips apply.
+    #[arg(long)]
+    no_apply: bool,
 }
 
 /// Manifest shape on disk. `wasm_bytes` is OMITTED in the file —
@@ -410,6 +428,24 @@ pub async fn run(args: DeployArgs, client: &ForgeClient) -> Result<()> {
             .cmp(b.get("path").and_then(|p| p.as_str()).unwrap_or(""))
     });
 
+    // GitOps authoring — emit the computed manifest array (the content-
+    // addressed `[{path, content_hash, size, kind}, …]` rows, the exact set
+    // sent in the deploy's `manifest` field) so it can be committed as
+    // `forge.manifest.json`. Written regardless of whether the deploy also
+    // applies; combined with `--no-apply` this is the GitOps stage step — the
+    // file `git push` later hands to the reconcile loop.
+    if let Some(path) = args.emit_manifest.as_ref() {
+        let json = serde_json::to_string_pretty(&manifest_artifacts)
+            .context("serialize manifest for --emit-manifest")?;
+        std::fs::write(path, json)
+            .with_context(|| format!("writing manifest to {}", path.display()))?;
+        eprintln!(
+            "wrote manifest ({} artifact(s)) to {}",
+            manifest_artifacts.len(),
+            path.display(),
+        );
+    }
+
     // Git provenance for the deploy record (branch / sha / commits-ahead).
     // The runtime pulls these off the body before the strict decode.
     let (git_branch, git_sha, git_ahead) = git_context(&manifest_dir);
@@ -505,6 +541,20 @@ pub async fn run(args: DeployArgs, client: &ForgeClient) -> Result<()> {
                 anyhow::bail!("unexpected status {other} from artifact HEAD {path}");
             }
         }
+    }
+
+    // GitOps staging — `--no-apply` uploaded the artifacts above so the content
+    // store holds the blobs the manifest references, but stops short of the
+    // apply call: desired + live state are untouched. The change goes live when
+    // forge-git PUTs the committed manifest on `git push`, or on a later plain
+    // `forge deploy`.
+    if args.no_apply {
+        eprintln!(
+            "staged {} artifact(s) to the content store; skipped apply (--no-apply). \
+             Commit the manifest and `git push` (or run a plain `forge deploy`) to apply.",
+            wasm_uploads.len(),
+        );
+        return Ok(());
     }
 
     let resp: DeployResponse = client
@@ -1274,6 +1324,9 @@ mod app_bundle_tests {
             allow_app_replace: false,
             inline_wasm: false,
             force: false,
+            force_unpin: false,
+            emit_manifest: None,
+            no_apply: false,
         }
     }
 
