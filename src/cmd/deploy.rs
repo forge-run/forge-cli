@@ -98,6 +98,14 @@ pub struct DeployArgs {
     /// already live. Use it to redeploy identical artifacts on purpose.
     #[arg(long)]
     force: bool,
+
+    /// Clear an incident rollback-pin and deploy anyway. A workspace pinned by
+    /// a rollback (W6) REFUSES a normal deploy with 409 WORKSPACE_PINNED so a
+    /// routine push can't silently clobber the rollback; pass this only when you
+    /// intend to supersede the pin. The clean alternative is
+    /// `POST /api/v1/manage/reconcile/promote` (promote the rolled-back state).
+    #[arg(long)]
+    force_unpin: bool,
 }
 
 /// Manifest shape on disk. `wasm_bytes` is OMITTED in the file —
@@ -452,6 +460,14 @@ pub async fn run(args: DeployArgs, client: &ForgeClient) -> Result<()> {
         && let Some(obj) = payload.as_object_mut()
     {
         obj.insert("allow_app_identity_change".into(), serde_json::json!(true));
+    }
+    // HIGH-2 — explicit override to clear a rollback-pin (the runtime refuses a
+    // normal deploy while pinned). Only sent when set, so a routine deploy
+    // against a pinned workspace fails loudly rather than silently unpinning.
+    if args.force_unpin
+        && let Some(obj) = payload.as_object_mut()
+    {
+        obj.insert("force_unpin".into(), serde_json::json!(true));
     }
 
     // W3 — artifact upload stage. For each wasm module, HEAD the
