@@ -83,6 +83,18 @@ pub struct DeployArgs {
     #[arg(long)]
     schema_dir: Option<PathBuf>,
 
+    /// GitOps config-data projection — directory of declarative config-data JSON
+    /// (`data/<table>.json`, each `{"table","key"?,"rows":[…]}`). Each file
+    /// becomes an inline `kind:"config_data"` manifest row; the runtime's
+    /// converge PROJECTS the full rowset into the (managed) table after the
+    /// schema applies — git is authoritative (insert/update/delete to match).
+    /// A `key` names the operator-stable match column (storage mints `id`); omit
+    /// it for full-replace. Defaults to `data/` relative to the `--app-manifest`
+    /// directory (or the `--manifest` directory). A defaulted dir that's absent
+    /// is skipped; an explicit `--data-dir` that's missing is an error.
+    #[arg(long)]
+    data_dir: Option<PathBuf>,
+
     /// Print the response as JSON instead of human-friendly text.
     #[arg(long)]
     json: bool,
@@ -388,6 +400,85 @@ fn collect_schema_artifacts(
     Ok(out)
 }
 
+/// GitOps config-data projection — collect each `data/<table>.json` (the
+/// declarative `{"table","key"?,"rows":[…]}` rowset) as an inline
+/// `kind:"config_data"` manifest row. The runtime's converge PROJECTS each into
+/// its MANAGED table AFTER the schema applies — git authoritative, full-rowset
+/// (insert/update/delete to match). Content rides inline (small JSON), like
+/// `schema`, so NO artifact upload is needed.
+///
+/// Dir resolution mirrors `collect_schema_artifacts`: an explicit `--data-dir`,
+/// else `data/` next to `--app-manifest` (or `--manifest` when no app manifest).
+/// A defaulted dir that's absent is skipped; an explicit dir that's missing is
+/// an error. Each file is parsed here so a malformed artifact fails fast in the
+/// CLI — the runtime trusts the CLI's pre-validation.
+fn collect_config_data_artifacts(
+    args: &DeployArgs,
+    manifest_dir: &std::path::Path,
+) -> Result<Vec<serde_json::Value>> {
+    let (dir, explicit) = match args.data_dir.as_ref() {
+        Some(d) => (d.clone(), true),
+        None => {
+            let base = args
+                .app_manifest
+                .as_ref()
+                .and_then(|p| p.parent())
+                .map(|p| p.to_path_buf())
+                .unwrap_or_else(|| manifest_dir.to_path_buf());
+            (base.join("data"), false)
+        }
+    };
+    if !dir.is_dir() {
+        if explicit {
+            anyhow::bail!("--data-dir {} is not a directory", dir.display());
+        }
+        return Ok(Vec::new());
+    }
+
+    let mut files: Vec<PathBuf> = std::fs::read_dir(&dir)
+        .with_context(|| format!("reading data dir {}", dir.display()))?
+        .filter_map(|e| e.ok().map(|e| e.path()))
+        .filter(|p| p.extension().and_then(|x| x.to_str()) == Some("json"))
+        .collect();
+    // Stable order so the manifest row-set (and its hash) is reproducible.
+    files.sort();
+
+    let mut out = Vec::with_capacity(files.len());
+    for path in files {
+        let bytes =
+            std::fs::read(&path).with_context(|| format!("reading config-data {}", path.display()))?;
+        let parsed: serde_json::Value = serde_json::from_slice(&bytes)
+            .with_context(|| format!("parsing config-data {}", path.display()))?;
+        let has_table = parsed
+            .get("table")
+            .and_then(|v| v.as_str())
+            .map(|s| !s.is_empty())
+            .unwrap_or(false);
+        if !has_table {
+            anyhow::bail!(
+                "config-data {} is missing a non-empty string `table`",
+                path.display()
+            );
+        }
+        if !parsed.get("rows").map(|v| v.is_array()).unwrap_or(false) {
+            anyhow::bail!(
+                "config-data {} is missing a `rows` array",
+                path.display()
+            );
+        }
+        let file_name = path
+            .file_name()
+            .and_then(|f| f.to_str())
+            .unwrap_or("data.json");
+        out.push(manifest_artifact_with_content(
+            format!("data/{file_name}"),
+            "config_data",
+            &bytes,
+        ));
+    }
+    Ok(out)
+}
+
 pub async fn run(args: DeployArgs, client: &ForgeClient) -> Result<()> {
     let manifest_bytes = std::fs::read(&args.manifest)
         .with_context(|| format!("reading manifest {}", args.manifest.display()))?;
@@ -549,6 +640,12 @@ pub async fn run(args: DeployArgs, client: &ForgeClient) -> Result<()> {
     // are refused. They carry `content_hash`, so a schema edit changes the
     // manifest hash → the reconcile loop converges → the schema applies.
     manifest_artifacts.extend(collect_schema_artifacts(&args, &manifest_dir)?);
+    // GitOps config-data projection — fold in each `data/<table>.json` as an
+    // inline `kind:"config_data"` row (see `collect_config_data_artifacts`).
+    // The runtime's converge projects each into its managed table AFTER the
+    // schema applies. Inline content carries a `content_hash`, so a data edit
+    // changes the manifest hash → reconcile converges → the projection runs.
+    manifest_artifacts.extend(collect_config_data_artifacts(&args, &manifest_dir)?);
     // Deterministic order so the manifest row-set is stable across runs
     // (the diff joins on `path`, but a stable order keeps the stored
     // rows + any human-facing dump reproducible).
@@ -1452,6 +1549,7 @@ mod app_bundle_tests {
             pages_dir: None,
             components_dir: None,
             schema_dir: None,
+            data_dir: None,
             json: false,
             allow_app_replace: false,
             inline_wasm: false,
@@ -1533,6 +1631,75 @@ mod app_bundle_tests {
         let mut args2 = deploy_args(None);
         args2.schema_dir = Some(tmp2.path().join("schemas"));
         assert!(collect_schema_artifacts(&args2, tmp2.path()).is_err());
+    }
+
+    #[test]
+    fn collect_config_data_artifacts_emits_inline_rows() {
+        let tmp = TempDir::new().unwrap();
+        let app_path = tmp.path().join("app.json");
+        write(tmp.path(), "app.json", "{}");
+        write(
+            tmp.path(),
+            "data/plan_catalog.json",
+            r#"{"table":"plan_catalog","key":"code","rows":[{"code":"hobby"}]}"#,
+        );
+        write(
+            tmp.path(),
+            "data/cms_content.json",
+            r#"{"table":"cms_content","rows":[]}"#,
+        );
+        write(tmp.path(), "data/README.md", "not config-data");
+
+        let args = deploy_args(Some(app_path));
+        let rows = collect_config_data_artifacts(&args, tmp.path()).expect("collect ok");
+        assert_eq!(rows.len(), 2, "only the two *.json files are rows");
+        // Sorted by path: cms_content before plan_catalog.
+        assert_eq!(rows[0]["path"], "data/cms_content.json");
+        assert_eq!(rows[0]["kind"], "config_data");
+        assert!(rows[0]["content"].is_string(), "rowset rides inline as content");
+        assert!(rows[0]["content_hash"].is_string());
+        assert_eq!(rows[1]["path"], "data/plan_catalog.json");
+    }
+
+    #[test]
+    fn collect_config_data_artifacts_skips_absent_default_dir() {
+        let tmp = TempDir::new().unwrap();
+        let app_path = tmp.path().join("app.json");
+        write(tmp.path(), "app.json", "{}");
+        let args = deploy_args(Some(app_path));
+        assert!(collect_config_data_artifacts(&args, tmp.path()).unwrap().is_empty());
+    }
+
+    #[test]
+    fn collect_config_data_artifacts_rejects_malformed_and_untabled() {
+        // Malformed JSON fails fast.
+        let tmp = TempDir::new().unwrap();
+        write(tmp.path(), "data/bad.json", "{not json");
+        let mut args = deploy_args(None);
+        args.data_dir = Some(tmp.path().join("data"));
+        assert!(collect_config_data_artifacts(&args, tmp.path()).is_err());
+
+        // Valid JSON but no `table` is rejected.
+        let tmp2 = TempDir::new().unwrap();
+        write(tmp2.path(), "data/x.json", r#"{"rows":[]}"#);
+        let mut args2 = deploy_args(None);
+        args2.data_dir = Some(tmp2.path().join("data"));
+        assert!(collect_config_data_artifacts(&args2, tmp2.path()).is_err());
+
+        // `table` present but no `rows` array is rejected.
+        let tmp3 = TempDir::new().unwrap();
+        write(tmp3.path(), "data/y.json", r#"{"table":"t"}"#);
+        let mut args3 = deploy_args(None);
+        args3.data_dir = Some(tmp3.path().join("data"));
+        assert!(collect_config_data_artifacts(&args3, tmp3.path()).is_err());
+    }
+
+    #[test]
+    fn collect_config_data_artifacts_errors_on_missing_explicit_dir() {
+        let tmp = TempDir::new().unwrap();
+        let mut args = deploy_args(None);
+        args.data_dir = Some(tmp.path().join("nope"));
+        assert!(collect_config_data_artifacts(&args, tmp.path()).is_err());
     }
 
     #[tokio::test]
