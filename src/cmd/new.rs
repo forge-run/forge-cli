@@ -131,25 +131,30 @@ pub async fn run(args: NewArgs) -> Result<()> {
     let template_artifact_name = template_crate_name.replace('-', "_");
     let customer_artifact_name = args.crate_name.replace('-', "_");
 
-    // The template's Cargo.toml has `forge-sdk = { path = "../.." }`,
-    // which is correct *inside* the templates dir of the forge-sdk
-    // repo but wrong everywhere else. Substitute it with an
-    // absolute path to forge-sdk so the customer's freshly-
-    // scaffolded crate compiles wherever they put it. v1 hack;
-    // when forge-sdk publishes to crates.io, replace this with
-    // `forge-sdk = "0.1"` and drop the substitution.
+    // The template's Cargo.toml has `forge-sdk-v2 = { path = "../.." }`,
+    // which is a placeholder the substitution below rewrites. We
+    // point it at an absolute path to forge-sdk-v2 so the customer's
+    // freshly-scaffolded crate compiles wherever they put it. v1
+    // hack; when forge-sdk-v2 publishes to crates.io, replace this
+    // with `forge-sdk-v2 = "0.2"` and drop the substitution.
+    //
+    // forge-sdk-v2 is the v0.2 Component-Model SDK: the template
+    // uses the `Guest`/`export!` pattern, which produces a wasm
+    // component the runtime can instantiate. (The legacy forge-sdk
+    // `define_op!` macro builds + deploys but TRAPS at runtime with
+    // `no exported instance forge:platform/op@0.2.0`.)
     //
     // We compute the SDK path from forge-cli's own
     // CARGO_MANIFEST_DIR at compile time. Falls back to a
-    // sibling-`forge-sdk` directory, which matches the canonical
-    // dev layout (`/Users/rory/Documents/{forge-cli,forge-sdk}/`).
+    // sibling-`forge-sdk-v2` directory, which matches the canonical
+    // dev layout (`/Users/rory/Documents/{forge-cli,forge-sdk-v2}/`).
     let sdk_path = env!("CARGO_MANIFEST_DIR")
         .strip_suffix("forge-cli")
-        .map(|prefix| format!("{}forge-sdk", prefix))
+        .map(|prefix| format!("{}forge-sdk-v2", prefix))
         .unwrap_or_else(|| {
             // Fallback for unusual layouts — dev should adjust
             // manually if forge-cli is renamed/moved.
-            "/Users/rory/Documents/forge-sdk".to_string()
+            "/Users/rory/Documents/forge-sdk-v2".to_string()
         });
 
     for (rel_path, content) in *files {
@@ -162,8 +167,8 @@ pub async fn run(args: NewArgs) -> Result<()> {
             .replace(&template_crate_name, &args.crate_name)
             .replace(&template_artifact_name, &customer_artifact_name)
             .replace(
-                "forge-sdk = { path = \"../..\" }",
-                &format!("forge-sdk = {{ path = \"{sdk_path}\" }}"),
+                "forge-sdk-v2 = { path = \"../..\" }",
+                &format!("forge-sdk-v2 = {{ path = \"{sdk_path}\" }}"),
             );
         std::fs::write(&path, substituted)
             .with_context(|| format!("writing {}", path.display()))?;

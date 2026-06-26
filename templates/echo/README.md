@@ -10,14 +10,14 @@ target for `forge build` + `forge deploy`.
 forge build
 ```
 
-Produces `target/wasm32-wasip2/release/{{crate_name}}.wasm`. The
+Produces `target/wasm32-wasip1/release/{{crate_name}}.wasm`. The
 artifact is small (~30KB stripped) because the template enables
 `lto + strip + opt-level=z` in `Cargo.toml`.
 
 ## Deploy
 
 ```bash
-forge deploy --manifest service.json --wasm target/wasm32-wasip2/release/{{crate_name}}.wasm
+forge deploy --manifest service.json --wasm target/wasm32-wasip1/release/{{crate_name}}.wasm
 ```
 
 The manifest declares one service `echo::echo` with one query op
@@ -39,7 +39,7 @@ Response:
 ```json
 {
   "echoed": {"hello": "world"},
-  "via": "forge-sdk echo template"
+  "via": "forge-sdk-v2 echo template"
 }
 ```
 
