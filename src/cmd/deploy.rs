@@ -334,10 +334,12 @@ pub async fn run(args: DeployArgs, client: &ForgeClient) -> Result<()> {
     // as each module's final (Component-wrapped) bytes are resolved.
     let mut wasm_artifacts: Vec<serde_json::Value> =
         Vec::with_capacity(manifest.wasm_modules.len());
-    // W3 — (content_hash, bytes) per module to upload by hash BEFORE the
-    // deploy (reference mode). Empty in `--inline-wasm` mode (bytes ride
-    // inline in the payload, no separate upload).
-    let mut wasm_uploads: Vec<(String, Vec<u8>)> = Vec::new();
+    // W3 — (content_hash, bytes, content_type) per artifact to upload by hash
+    // BEFORE the deploy (reference mode). Holds the wasm modules (empty in
+    // `--inline-wasm` mode — those bytes ride inline in the payload) AND, when
+    // an app bundle is present, the single content-addressed `app_bundle` blob
+    // appended after `build_app_bundle` below.
+    let mut artifact_uploads: Vec<(String, Vec<u8>, &'static str)> = Vec::new();
     for entry in &manifest.wasm_modules {
         let resolved = wasm_by_name
             .get(&entry.service_name)
@@ -391,7 +393,7 @@ pub async fn run(args: DeployArgs, client: &ForgeClient) -> Result<()> {
                 obj.insert("wasm_bytes".into(), serde_json::json!(bytes));
             }
         } else {
-            wasm_uploads.push((content_hash, bytes));
+            artifact_uploads.push((content_hash, bytes, "application/wasm"));
         }
         wasm_modules.push(module);
     }
@@ -404,6 +406,44 @@ pub async fn run(args: DeployArgs, client: &ForgeClient) -> Result<()> {
     // content-addressed manifest rows for the bundle's artifacts
     // (app.json + pages + components + static assets).
     let (app_bundle, mut manifest_artifacts) = build_app_bundle(&args).await?;
+
+    // GitOps app-bundle converge — stage the renderable bundle as ONE
+    // content-addressed `app_bundle` blob (only when `--app-manifest` produced
+    // a bundle). The runtime's converge (`reconstruct_from_manifest_rows` →
+    // `fetch_app_bundle_blob`) rebuilds the renderable half of the app from
+    // this single blob: it finds the manifest row `{kind:"app_bundle",
+    // content_hash:H}` and fetches the bytes `H` from the content store (the
+    // `/api/v1/manage/artifacts/{hash}` PUT target it tries first). Without
+    // this, a `--no-apply` stage + `git push` converge FAILS CLOSED — the
+    // runtime refuses to deploy the service-only half of a manifest that
+    // declares an app (the page/component bodies + head_extras live ONLY in
+    // this blob). Mirrors the wasm-staging pattern: hash the EXACT bytes we
+    // PUT, reference them by that hash in the manifest, stage through the same
+    // HEAD-dedup + PUT path. The per-row `app_manifest`/`page`/`component`
+    // entries below stay (they feed the deploy-diff surface); THIS row is what
+    // the converge resolves.
+    if !app_bundle.is_null() {
+        // Byte-exact: hash and upload the SAME serialization. `to_vec` is the
+        // compact, no-trailing-newline form — identical to how the runtime
+        // itself serializes the bundle for its redeploy-capture path
+        // (`serde_json::to_vec(&app_bundle_value)`), so the row's
+        // `content_hash` equals blake3 of the uploaded bytes and the converge's
+        // content-address resolution hits.
+        let bundle_bytes = serde_json::to_vec(&app_bundle)
+            .context("serialize app_bundle for content-addressed staging")?;
+        let bundle_hash = blake3::hash(&bundle_bytes).to_hex().to_string();
+        manifest_artifacts.push(serde_json::json!({
+            "path": "app_bundle",
+            "content_hash": bundle_hash,
+            "size": bundle_bytes.len() as i64,
+            "kind": "app_bundle",
+        }));
+        // Stage through the same HEAD-dedup + PUT path the wasm modules use so
+        // the blob is present on a normal deploy AND on `--no-apply`. Uploaded
+        // even under `--inline-wasm` (that flag concerns only wasm payload
+        // mode; the GitOps converge always resolves the bundle from the store).
+        artifact_uploads.push((bundle_hash, bundle_bytes, "application/json"));
+    }
 
     // Manifest-as-unit-of-deploy — fold the wasm + service-manifest
     // artifacts into the bundle's artifact set. The runtime persists the
@@ -513,7 +553,7 @@ pub async fn run(args: DeployArgs, client: &ForgeClient) -> Result<()> {
     // referenced bytes are guaranteed present when the runtime resolves
     // them — the upload-before-bump invariant `forge ship` mechanizes.
     // Skipped entirely in `--inline-wasm` mode (bytes ride in the payload).
-    for (hash, bytes) in &wasm_uploads {
+    for (hash, bytes, content_type) in &artifact_uploads {
         let path = format!("/api/v1/manage/artifacts/{hash}");
         let status = client.head_status(&path).await.map_err(map_err)?;
         match status {
@@ -522,7 +562,7 @@ pub async fn run(args: DeployArgs, client: &ForgeClient) -> Result<()> {
             }
             StatusCode::NOT_FOUND => {
                 client
-                    .put_bytes(&path, bytes, "application/wasm")
+                    .put_bytes(&path, bytes, content_type)
                     .await
                     .map_err(map_err)?;
                 eprintln!(
@@ -552,7 +592,7 @@ pub async fn run(args: DeployArgs, client: &ForgeClient) -> Result<()> {
         eprintln!(
             "staged {} artifact(s) to the content store; skipped apply (--no-apply). \
              Commit the manifest and `git push` (or run a plain `forge deploy`) to apply.",
-            wasm_uploads.len(),
+            artifact_uploads.len(),
         );
         return Ok(());
     }
