@@ -5,6 +5,15 @@
 //! new build references, the edge (Cloudflare) can cache a 404 for the new
 //! asset URL for hours, serving an unstyled page in the gap. `ship` removes
 //! the footgun by doing both in the correct order from a single invocation.
+//!
+//! Full ordering: **static upload → artifact upload → deploy**. The
+//! middle stage — uploading each wasm module by content hash before the
+//! deploy references it — lives inside `deploy::run` (it shares the
+//! deploy's resolved, Component-wrapped bytes + content hashes), so the
+//! `ship` plan models the two top-level steps and the artifact upload runs
+//! at the head of `Deploy`. Both halves mechanize the same invariant:
+//! every byte the deploy will reference is uploaded BEFORE the registry
+//! bump / edge cutover.
 
 use std::path::PathBuf;
 
@@ -72,7 +81,10 @@ pub async fn run(args: ShipArgs, client: &ForgeClient) -> Result<()> {
         );
     }
 
-    eprintln!("ship: deploying …");
+    // `deploy::run` uploads each wasm module by content hash (HEAD/PUT
+    // dedup) at its head, then deploys references — so the effective
+    // ordering is static upload → artifact upload → deploy.
+    eprintln!("ship: uploading artifacts + deploying …");
     deploy::run(args.deploy, client).await
 }
 

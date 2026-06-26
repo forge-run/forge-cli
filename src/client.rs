@@ -164,6 +164,33 @@ impl ForgeClient {
         Ok(parsed)
     }
 
+    /// `HEAD <base>/<path>`; returns the HTTP status WITHOUT treating a
+    /// non-2xx (e.g. 404) as an error, so a caller can branch on presence.
+    /// Used by the W3 artifact-upload stage: 200 → already stored (dedup),
+    /// 404 → needs a PUT, 503 → store unavailable. Transparently re-auths
+    /// once on a 401 like every other request.
+    pub async fn head_status(&self, path: &str) -> Result<StatusCode, ForgeError> {
+        let resp = self
+            .send_with_retry(Method::Head, path, None, "application/json", &[])
+            .await?;
+        Ok(resp.status())
+    }
+
+    /// `PUT <base>/<path>` with raw bytes under an explicit content type
+    /// (content-addressed artifact upload — NOT JSON). Returns the response
+    /// body on success, `ForgeError::Http` on 4xx/5xx.
+    pub async fn put_bytes(
+        &self,
+        path: &str,
+        bytes: &[u8],
+        content_type: &str,
+    ) -> Result<Vec<u8>, ForgeError> {
+        let resp = self
+            .send_with_retry(Method::Put, path, Some(bytes), content_type, &[])
+            .await?;
+        finish(resp).await
+    }
+
     /// Single-shot request with the current bearer. Returns the
     /// raw response body on success, ForgeError::Http on
     /// 4xx/5xx. Used internally by the retry interceptor; doesn't
@@ -173,6 +200,7 @@ impl ForgeClient {
         method: Method,
         path: &str,
         body_bytes: Option<&[u8]>,
+        content_type: &str,
         extra_headers: &[(String, String)],
     ) -> Result<reqwest::Response, ForgeError> {
         let (base, token) = {
@@ -183,14 +211,14 @@ impl ForgeClient {
         let mut req = match method {
             Method::Get => self.inner.get(&url),
             Method::Post => self.inner.post(&url),
+            Method::Put => self.inner.put(&url),
+            Method::Head => self.inner.head(&url),
         };
         if !token.is_empty() {
             req = req.bearer_auth(&token);
         }
         if let Some(b) = body_bytes {
-            req = req
-                .header("content-type", "application/json")
-                .body(b.to_vec());
+            req = req.header("content-type", content_type).body(b.to_vec());
         }
         for (n, v) in extra_headers {
             req = req.header(n.as_str(), v.as_str());
@@ -198,21 +226,24 @@ impl ForgeClient {
         Ok(req.send().await?)
     }
 
-    /// Request with the 401-retry interceptor wrapped around it.
-    /// Returns the response body bytes; callers decode as needed.
-    async fn do_request_with_retry(
+    /// Core 401-retry interceptor: sends the request, and on a 401
+    /// transparently re-mints a federated bearer (when a portal session +
+    /// active workspace are configured) and retries once. Returns the raw
+    /// `reqwest::Response` — JSON callers go through [`do_request_with_retry`]
+    /// (which adds `finish`), the artifact HEAD reads the status directly.
+    async fn send_with_retry(
         &self,
         method: Method,
         path: &str,
         body_bytes: Option<&[u8]>,
+        content_type: &str,
         extra_headers: &[(String, String)],
-    ) -> Result<Vec<u8>, ForgeError> {
+    ) -> Result<reqwest::Response, ForgeError> {
         let resp = self
-            .do_request_once(method, path, body_bytes, extra_headers)
+            .do_request_once(method, path, body_bytes, content_type, extra_headers)
             .await?;
-        let status = resp.status();
-        if status != StatusCode::UNAUTHORIZED {
-            return finish(resp).await;
+        if resp.status() != StatusCode::UNAUTHORIZED {
+            return Ok(resp);
         }
         // 401 — try the federated re-mint if the portal session is
         // available + an active workspace is set. Without both we
@@ -222,8 +253,6 @@ impl ForgeClient {
             (s.portal.clone(), s.workspace_id.clone())
         };
         let Some(portal) = portal else {
-            // Read the body before surfacing the error so the
-            // caller's error message has the server's reason.
             return Err(consume_to_http_err(resp).await);
         };
         let Some(workspace_id) = workspace_id else {
@@ -238,14 +267,28 @@ impl ForgeClient {
         }
         // Retry once.
         let resp = self
-            .do_request_once(method, path, body_bytes, extra_headers)
+            .do_request_once(method, path, body_bytes, content_type, extra_headers)
             .await?;
-        let status = resp.status();
-        if status == StatusCode::UNAUTHORIZED {
+        if resp.status() == StatusCode::UNAUTHORIZED {
             return Err(ForgeError::RetryFailed {
                 inner: Box::new(consume_to_http_err(resp).await),
             });
         }
+        Ok(resp)
+    }
+
+    /// Request with the 401-retry interceptor wrapped around it.
+    /// Returns the response body bytes; callers decode as needed.
+    async fn do_request_with_retry(
+        &self,
+        method: Method,
+        path: &str,
+        body_bytes: Option<&[u8]>,
+        extra_headers: &[(String, String)],
+    ) -> Result<Vec<u8>, ForgeError> {
+        let resp = self
+            .send_with_retry(method, path, body_bytes, "application/json", extra_headers)
+            .await?;
         finish(resp).await
     }
 
@@ -338,6 +381,8 @@ impl ForgeClient {
 enum Method {
     Get,
     Post,
+    Put,
+    Head,
 }
 
 #[derive(Debug, serde::Deserialize)]

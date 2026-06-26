@@ -29,6 +29,7 @@ use std::path::PathBuf;
 
 use anyhow::{Context, Result};
 use clap::Args;
+use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -82,6 +83,21 @@ pub struct DeployArgs {
     /// intentional app replacement.
     #[arg(long)]
     allow_app_replace: bool,
+
+    /// Send wasm bytes INLINE in the deploy payload instead of the default
+    /// GitOps reference mode (upload each module once by content hash, then
+    /// deploy a reference). Use this against an older runtime that doesn't
+    /// resolve references, or a node without the artifact store configured.
+    #[arg(long)]
+    inline_wasm: bool,
+
+    /// Force a full re-converge, bypassing the no-op. Omits `manifest_hash`
+    /// from the payload so the runtime's opt-in no-op never fires — the
+    /// deploy always runs end-to-end (registry bump, warm-module eviction,
+    /// deploy row), even when the artifact set is byte-identical to what's
+    /// already live. Use it to redeploy identical artifacts on purpose.
+    #[arg(long)]
+    force: bool,
 }
 
 /// Manifest shape on disk. `wasm_bytes` is OMITTED in the file —
@@ -117,7 +133,19 @@ struct DeployedService {
 
 #[derive(Debug, Deserialize)]
 struct DeployResponse {
+    /// W4 — true when the runtime short-circuited a byte-identical
+    /// redeploy (incoming manifest_hash == live registry's). A no-op
+    /// response carries no `services` / `registry_version`, hence the
+    /// `#[serde(default)]` on those below.
+    #[serde(default)]
+    no_op: bool,
+    /// Desired-state identity echoed back (present on both a converged
+    /// deploy and a no-op).
+    #[serde(default)]
+    manifest_hash: Option<String>,
+    #[serde(default)]
     services: Vec<DeployedService>,
+    #[serde(default)]
     registry_version: u64,
     /// Phase E.5 — present only when the deploy carried an
     /// `app_bundle` section (i.e., the customer passed
@@ -173,6 +201,44 @@ fn manifest_artifact(path: impl Into<String>, kind: &str, bytes: &[u8]) -> serde
         "size": bytes.len() as i64,
         "kind": kind,
     })
+}
+
+/// Content-hash of a deploy's artifact set — the desired-state identity.
+///
+/// LOCKED cross-repo contract: this MUST reproduce forge-runtime's
+/// `compute_manifest_hash` (manage_routes.rs) byte-for-byte, so the CLI
+/// can compute the same `manifest_hash` the runtime stamps on the
+/// registry. The golden-vector test pins both sides to the same constant;
+/// changing the layout here without versioning it breaks that test.
+///
+/// Algorithm: take each artifact's `(path, content_hash)`; dedup by `path`
+/// (last write wins); sort ascending by `path` as raw UTF-8 bytes; for each
+/// surviving pair append `(path.len() u32 LE)||path||(content_hash.len()
+/// u32 LE)||content_hash`; the hash is the lowercase blake3 hex of the
+/// buffer. An empty set hashes the empty buffer.
+fn compute_manifest_hash(artifacts: &[serde_json::Value]) -> String {
+    use std::collections::BTreeMap;
+    // BTreeMap gives last-write-wins dedup by path AND ascending UTF-8
+    // byte-order iteration — both behaviours the contract requires.
+    let mut by_path: BTreeMap<String, String> = BTreeMap::new();
+    for a in artifacts {
+        let Some(o) = a.as_object() else { continue };
+        let (Some(path), Some(content_hash)) = (
+            o.get("path").and_then(|v| v.as_str()),
+            o.get("content_hash").and_then(|v| v.as_str()),
+        ) else {
+            continue;
+        };
+        by_path.insert(path.to_string(), content_hash.to_string());
+    }
+    let mut buf: Vec<u8> = Vec::new();
+    for (path, content_hash) in &by_path {
+        buf.extend_from_slice(&(path.len() as u32).to_le_bytes());
+        buf.extend_from_slice(path.as_bytes());
+        buf.extend_from_slice(&(content_hash.len() as u32).to_le_bytes());
+        buf.extend_from_slice(content_hash.as_bytes());
+    }
+    blake3::hash(&buf).to_hex().to_string()
 }
 
 /// Like [`manifest_artifact`] but also carries the verbatim source so the
@@ -242,6 +308,10 @@ pub async fn run(args: DeployArgs, client: &ForgeClient) -> Result<()> {
     // as each module's final (Component-wrapped) bytes are resolved.
     let mut wasm_artifacts: Vec<serde_json::Value> =
         Vec::with_capacity(manifest.wasm_modules.len());
+    // W3 — (content_hash, bytes) per module to upload by hash BEFORE the
+    // deploy (reference mode). Empty in `--inline-wasm` mode (bytes ride
+    // inline in the payload, no separate upload).
+    let mut wasm_uploads: Vec<(String, Vec<u8>)> = Vec::new();
     for entry in &manifest.wasm_modules {
         let resolved = wasm_by_name
             .get(&entry.service_name)
@@ -275,17 +345,29 @@ pub async fn run(args: DeployArgs, client: &ForgeClient) -> Result<()> {
                 .with_context(|| format!("wit-component wrap of {}", resolved.display()))?
         };
         // Hash the final (post-wrap) bytes — the exact content the
-        // runtime stores — before `bytes` moves into the payload.
+        // runtime stores AND the content address the artifact upload uses.
+        let content_hash = blake3::hash(&bytes).to_hex().to_string();
         wasm_artifacts.push(manifest_artifact(
             format!("wasm:{}::{}", entry.service_namespace, entry.service_name),
             "wasm",
             &bytes,
         ));
-        wasm_modules.push(serde_json::json!({
+        // Reference mode (default): the module entry carries only its
+        // identity; the runtime resolves the bytes from the artifact store
+        // via the `wasm:<ns>::<name>` manifest row's content_hash. Inline
+        // mode keeps the bytes in the payload for older runtimes.
+        let mut module = serde_json::json!({
             "service_namespace": entry.service_namespace,
             "service_name": entry.service_name,
-            "wasm_bytes": bytes,
-        }));
+        });
+        if args.inline_wasm {
+            if let Some(obj) = module.as_object_mut() {
+                obj.insert("wasm_bytes".into(), serde_json::json!(bytes));
+            }
+        } else {
+            wasm_uploads.push((content_hash, bytes));
+        }
+        wasm_modules.push(module);
     }
 
     // Phase E.4 — substrate app bundle (optional). When
@@ -330,6 +412,14 @@ pub async fn run(args: DeployArgs, client: &ForgeClient) -> Result<()> {
     // in the same runtime, so SEND_COMMITS_AHEAD flips true in lockstep.
     // (An unmodelled key — even null — would fail an older runtime's
     // decode, which is why it was gated.)
+    // W3 — content-addressed desired-state identity, computed CLIENT-SIDE
+    // reproducing forge-runtime's `compute_manifest_hash` byte-for-byte
+    // (locked cross-repo contract; the golden-vector test pins it). Sent in
+    // `DeployServicesRequest.manifest_hash`. The runtime recomputes the same
+    // value from the `manifest` array and stamps it on the live registry;
+    // sending it makes the contract explicit + verifiable on both sides.
+    let manifest_hash = compute_manifest_hash(&manifest_artifacts);
+
     const SEND_COMMITS_AHEAD: bool = true;
     let mut payload = serde_json::json!({
         "services": manifest.services,
@@ -348,6 +438,13 @@ pub async fn run(args: DeployArgs, client: &ForgeClient) -> Result<()> {
         // requires that runtime (same release as commits_ahead_main).
         "manifest": manifest_artifacts,
     });
+    // W4 desired-state identity. OMITTED under `--force` so the runtime's
+    // opt-in no-op never fires — the deploy then always converges (MEDIUM-2b).
+    // The artifact set is still sent in `manifest` (used for the deploy
+    // history + reference resolution); only the explicit hash field is dropped.
+    if !args.force && let Some(obj) = payload.as_object_mut() {
+        obj.insert("manifest_hash".into(), serde_json::json!(manifest_hash));
+    }
     if SEND_COMMITS_AHEAD && let Some(obj) = payload.as_object_mut() {
         obj.insert("commits_ahead_main".into(), serde_json::json!(git_ahead));
     }
@@ -357,10 +454,71 @@ pub async fn run(args: DeployArgs, client: &ForgeClient) -> Result<()> {
         obj.insert("allow_app_identity_change".into(), serde_json::json!(true));
     }
 
+    // W3 — artifact upload stage. For each wasm module, HEAD the
+    // content-addressed artifact route; on 404 PUT the raw bytes. An
+    // unchanged binary across deploys HEADs 200 and transfers ZERO bytes
+    // (server- + client-side dedup). Runs BEFORE the deploy so the
+    // referenced bytes are guaranteed present when the runtime resolves
+    // them — the upload-before-bump invariant `forge ship` mechanizes.
+    // Skipped entirely in `--inline-wasm` mode (bytes ride in the payload).
+    for (hash, bytes) in &wasm_uploads {
+        let path = format!("/api/v1/manage/artifacts/{hash}");
+        let status = client.head_status(&path).await.map_err(map_err)?;
+        match status {
+            StatusCode::OK => {
+                eprintln!("artifact {} already stored (dedup)", &hash[..16.min(hash.len())]);
+            }
+            StatusCode::NOT_FOUND => {
+                client
+                    .put_bytes(&path, bytes, "application/wasm")
+                    .await
+                    .map_err(map_err)?;
+                eprintln!(
+                    "uploaded artifact {} ({} bytes)",
+                    &hash[..16.min(hash.len())],
+                    bytes.len()
+                );
+            }
+            StatusCode::SERVICE_UNAVAILABLE => {
+                anyhow::bail!(
+                    "the artifact store is not available on this node (HEAD {path} → 503). \
+                     Re-run with --inline-wasm to send wasm bytes inline."
+                );
+            }
+            other => {
+                anyhow::bail!("unexpected status {other} from artifact HEAD {path}");
+            }
+        }
+    }
+
     let resp: DeployResponse = client
         .post_json("/api/v1/manage/wasm/deploy", &payload)
         .await
         .map_err(map_err)?;
+
+    // W4 — a manifest-hash no-op: the live deploy already matches this
+    // desired state, so the runtime made no change (registry version
+    // unchanged). Report it honestly and stop.
+    if resp.no_op {
+        if args.json {
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&serde_json::json!({
+                    "no_op": true,
+                    "manifest_hash": resp.manifest_hash,
+                }))?,
+            );
+        } else {
+            eprintln!(
+                "deploy: no-op — manifest unchanged{}. Registry version not bumped.",
+                resp.manifest_hash
+                    .as_deref()
+                    .map(|h| format!(" ({})", &h[..16.min(h.len())]))
+                    .unwrap_or_default(),
+            );
+        }
+        return Ok(());
+    }
 
     if args.json {
         println!(
@@ -1031,6 +1189,54 @@ fn collect_component_jsons(dir: &PathBuf) -> Result<Vec<BundledComponent>> {
 }
 
 #[cfg(test)]
+mod manifest_hash_tests {
+    use super::compute_manifest_hash;
+
+    // LOCKED golden vectors — these MUST match forge-runtime's
+    // `compute_manifest_hash` (the same constants pinned in its test
+    // module). If either side changes the byte layout, both this test and
+    // the runtime's `manifest_hash_golden_vector` break — the cross-repo
+    // hash contract failing closed by design.
+    const GOLDEN_MANIFEST_HASH: &str =
+        "b64fe6cb6ca950b7521b2693630672c0a30d22aadd116ae2f8c73735963c585e";
+    const EMPTY_MANIFEST_HASH: &str =
+        "af1349b9f5f9a1a6a0404dea36dcc9499bcb25c9adc112b7cc9a93cae41f3262";
+
+    fn golden_artifacts() -> Vec<serde_json::Value> {
+        vec![
+            serde_json::json!({"path": "app.wasm", "content_hash": "b3b3"}),
+            serde_json::json!({"path": "pages/index.html", "content_hash": "cafe"}),
+        ]
+    }
+
+    #[test]
+    fn golden_vector_matches_runtime() {
+        assert_eq!(compute_manifest_hash(&golden_artifacts()), GOLDEN_MANIFEST_HASH);
+    }
+
+    #[test]
+    fn empty_set_is_blake3_of_empty_buffer() {
+        assert_eq!(compute_manifest_hash(&[]), EMPTY_MANIFEST_HASH);
+    }
+
+    #[test]
+    fn order_independent_and_dedups_last_write_wins() {
+        // Reversed input → same hash (sort + dedup by path).
+        let mut reversed = golden_artifacts();
+        reversed.reverse();
+        assert_eq!(compute_manifest_hash(&reversed), GOLDEN_MANIFEST_HASH);
+        // A duplicate path keeps the LAST content_hash; here the last write
+        // restores the golden content_hash so the result is unchanged.
+        let deduped = vec![
+            serde_json::json!({"path": "app.wasm", "content_hash": "0000"}),
+            serde_json::json!({"path": "app.wasm", "content_hash": "b3b3"}),
+            serde_json::json!({"path": "pages/index.html", "content_hash": "cafe"}),
+        ];
+        assert_eq!(compute_manifest_hash(&deduped), GOLDEN_MANIFEST_HASH);
+    }
+}
+
+#[cfg(test)]
 mod app_bundle_tests {
     use super::*;
     use tempfile::TempDir;
@@ -1050,6 +1256,8 @@ mod app_bundle_tests {
             components_dir: None,
             json: false,
             allow_app_replace: false,
+            inline_wasm: false,
+            force: false,
         }
     }
 
