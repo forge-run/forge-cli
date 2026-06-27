@@ -11,6 +11,7 @@ pub mod email;
 pub mod login;
 pub mod logout;
 pub mod logs;
+pub mod init;
 pub mod new;
 pub mod pages;
 pub mod schema;

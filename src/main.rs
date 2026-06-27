@@ -123,6 +123,10 @@ enum Cmd {
     /// Scaffold a new forge workload from a starter template.
     New(cmd::new::NewArgs),
 
+    /// Scaffold a new GitOps-native workspace repo (app.json + config dirs +
+    /// git init). Push its `main` to deploy: `main` is the desired state.
+    Init(cmd::init::InitArgs),
+
     /// Upload static assets (CSS, JS, images) to the workspace's
     /// static directory. Each file becomes reachable at
     /// `https://<workspace>/static/<path>`.
@@ -250,6 +254,7 @@ async fn main() -> Result<()> {
             cmd::ship::run(s, &client).await
         }
         Cmd::New(args) => cmd::new::run(args).await,
+        Cmd::Init(args) => cmd::init::run(args).await,
         Cmd::Static(s) => {
             let cfg = config::resolve(cli.base_url, cli.token, cli.profile)?;
             let client = client::ForgeClient::new(cfg)?;
