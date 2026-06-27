@@ -43,6 +43,11 @@ regex = { version = "1", default-features = false, features = ["std"] }
 # no wasm coupling; safe to depend on directly for app.json /
 # pages / components validation in the deploy pipeline.
 forge-schema = { path = "../forge-schema" }
+# GitOps A5 — shared, PURE deploy-manifest assembly (content-addressing,
+# the locked manifest-hash algorithm, the forge.lock shape). Lives in the
+# forge-types workspace so forge-git (control-plane) derives a byte-identical
+# manifest from the same code — parity by construction, not by re-test.
+forge-manifest = { path = "../forge-types/crates/forge-manifest" }
 # Wrap the wasm32-wasip1 cdylib as a Component-Model artifact
 # before deploy. forge-runtime W3 cutover (2026-05-15) made the
 # runtime reject core modules — only Components instantiate. The

@@ -478,6 +478,7 @@ dependencies = [
  "base64",
  "blake3",
  "clap",
+ "forge-manifest",
  "forge-schema",
  "notify",
  "notify-debouncer-full",
@@ -497,6 +498,16 @@ dependencies = [
  "wat",
  "webbrowser",
  "wit-component 0.236.1",
+]
+
+[[package]]
+name = "forge-manifest"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "blake3",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

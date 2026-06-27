@@ -34,6 +34,14 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::client::{ForgeClient, ForgeError};
+// GitOps A5 — pure deploy-manifest assembly + the locked manifest-hash
+// algorithm now live in the shared `forge-manifest` crate so forge-git
+// derives a byte-identical manifest from the same code. The impure half
+// (fs reads, wasm build/wrap, validation) stays here and feeds these.
+use forge_manifest::{
+    compute_manifest_hash, logical_unit_bytes, manifest_artifact, manifest_artifact_with_content,
+    manifest_artifact_with_explicit_content, Lock,
+};
 
 #[derive(Debug, Args)]
 pub struct DeployArgs {
@@ -140,6 +148,16 @@ pub struct DeployArgs {
     #[arg(long, value_name = "PATH")]
     emit_manifest: Option<PathBuf>,
 
+    /// GitOps authoring — write `forge.lock` (the build-output identities this
+    /// deploy pins) to PATH as pretty-printed JSON:
+    /// `{version, wasm_modules:{"<ns>::<name>":"<blake3>"}, app_bundle_hash}`.
+    /// Sourced from the already-computed manifest rows (the `wasm` +
+    /// `app_bundle` kinds), so it's exactly the subset forge-git can't rebuild
+    /// without a build. Like `--emit-manifest`, emitted whether or not the
+    /// deploy applies — pair with `--no-apply` for a stage-only step.
+    #[arg(long, value_name = "PATH")]
+    emit_lock: Option<PathBuf>,
+
     /// GitOps staging — upload the artifacts to the content store (so the blobs
     /// the manifest references are present) but SKIP the final apply, leaving
     /// desired + live state untouched. Pair with `--emit-manifest` to stage a
@@ -236,94 +254,6 @@ fn git_context(dir: &std::path::Path) -> (Option<String>, Option<String>, Option
         .or_else(|| git(dir, &["rev-list", "--count", "master..HEAD"]))
         .and_then(|s| s.parse::<i64>().ok());
     (branch, head_sha, ahead)
-}
-
-/// blake3-hash an artifact's bytes into a manifest row:
-/// `{path, content_hash, size, kind}`. The content-addressing primitive
-/// the deploy-history diff is built on — an unchanged artifact across
-/// deploys keeps the same hash, so diffing two deploys reduces to a set
-/// difference over their `(path, content_hash)` pairs.
-fn manifest_artifact(path: impl Into<String>, kind: &str, bytes: &[u8]) -> serde_json::Value {
-    serde_json::json!({
-        "path": path.into(),
-        "content_hash": blake3::hash(bytes).to_hex().to_string(),
-        "size": bytes.len() as i64,
-        "kind": kind,
-    })
-}
-
-/// Content-hash of a deploy's artifact set — the desired-state identity.
-///
-/// LOCKED cross-repo contract: this MUST reproduce forge-runtime's
-/// `compute_manifest_hash` (manage_routes.rs) byte-for-byte, so the CLI
-/// can compute the same `manifest_hash` the runtime stamps on the
-/// registry. The golden-vector test pins both sides to the same constant;
-/// changing the layout here without versioning it breaks that test.
-///
-/// Algorithm: take each artifact's `(path, content_hash)`; dedup by `path`
-/// (last write wins); sort ascending by `path` as raw UTF-8 bytes; for each
-/// surviving pair append `(path.len() u32 LE)||path||(content_hash.len()
-/// u32 LE)||content_hash`; the hash is the lowercase blake3 hex of the
-/// buffer. An empty set hashes the empty buffer.
-fn compute_manifest_hash(artifacts: &[serde_json::Value]) -> String {
-    use std::collections::BTreeMap;
-    // BTreeMap gives last-write-wins dedup by path AND ascending UTF-8
-    // byte-order iteration — both behaviours the contract requires.
-    let mut by_path: BTreeMap<String, String> = BTreeMap::new();
-    for a in artifacts {
-        let Some(o) = a.as_object() else { continue };
-        let (Some(path), Some(content_hash)) = (
-            o.get("path").and_then(|v| v.as_str()),
-            o.get("content_hash").and_then(|v| v.as_str()),
-        ) else {
-            continue;
-        };
-        by_path.insert(path.to_string(), content_hash.to_string());
-    }
-    let mut buf: Vec<u8> = Vec::new();
-    for (path, content_hash) in &by_path {
-        buf.extend_from_slice(&(path.len() as u32).to_le_bytes());
-        buf.extend_from_slice(path.as_bytes());
-        buf.extend_from_slice(&(content_hash.len() as u32).to_le_bytes());
-        buf.extend_from_slice(content_hash.as_bytes());
-    }
-    blake3::hash(&buf).to_hex().to_string()
-}
-
-/// Like [`manifest_artifact`] but also carries the verbatim source so the
-/// deploy-history surface can compute a *semantic* diff (which op / route
-/// / RLS / branding key changed inside the file). Only used for the small
-/// structured manifests (app.json, service.json) — wasm/static stay
-/// hash-only via [`manifest_artifact`].
-fn manifest_artifact_with_content(
-    path: impl Into<String>,
-    kind: &str,
-    bytes: &[u8],
-) -> serde_json::Value {
-    manifest_artifact_with_explicit_content(path, kind, bytes, &String::from_utf8_lossy(bytes))
-}
-
-/// Like [`manifest_artifact_with_content`] but lets the persisted `content`
-/// differ from the hashed bytes. Used for pages: the `content_hash` covers
-/// the full logical unit (page.json + template + css) so any edit re-hashes
-/// and shows in the file diff, while the stored `content` is just the small
-/// page.json manifest — enough for the services/pages navigator + the
-/// op↔page binding graph to introspect a page's route, auth tier, and the
-/// ops it consumes, without bloating the manifest table with template+css.
-fn manifest_artifact_with_explicit_content(
-    path: impl Into<String>,
-    kind: &str,
-    hash_bytes: &[u8],
-    content: &str,
-) -> serde_json::Value {
-    let mut a = manifest_artifact(path, kind, hash_bytes);
-    if let Some(obj) = a.as_object_mut() {
-        obj.insert(
-            "content".into(),
-            serde_json::Value::String(content.to_string()),
-        );
-    }
-    a
 }
 
 /// GitOps schema converge — collect each `schemas/*.json` (the declarative DDL
@@ -674,6 +604,28 @@ pub async fn run(args: DeployArgs, client: &ForgeClient) -> Result<()> {
         );
     }
 
+    // GitOps authoring — emit `forge.lock`: the build-output identities (wasm
+    // modules + app bundle) projected from the SAME manifest rows above, via
+    // the shared `forge-manifest` crate so forge-git derives an identical lock
+    // from an identical manifest. Written regardless of `--no-apply`, mirroring
+    // `--emit-manifest`, so a stage-only step can commit both files together.
+    if let Some(path) = args.emit_lock.as_ref() {
+        let lock = Lock::from_manifest_rows(&manifest_artifacts);
+        let json = serde_json::to_string_pretty(&lock).context("serialize lock for --emit-lock")?;
+        std::fs::write(path, json)
+            .with_context(|| format!("writing lock to {}", path.display()))?;
+        eprintln!(
+            "wrote lock ({} wasm module(s){}) to {}",
+            lock.wasm_modules.len(),
+            if lock.app_bundle_hash.is_some() {
+                " + app bundle"
+            } else {
+                ""
+            },
+            path.display(),
+        );
+    }
+
     // Git provenance for the deploy record (branch / sha / commits-ahead).
     // The runtime pulls these off the body before the strict decode.
     let (git_branch, git_sha, git_ahead) = git_context(&manifest_dir);
@@ -997,30 +949,6 @@ async fn build_app_bundle(
         "head_extras": head_extras,
     });
     Ok((bundle, artifacts))
-}
-
-/// Canonical byte sequence for a logical unit (page / component) made
-/// of a manifest struct + sibling template + css. Serializes the
-/// manifest deterministically (serde struct field order is fixed) and
-/// length-delimits the three parts so two units can't collide by
-/// shifting bytes across the template/css boundary.
-fn logical_unit_bytes<M: serde::Serialize>(
-    manifest: &M,
-    template_body: &str,
-    css_body: &str,
-) -> Result<Vec<u8>> {
-    let manifest_json = serde_json::to_vec(manifest).context("serialize logical-unit manifest")?;
-    let mut buf =
-        Vec::with_capacity(manifest_json.len() + template_body.len() + css_body.len() + 24);
-    for part in [
-        manifest_json.as_slice(),
-        template_body.as_bytes(),
-        css_body.as_bytes(),
-    ] {
-        buf.extend_from_slice(&(part.len() as u64).to_le_bytes());
-        buf.extend_from_slice(part);
-    }
-    Ok(buf)
 }
 
 /// Hash every file under `static/` into the manifest. Static assets
@@ -1482,53 +1410,10 @@ fn collect_component_jsons(dir: &PathBuf) -> Result<Vec<BundledComponent>> {
     Ok(out)
 }
 
-#[cfg(test)]
-mod manifest_hash_tests {
-    use super::compute_manifest_hash;
-
-    // LOCKED golden vectors — these MUST match forge-runtime's
-    // `compute_manifest_hash` (the same constants pinned in its test
-    // module). If either side changes the byte layout, both this test and
-    // the runtime's `manifest_hash_golden_vector` break — the cross-repo
-    // hash contract failing closed by design.
-    const GOLDEN_MANIFEST_HASH: &str =
-        "b64fe6cb6ca950b7521b2693630672c0a30d22aadd116ae2f8c73735963c585e";
-    const EMPTY_MANIFEST_HASH: &str =
-        "af1349b9f5f9a1a6a0404dea36dcc9499bcb25c9adc112b7cc9a93cae41f3262";
-
-    fn golden_artifacts() -> Vec<serde_json::Value> {
-        vec![
-            serde_json::json!({"path": "app.wasm", "content_hash": "b3b3"}),
-            serde_json::json!({"path": "pages/index.html", "content_hash": "cafe"}),
-        ]
-    }
-
-    #[test]
-    fn golden_vector_matches_runtime() {
-        assert_eq!(compute_manifest_hash(&golden_artifacts()), GOLDEN_MANIFEST_HASH);
-    }
-
-    #[test]
-    fn empty_set_is_blake3_of_empty_buffer() {
-        assert_eq!(compute_manifest_hash(&[]), EMPTY_MANIFEST_HASH);
-    }
-
-    #[test]
-    fn order_independent_and_dedups_last_write_wins() {
-        // Reversed input → same hash (sort + dedup by path).
-        let mut reversed = golden_artifacts();
-        reversed.reverse();
-        assert_eq!(compute_manifest_hash(&reversed), GOLDEN_MANIFEST_HASH);
-        // A duplicate path keeps the LAST content_hash; here the last write
-        // restores the golden content_hash so the result is unchanged.
-        let deduped = vec![
-            serde_json::json!({"path": "app.wasm", "content_hash": "0000"}),
-            serde_json::json!({"path": "app.wasm", "content_hash": "b3b3"}),
-            serde_json::json!({"path": "pages/index.html", "content_hash": "cafe"}),
-        ];
-        assert_eq!(compute_manifest_hash(&deduped), GOLDEN_MANIFEST_HASH);
-    }
-}
+// NOTE: the manifest-hash golden-vector test moved to the shared
+// `forge-manifest` crate (crates/forge-manifest/src/lib.rs), where the
+// cross-repo hash contract is now pinned for every producer (forge-cli +
+// forge-git). See `forge_manifest::manifest_hash_tests`.
 
 #[cfg(test)]
 mod app_bundle_tests {
@@ -1556,6 +1441,7 @@ mod app_bundle_tests {
             force: false,
             force_unpin: false,
             emit_manifest: None,
+            emit_lock: None,
             no_apply: false,
         }
     }
