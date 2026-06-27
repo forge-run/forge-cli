@@ -43,6 +43,16 @@ jobs:
           token: ${{ secrets.FORGE_CROSS_REPO_TOKEN }}
           path: forge-schema
 
+      # forge-cli has a `forge-manifest = { path = "../forge-types/crates/forge-manifest" }`
+      # dep (the shared manifest-assembly crate), so forge-types must be checked
+      # out as a sibling too or the build/test can't resolve the path.
+      - name: Checkout forge-types
+        uses: actions/checkout@v4
+        with:
+          repository: forge-run/forge-types
+          token: ${{ secrets.FORGE_CROSS_REPO_TOKEN }}
+          path: forge-types
+
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
