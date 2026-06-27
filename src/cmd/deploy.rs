@@ -39,8 +39,8 @@ use crate::client::{ForgeClient, ForgeError};
 // derives a byte-identical manifest from the same code. The impure half
 // (fs reads, wasm build/wrap, validation) stays here and feeds these.
 use forge_manifest::{
-    compute_manifest_hash, logical_unit_bytes, manifest_artifact, manifest_artifact_with_content,
-    manifest_artifact_with_explicit_content, Lock,
+    Lock, compute_manifest_hash, logical_unit_bytes, manifest_artifact,
+    manifest_artifact_with_content, manifest_artifact_with_explicit_content,
 };
 
 #[derive(Debug, Args)]
@@ -302,8 +302,8 @@ fn collect_schema_artifacts(
 
     let mut out = Vec::with_capacity(files.len());
     for path in files {
-        let bytes = std::fs::read(&path)
-            .with_context(|| format!("reading schema {}", path.display()))?;
+        let bytes =
+            std::fs::read(&path).with_context(|| format!("reading schema {}", path.display()))?;
         let parsed: serde_json::Value = serde_json::from_slice(&bytes)
             .with_context(|| format!("parsing schema {}", path.display()))?;
         let has_name = parsed
@@ -375,8 +375,8 @@ fn collect_config_data_artifacts(
 
     let mut out = Vec::with_capacity(files.len());
     for path in files {
-        let bytes =
-            std::fs::read(&path).with_context(|| format!("reading config-data {}", path.display()))?;
+        let bytes = std::fs::read(&path)
+            .with_context(|| format!("reading config-data {}", path.display()))?;
         let parsed: serde_json::Value = serde_json::from_slice(&bytes)
             .with_context(|| format!("parsing config-data {}", path.display()))?;
         let has_table = parsed
@@ -391,10 +391,7 @@ fn collect_config_data_artifacts(
             );
         }
         if !parsed.get("rows").map(|v| v.is_array()).unwrap_or(false) {
-            anyhow::bail!(
-                "config-data {} is missing a `rows` array",
-                path.display()
-            );
+            anyhow::bail!("config-data {} is missing a `rows` array", path.display());
         }
         let file_name = path
             .file_name()
@@ -666,7 +663,9 @@ pub async fn run(args: DeployArgs, client: &ForgeClient) -> Result<()> {
     // opt-in no-op never fires — the deploy then always converges (MEDIUM-2b).
     // The artifact set is still sent in `manifest` (used for the deploy
     // history + reference resolution); only the explicit hash field is dropped.
-    if !args.force && let Some(obj) = payload.as_object_mut() {
+    if !args.force
+        && let Some(obj) = payload.as_object_mut()
+    {
         obj.insert("manifest_hash".into(), serde_json::json!(manifest_hash));
     }
     if SEND_COMMITS_AHEAD && let Some(obj) = payload.as_object_mut() {
@@ -698,7 +697,10 @@ pub async fn run(args: DeployArgs, client: &ForgeClient) -> Result<()> {
         let status = client.head_status(&path).await.map_err(map_err)?;
         match status {
             StatusCode::OK => {
-                eprintln!("artifact {} already stored (dedup)", &hash[..16.min(hash.len())]);
+                eprintln!(
+                    "artifact {} already stored (dedup)",
+                    &hash[..16.min(hash.len())]
+                );
             }
             StatusCode::NOT_FOUND => {
                 client
@@ -1477,7 +1479,10 @@ mod app_bundle_tests {
         // Sorted by path: gadgets before widgets.
         assert_eq!(rows[0]["path"], "schemas/gadgets.json");
         assert_eq!(rows[0]["kind"], "schema");
-        assert!(rows[0]["content"].is_string(), "schema rides inline as content");
+        assert!(
+            rows[0]["content"].is_string(),
+            "schema rides inline as content"
+        );
         assert!(rows[0]["content_hash"].is_string());
         assert_eq!(rows[1]["path"], "schemas/widgets.json");
     }
@@ -1489,7 +1494,11 @@ mod app_bundle_tests {
         let app_path = tmp.path().join("app.json");
         write(tmp.path(), "app.json", "{}");
         let args = deploy_args(Some(app_path));
-        assert!(collect_schema_artifacts(&args, tmp.path()).unwrap().is_empty());
+        assert!(
+            collect_schema_artifacts(&args, tmp.path())
+                .unwrap()
+                .is_empty()
+        );
     }
 
     #[test]
@@ -1513,7 +1522,11 @@ mod app_bundle_tests {
 
         // Valid JSON but no `name` is also rejected (the converge needs a table).
         let tmp2 = TempDir::new().unwrap();
-        write(tmp2.path(), "schemas/nameless.json", r#"{"archetype":"Base"}"#);
+        write(
+            tmp2.path(),
+            "schemas/nameless.json",
+            r#"{"archetype":"Base"}"#,
+        );
         let mut args2 = deploy_args(None);
         args2.schema_dir = Some(tmp2.path().join("schemas"));
         assert!(collect_schema_artifacts(&args2, tmp2.path()).is_err());
@@ -1542,7 +1555,10 @@ mod app_bundle_tests {
         // Sorted by path: cms_content before plan_catalog.
         assert_eq!(rows[0]["path"], "data/cms_content.json");
         assert_eq!(rows[0]["kind"], "config_data");
-        assert!(rows[0]["content"].is_string(), "rowset rides inline as content");
+        assert!(
+            rows[0]["content"].is_string(),
+            "rowset rides inline as content"
+        );
         assert!(rows[0]["content_hash"].is_string());
         assert_eq!(rows[1]["path"], "data/plan_catalog.json");
     }
@@ -1553,7 +1569,11 @@ mod app_bundle_tests {
         let app_path = tmp.path().join("app.json");
         write(tmp.path(), "app.json", "{}");
         let args = deploy_args(Some(app_path));
-        assert!(collect_config_data_artifacts(&args, tmp.path()).unwrap().is_empty());
+        assert!(
+            collect_config_data_artifacts(&args, tmp.path())
+                .unwrap()
+                .is_empty()
+        );
     }
 
     #[test]

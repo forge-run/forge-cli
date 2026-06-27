@@ -123,7 +123,10 @@ fn scaffold_files(app_name: &str) -> Vec<(&'static str, String)> {
         ("schemas/.gitkeep", dir_note("table schema JSON (*.json)")),
         ("data/.gitkeep", dir_note("config-data (<table>.json)")),
         ("pages/.gitkeep", dir_note("pages (*.page.json/html/css)")),
-        ("components/.gitkeep", dir_note("components (*.component.*)")),
+        (
+            "components/.gitkeep",
+            dir_note("components (*.component.*)"),
+        ),
     ]
 }
 
@@ -170,8 +173,7 @@ pub async fn run(args: InitArgs) -> Result<()> {
             std::fs::create_dir_all(parent)
                 .with_context(|| format!("create dir {}", parent.display()))?;
         }
-        std::fs::write(&dest, contents)
-            .with_context(|| format!("write {}", dest.display()))?;
+        std::fs::write(&dest, contents).with_context(|| format!("write {}", dest.display()))?;
         written += 1;
     }
 
@@ -183,7 +185,52 @@ pub async fn run(args: InitArgs) -> Result<()> {
         "scaffolded git-native workspace `{app_name}` in {} ({written} file(s) written, {skipped} kept)",
         target.display()
     );
-    println!("next: `forge ws use <id>` → `git remote add forge https://git.forge.run/<id>/{app_name}` → `git push forge main`");
+    println!(
+        "next: `forge ws use <id>` → `git remote add forge https://git.forge.run/<id>/{app_name}` → `git push forge main`"
+    );
+    Ok(())
+}
+
+/// `git init` (idempotent) + an initial commit of the scaffold, so the repo's
+/// `main` is immediately a valid desired state ready to push. Best-effort on
+/// the commit (a repo with no configured identity still gets `git init` + the
+/// files; the user commits themselves). Never fails the scaffold.
+fn init_git(target: &Path) -> Result<()> {
+    let git = |args: &[&str]| -> std::io::Result<std::process::Output> {
+        std::process::Command::new("git")
+            .args(args)
+            .current_dir(target)
+            .output()
+    };
+    // Already a repo? Leave it (idempotent).
+    let is_repo = git(&["rev-parse", "--is-inside-work-tree"])
+        .map(|o| o.status.success())
+        .unwrap_or(false);
+    if !is_repo {
+        // -b main: the protected default branch the converge tracks.
+        if git(&["init", "-b", "main"])
+            .map(|o| !o.status.success())
+            .unwrap_or(true)
+        {
+            // Older git without -b: fall back to plain init.
+            let _ = git(&["init"]);
+        }
+    }
+    let _ = git(&["add", "-A"]);
+    // Only commit if something is staged AND an identity exists; otherwise the
+    // user finishes the commit. Don't hard-fail the scaffold on commit issues.
+    let has_staged = git(&["diff", "--cached", "--quiet"])
+        .map(|o| !o.status.success()) // non-zero exit == there ARE staged changes
+        .unwrap_or(false);
+    if has_staged {
+        let out = git(&["commit", "-m", "forge init: git-native workspace scaffold"]);
+        match out {
+            Ok(o) if o.status.success() => {}
+            _ => println!(
+                "(scaffold staged; finish with `git commit` — set user.name/user.email if git asks)"
+            ),
+        }
+    }
     Ok(())
 }
 
@@ -205,7 +252,10 @@ mod tests {
             serde_json::from_str(app).expect("scaffold app.json parses as AppManifest");
         assert_eq!(manifest.app.name, "my-app");
         let errors = forge_schema::validate_app_manifest(&manifest);
-        assert!(errors.is_empty(), "scaffold app.json must validate: {errors:?}");
+        assert!(
+            errors.is_empty(),
+            "scaffold app.json must validate: {errors:?}"
+        );
     }
 
     #[test]
@@ -219,47 +269,10 @@ mod tests {
             "schemas/.gitkeep",
             "data/.gitkeep",
         ] {
-            assert!(paths.contains(&required), "missing scaffold file {required}");
+            assert!(
+                paths.contains(&required),
+                "missing scaffold file {required}"
+            );
         }
     }
-}
-
-/// `git init` (idempotent) + an initial commit of the scaffold, so the repo's
-/// `main` is immediately a valid desired state ready to push. Best-effort on
-/// the commit (a repo with no configured identity still gets `git init` + the
-/// files; the user commits themselves). Never fails the scaffold.
-fn init_git(target: &Path) -> Result<()> {
-    let git = |args: &[&str]| -> std::io::Result<std::process::Output> {
-        std::process::Command::new("git")
-            .args(args)
-            .current_dir(target)
-            .output()
-    };
-    // Already a repo? Leave it (idempotent).
-    let is_repo = git(&["rev-parse", "--is-inside-work-tree"])
-        .map(|o| o.status.success())
-        .unwrap_or(false);
-    if !is_repo {
-        // -b main: the protected default branch the converge tracks.
-        if git(&["init", "-b", "main"]).map(|o| !o.status.success()).unwrap_or(true) {
-            // Older git without -b: fall back to plain init.
-            let _ = git(&["init"]);
-        }
-    }
-    let _ = git(&["add", "-A"]);
-    // Only commit if something is staged AND an identity exists; otherwise the
-    // user finishes the commit. Don't hard-fail the scaffold on commit issues.
-    let has_staged = git(&["diff", "--cached", "--quiet"])
-        .map(|o| !o.status.success()) // non-zero exit == there ARE staged changes
-        .unwrap_or(false);
-    if has_staged {
-        let out = git(&["commit", "-m", "forge init: git-native workspace scaffold"]);
-        match out {
-            Ok(o) if o.status.success() => {}
-            _ => println!(
-                "(scaffold staged; finish with `git commit` — set user.name/user.email if git asks)"
-            ),
-        }
-    }
-    Ok(())
 }
