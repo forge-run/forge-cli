@@ -179,7 +179,11 @@ pub(crate) fn compile_workspace_graph(root: &std::path::Path) -> Result<()> {
             a.pages.len(),
             a.components.len(),
             a.manifest.consumes.join(","),
-            if a.has_wasm { "[wasm]" } else { "[declarative]" },
+            if a.has_wasm {
+                "[wasm]"
+            } else {
+                "[declarative]"
+            },
         );
     }
     println!("{}", root.join(".forge").display());

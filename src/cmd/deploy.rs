@@ -448,8 +448,8 @@ fn collect_workspace_schema_artifacts(base: &std::path::Path) -> Result<Vec<serd
 fn collect_workspace_data_artifacts(base: &std::path::Path) -> Result<Vec<serde_json::Value>> {
     let mut out = Vec::new();
     for (path, abs) in gather_domain_files(base, "seeds", ".json")? {
-        let bytes = std::fs::read(&abs)
-            .with_context(|| format!("reading seed {}", abs.display()))?;
+        let bytes =
+            std::fs::read(&abs).with_context(|| format!("reading seed {}", abs.display()))?;
         let parsed: serde_json::Value = serde_json::from_slice(&bytes)
             .with_context(|| format!("parsing seed {}", abs.display()))?;
         let has_table = parsed
@@ -1590,7 +1590,11 @@ mod app_bundle_tests {
     /// seed deploy collection should source from domains/* in this layout.
     fn workspace_tree() -> TempDir {
         let tmp = TempDir::new().unwrap();
-        write(tmp.path(), "workspace.json", r#"{"workspace":{"name":"t"}}"#);
+        write(
+            tmp.path(),
+            "workspace.json",
+            r#"{"workspace":{"name":"t"}}"#,
+        );
         write(
             tmp.path(),
             "domains/billing/schemas/plan_products.table.json",
@@ -1615,10 +1619,7 @@ mod app_bundle_tests {
         // app_manifest=None → base resolves to manifest_dir (the workspace root).
         let rows = collect_schema_artifacts(&deploy_args(None), tmp.path()).unwrap();
         assert_eq!(rows.len(), 2, "one schema row per domain table");
-        let paths: Vec<&str> = rows
-            .iter()
-            .map(|r| r["path"].as_str().unwrap())
-            .collect();
+        let paths: Vec<&str> = rows.iter().map(|r| r["path"].as_str().unwrap()).collect();
         // Deterministic, domain-then-file sorted, provenance preserved.
         assert_eq!(
             paths,
@@ -1637,10 +1638,7 @@ mod app_bundle_tests {
         let rows = collect_config_data_artifacts(&deploy_args(None), tmp.path()).unwrap();
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0]["kind"], "config_data");
-        assert_eq!(
-            rows[0]["path"],
-            "domains/billing/seeds/plan_products.json"
-        );
+        assert_eq!(rows[0]["path"], "domains/billing/seeds/plan_products.json");
     }
 
     #[test]
@@ -1673,7 +1671,11 @@ mod app_bundle_tests {
     fn flat_layout_still_works_without_workspace_json() {
         // No workspace.json → the legacy flat schemas/ dir is used.
         let tmp = TempDir::new().unwrap();
-        write(tmp.path(), "schemas/widgets.json", r#"{"name":"widgets","columns":[]}"#);
+        write(
+            tmp.path(),
+            "schemas/widgets.json",
+            r#"{"name":"widgets","columns":[]}"#,
+        );
         let rows = collect_schema_artifacts(&deploy_args(None), tmp.path()).unwrap();
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0]["path"], "schemas/widgets.json");
