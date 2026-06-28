@@ -43,6 +43,15 @@ pub async fn run(args: BuildArgs) -> Result<()> {
         .canonicalize()
         .context("resolving --manifest-dir")?;
 
+    // Workspace mode (domain/app/capability layout): when a
+    // `workspace.json` is present, `forge build` compiles the module graph
+    // — walking domains/ + apps/, enforcing consumes (D2) + capability
+    // config (D7), and emitting the generated `.forge/` set. A bad graph
+    // fails here (the cargo line), not first request.
+    if manifest_dir.join("workspace.json").exists() {
+        return compile_workspace_graph(&manifest_dir);
+    }
+
     let manifest = manifest_dir.join("Cargo.toml");
     if !manifest.exists() {
         anyhow::bail!(
@@ -127,6 +136,54 @@ pub async fn run(args: BuildArgs) -> Result<()> {
             HARD_SIZE_BYTES / 1_048_576,
         );
     }
+    Ok(())
+}
+
+/// Workspace-mode build: run the domain/app/capability compiler over the
+/// tree rooted at `root`, failing the build on any graph error (consumes
+/// violation, unknown capability, malformed manifest, missing app/domain).
+/// Emits the generated `.forge/` set and prints the module graph summary.
+pub(crate) fn compile_workspace_graph(root: &std::path::Path) -> Result<()> {
+    let scratch = root.join("target").join("forge-workspace");
+    std::fs::create_dir_all(&scratch)
+        .with_context(|| format!("creating workspace scratch dir {}", scratch.display()))?;
+
+    eprintln!("compiling workspace graph at {}", root.display());
+    let graph = forge_web_build::compile_workspace(root, &scratch)
+        .map_err(|e| anyhow::anyhow!("workspace compile failed: {e}"))?;
+
+    let domain_modules = graph.domains.iter().filter(|d| d.has_wasm).count();
+    let app_modules = graph.apps.iter().filter(|a| a.has_wasm).count();
+    eprintln!(
+        "  {} domain(s) ({} with wasm), {} app(s) ({} with wasm) → {} module(s)",
+        graph.domains.len(),
+        domain_modules,
+        graph.apps.len(),
+        app_modules,
+        graph.module_count(),
+    );
+    for d in &graph.domains {
+        eprintln!(
+            "  domain {:<14} ops:{:<3} tables:{:<3} workflows:{:<3} {}",
+            d.name,
+            d.ops.len(),
+            d.tables.len(),
+            d.workflows.len(),
+            if d.has_wasm { "[wasm]" } else { "[data-only]" },
+        );
+    }
+    for a in &graph.apps {
+        eprintln!(
+            "  app    {:<14} pages:{:<3} components:{:<3} consumes:{} {}",
+            a.name,
+            a.pages.len(),
+            a.components.len(),
+            a.manifest.consumes.join(","),
+            if a.has_wasm { "[wasm]" } else { "[declarative]" },
+        );
+    }
+    println!("{}", root.join(".forge").display());
+    eprintln!("workspace graph OK — generated .forge/ written");
     Ok(())
 }
 
@@ -282,6 +339,58 @@ fn read_crate_name(manifest: &std::path::Path) -> Result<String> {
 mod tests {
     use super::*;
     use std::io::Write;
+
+    /// Build a minimal valid workspace tree; `consumes` controls whether
+    /// the portal app consumes the billing domain it binds.
+    fn ws_fixture(consumes: &str) -> tempfile::TempDir {
+        let td = tempfile::tempdir().unwrap();
+        let r = td.path();
+        let w = |rel: &str, body: &str| {
+            let p = r.join(rel);
+            std::fs::create_dir_all(p.parent().unwrap()).unwrap();
+            std::fs::write(p, body).unwrap();
+        };
+        w(
+            "workspace.json",
+            r#"{ "workspace": { "name": "t" }, "hosts": { "app.x": { "app": "portal" } } }"#,
+        );
+        w("domains/billing/domain.json", r#"{ "name": "billing" }"#);
+        w(
+            "domains/billing/service.json",
+            r#"{ "name": "billing", "operations": [ { "name": "plan_catalog" } ] }"#,
+        );
+        w("domains/billing/services/catalog.rs", "// ops");
+        w(
+            "apps/portal/app.json",
+            &format!(
+                r#"{{ "schema_version": "0.1", "app": {{ "name": "portal", "version": "1.0.0" }}, "routing_claim": {{ "host": "@default", "path": "/" }}, "consumes": [{consumes}] }}"#
+            ),
+        );
+        w(
+            "apps/portal/pages/home.page.json",
+            r#"{ "schema_version": "0.1", "name": "home", "route": { "method": "GET", "path": "/" }, "rendering": "BufferedHtml", "data": { "x": { "query": "@op:billing::plan_catalog", "params": {} } }, "template": { "kind": "Path", "path": "pages/home.page.html" } }"#,
+        );
+        w("apps/portal/pages/home.page.html", "<h1>h</h1>");
+        td
+    }
+
+    #[test]
+    fn forge_build_gates_a_valid_workspace() {
+        let td = ws_fixture("\"billing\"");
+        compile_workspace_graph(td.path()).expect("valid workspace compiles");
+        assert!(td.path().join(".forge/forge.lock").is_file());
+    }
+
+    #[test]
+    fn forge_build_fails_on_consumes_violation() {
+        // portal binds billing but does not consume it → build must fail.
+        let td = ws_fixture("");
+        let err = compile_workspace_graph(td.path()).unwrap_err();
+        assert!(
+            format!("{err:#}").contains("consume"),
+            "expected a consumes failure, got: {err:#}"
+        );
+    }
 
     #[test]
     fn read_crate_name_handles_well_formed_manifest() {

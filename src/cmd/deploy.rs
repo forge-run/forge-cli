@@ -269,19 +269,99 @@ fn git_context(dir: &std::path::Path) -> (Option<String>, Option<String>, Option
 /// (a deploy may carry no schema); an explicit dir that's missing is an error.
 /// Each file is parsed here so a malformed schema fails fast in the CLI — the
 /// runtime trusts the CLI's pre-validation.
+/// Resolve the directory a deploy reads flat `schemas/` / `data/` from:
+/// an explicit override, else next to `--app-manifest`, else the deploy
+/// manifest's dir.
+fn deploy_base_dir(args: &DeployArgs, manifest_dir: &std::path::Path) -> std::path::PathBuf {
+    args.app_manifest
+        .as_ref()
+        .and_then(|p| p.parent())
+        .map(|p| p.to_path_buf())
+        .unwrap_or_else(|| manifest_dir.to_path_buf())
+}
+
+/// Walk `domains/*/<subdir>/*<suffix>` under `root`, returning sorted
+/// `(manifest_path, abs_path)` pairs. Deterministic: domains sorted, then
+/// files within each. The manifest path preserves domain provenance
+/// (`domains/<d>/<subdir>/<file>`) so the converge diff + code browser
+/// show which domain owns each schema/seed.
+fn gather_domain_files(
+    root: &std::path::Path,
+    subdir: &str,
+    suffix: &str,
+) -> Result<Vec<(String, PathBuf)>> {
+    let domains_dir = root.join("domains");
+    if !domains_dir.is_dir() {
+        return Ok(Vec::new());
+    }
+    let mut domain_dirs: Vec<PathBuf> = std::fs::read_dir(&domains_dir)
+        .with_context(|| format!("reading domains dir {}", domains_dir.display()))?
+        .filter_map(|e| e.ok().map(|e| e.path()))
+        .filter(|p| p.is_dir())
+        .collect();
+    domain_dirs.sort();
+
+    let mut out = Vec::new();
+    for d in domain_dirs {
+        let dname = d
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or_default()
+            .to_string();
+        let sub = d.join(subdir);
+        if !sub.is_dir() {
+            continue;
+        }
+        let mut files: Vec<PathBuf> = std::fs::read_dir(&sub)
+            .with_context(|| format!("reading {}", sub.display()))?
+            .filter_map(|e| e.ok().map(|e| e.path()))
+            .filter(|p| {
+                p.is_file()
+                    && p.file_name()
+                        .and_then(|n| n.to_str())
+                        .is_some_and(|n| n.ends_with(suffix))
+            })
+            .collect();
+        files.sort();
+        for f in files {
+            let file = f
+                .file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or_default()
+                .to_string();
+            out.push((format!("domains/{dname}/{subdir}/{file}"), f));
+        }
+    }
+    Ok(out)
+}
+
+/// True when the deploy is rooted at a domain/app workspace (a
+/// `workspace.json` + a `domains/` tree at the base). In that case
+/// schemas + seeds come from `domains/*/{schemas,seeds}` rather than the
+/// flat single-app `schemas/` + `data/` dirs.
+fn is_workspace_layout(base: &std::path::Path) -> bool {
+    base.join("workspace.json").is_file() && base.join("domains").is_dir()
+}
+
 fn collect_schema_artifacts(
     args: &DeployArgs,
     manifest_dir: &std::path::Path,
 ) -> Result<Vec<serde_json::Value>> {
+    // Workspace layout: gather every domain's typed `*.table.json`, validated
+    // through the same `forge-schema` path the Phase-1 compiler uses, and emit
+    // them as `kind:"schema"` rows — the data model is repo-owned, applied on
+    // deploy (retires per-table `forge schema apply` as the authoring path).
+    if args.schema_dir.is_none() {
+        let base = deploy_base_dir(args, manifest_dir);
+        if is_workspace_layout(&base) {
+            return collect_workspace_schema_artifacts(&base);
+        }
+    }
+
     let (dir, explicit) = match args.schema_dir.as_ref() {
         Some(d) => (d.clone(), true),
         None => {
-            let base = args
-                .app_manifest
-                .as_ref()
-                .and_then(|p| p.parent())
-                .map(|p| p.to_path_buf())
-                .unwrap_or_else(|| manifest_dir.to_path_buf());
+            let base = deploy_base_dir(args, manifest_dir);
             (base.join("schemas"), false)
         }
     };
@@ -342,19 +422,70 @@ fn collect_schema_artifacts(
 /// A defaulted dir that's absent is skipped; an explicit dir that's missing is
 /// an error. Each file is parsed here so a malformed artifact fails fast in the
 /// CLI — the runtime trusts the CLI's pre-validation.
+/// Workspace-mode schema collection: every `domains/*/schemas/*.table.json`,
+/// parsed + validated as a typed `TableManifest` (the Phase-1 contract), emitted
+/// as inline `kind:"schema"` rows for the runtime's converge to apply.
+fn collect_workspace_schema_artifacts(base: &std::path::Path) -> Result<Vec<serde_json::Value>> {
+    let mut out = Vec::new();
+    for (path, abs) in gather_domain_files(base, "schemas", ".table.json")? {
+        let bytes =
+            std::fs::read(&abs).with_context(|| format!("reading schema {}", abs.display()))?;
+        let tm = forge_schema::parse_table_file(&bytes)
+            .with_context(|| format!("parsing table schema {}", abs.display()))?;
+        let errs = forge_schema::validate_table_manifest(&tm);
+        if !errs.is_empty() {
+            anyhow::bail!("table schema {} invalid: {errs:?}", abs.display());
+        }
+        out.push(manifest_artifact_with_content(path, "schema", &bytes));
+    }
+    Ok(out)
+}
+
+/// Workspace-mode seed/config-data collection: every `domains/*/seeds/*.json`
+/// (the `{table, key?, rows}` config-data shape), emitted as inline
+/// `kind:"config_data"` rows the runtime projects into managed tables after the
+/// schema applies.
+fn collect_workspace_data_artifacts(base: &std::path::Path) -> Result<Vec<serde_json::Value>> {
+    let mut out = Vec::new();
+    for (path, abs) in gather_domain_files(base, "seeds", ".json")? {
+        let bytes = std::fs::read(&abs)
+            .with_context(|| format!("reading seed {}", abs.display()))?;
+        let parsed: serde_json::Value = serde_json::from_slice(&bytes)
+            .with_context(|| format!("parsing seed {}", abs.display()))?;
+        let has_table = parsed
+            .get("table")
+            .and_then(|v| v.as_str())
+            .map(|s| !s.is_empty())
+            .unwrap_or(false);
+        if !has_table {
+            anyhow::bail!(
+                "seed {} is missing a non-empty string `table` (use the {{table, key?, rows}} config-data shape)",
+                abs.display()
+            );
+        }
+        if !parsed.get("rows").map(|v| v.is_array()).unwrap_or(false) {
+            anyhow::bail!("seed {} is missing a `rows` array", abs.display());
+        }
+        out.push(manifest_artifact_with_content(path, "config_data", &bytes));
+    }
+    Ok(out)
+}
+
 fn collect_config_data_artifacts(
     args: &DeployArgs,
     manifest_dir: &std::path::Path,
 ) -> Result<Vec<serde_json::Value>> {
+    if args.data_dir.is_none() {
+        let base = deploy_base_dir(args, manifest_dir);
+        if is_workspace_layout(&base) {
+            return collect_workspace_data_artifacts(&base);
+        }
+    }
+
     let (dir, explicit) = match args.data_dir.as_ref() {
         Some(d) => (d.clone(), true),
         None => {
-            let base = args
-                .app_manifest
-                .as_ref()
-                .and_then(|p| p.parent())
-                .map(|p| p.to_path_buf())
-                .unwrap_or_else(|| manifest_dir.to_path_buf());
+            let base = deploy_base_dir(args, manifest_dir);
             (base.join("data"), false)
         }
     };
@@ -1453,6 +1584,99 @@ mod app_bundle_tests {
         let args = deploy_args(None);
         let (bundle, _) = build_app_bundle(&args).await.unwrap();
         assert!(bundle.is_null());
+    }
+
+    /// Build a workspace tree (workspace.json + a domains/ tree). Schema +
+    /// seed deploy collection should source from domains/* in this layout.
+    fn workspace_tree() -> TempDir {
+        let tmp = TempDir::new().unwrap();
+        write(tmp.path(), "workspace.json", r#"{"workspace":{"name":"t"}}"#);
+        write(
+            tmp.path(),
+            "domains/billing/schemas/plan_products.table.json",
+            r#"{"name":"plan_products","archetype":"Base","columns":[{"name":"slug","type":"string","required":true}]}"#,
+        );
+        write(
+            tmp.path(),
+            "domains/identity/schemas/users.table.json",
+            r#"{"name":"users","archetype":"Base","columns":[{"name":"email","type":"string","required":true}]}"#,
+        );
+        write(
+            tmp.path(),
+            "domains/billing/seeds/plan_products.json",
+            r#"{"table":"plan_products","key":["slug"],"rows":[{"slug":"hobby"}]}"#,
+        );
+        tmp
+    }
+
+    #[test]
+    fn workspace_schema_collection_spans_all_domains() {
+        let tmp = workspace_tree();
+        // app_manifest=None → base resolves to manifest_dir (the workspace root).
+        let rows = collect_schema_artifacts(&deploy_args(None), tmp.path()).unwrap();
+        assert_eq!(rows.len(), 2, "one schema row per domain table");
+        let paths: Vec<&str> = rows
+            .iter()
+            .map(|r| r["path"].as_str().unwrap())
+            .collect();
+        // Deterministic, domain-then-file sorted, provenance preserved.
+        assert_eq!(
+            paths,
+            vec![
+                "domains/billing/schemas/plan_products.table.json",
+                "domains/identity/schemas/users.table.json"
+            ]
+        );
+        assert!(rows.iter().all(|r| r["kind"] == "schema"));
+        assert!(rows.iter().all(|r| r.get("content").is_some()));
+    }
+
+    #[test]
+    fn workspace_seed_collection_emits_config_data() {
+        let tmp = workspace_tree();
+        let rows = collect_config_data_artifacts(&deploy_args(None), tmp.path()).unwrap();
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0]["kind"], "config_data");
+        assert_eq!(
+            rows[0]["path"],
+            "domains/billing/seeds/plan_products.json"
+        );
+    }
+
+    #[test]
+    fn workspace_schema_collection_rejects_malformed_table() {
+        let tmp = workspace_tree();
+        // a table with a duplicate column → invalid via TableManifest.
+        write(
+            tmp.path(),
+            "domains/billing/schemas/bad.table.json",
+            r#"{"name":"bad","columns":[{"name":"a"},{"name":"a"}]}"#,
+        );
+        let err = collect_schema_artifacts(&deploy_args(None), tmp.path()).unwrap_err();
+        assert!(format!("{err:#}").contains("invalid"), "got: {err:#}");
+    }
+
+    #[test]
+    fn workspace_seed_collection_rejects_bare_array() {
+        let tmp = workspace_tree();
+        // a seed in the wrong (bare-array) shape → must fail, not silently skip.
+        write(
+            tmp.path(),
+            "domains/identity/seeds/users.json",
+            r#"[{"email":"a@b.c"}]"#,
+        );
+        let err = collect_config_data_artifacts(&deploy_args(None), tmp.path()).unwrap_err();
+        assert!(format!("{err:#}").contains("table"), "got: {err:#}");
+    }
+
+    #[test]
+    fn flat_layout_still_works_without_workspace_json() {
+        // No workspace.json → the legacy flat schemas/ dir is used.
+        let tmp = TempDir::new().unwrap();
+        write(tmp.path(), "schemas/widgets.json", r#"{"name":"widgets","columns":[]}"#);
+        let rows = collect_schema_artifacts(&deploy_args(None), tmp.path()).unwrap();
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0]["path"], "schemas/widgets.json");
     }
 
     #[test]

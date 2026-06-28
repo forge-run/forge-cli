@@ -113,7 +113,7 @@ async fn list() -> Result<()> {
         "WORKSPACE_ID     NODE                         TENANT                     FROZEN  GEN"
     );
     for r in &rows {
-        let active = current_ws.as_deref() == Some(&r.envelope.workspace_id);
+        let active = current_ws.as_deref() == Some(r.envelope.workspace_id.as_str());
         let marker = if active { "*" } else { " " };
         let frozen = r
             .envelope

@@ -48,6 +48,12 @@ forge-schema = { path = "../forge-schema" }
 # forge-types workspace so forge-git (control-plane) derives a byte-identical
 # manifest from the same code — parity by construction, not by re-test.
 forge-manifest = { path = "../forge-types/crates/forge-manifest" }
+# Domain/app/capability workspace compiler. `forge build`, when run in a
+# workspace root (a `workspace.json` is present), runs the compiler as a
+# pre-build gate: it walks domains/ + apps/, enforces consumes (D2) +
+# capability config (D7), and emits the generated `.forge/` graph. The CLI
+# is the build orchestrator, so it depends on the compiler directly.
+forge-web-build = { path = "../forge-web/build" }
 # Wrap the wasm32-wasip1 cdylib as a Component-Model artifact
 # before deploy. forge-runtime W3 cutover (2026-05-15) made the
 # runtime reject core modules — only Components instantiate. The
