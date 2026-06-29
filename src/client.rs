@@ -102,7 +102,14 @@ impl ForgeClient {
 
     pub fn new(cfg: ResolvedConfig) -> Result<Self> {
         let inner = Client::builder()
-            .timeout(Duration::from_secs(30))
+            // A generous ceiling, not a target: most calls return in
+            // milliseconds. A whole-workspace deploy (many domain/capability
+            // wasm services + a large app bundle) is applied + validated
+            // server-side in one request and can legitimately take tens of
+            // seconds; the old 30s ceiling aborted the client mid-apply (the
+            // server still committed, but the CLI reported a transport
+            // timeout). 300s covers a cold multi-module workspace deploy.
+            .timeout(Duration::from_secs(300))
             .user_agent(concat!("forge-cli/", env!("CARGO_PKG_VERSION")))
             // The federated consume path returns a JSON body; the
             // legacy consume returns a 302. We follow neither
