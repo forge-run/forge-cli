@@ -186,8 +186,101 @@ pub(crate) fn compile_workspace_graph(root: &std::path::Path) -> Result<()> {
             },
         );
     }
+    // ── finding #5: stamp BUILT-BYTE wasm hashes into forge.lock ───────────
+    // compile_workspace writes the lock with SOURCE-artifact hashes (its own
+    // content-addressing). But the deploy resolves each wasm by its R2 key,
+    // which is blake3 of the COMPONENT bytes — and the runtime re-verifies
+    // blake3(bytes)==hash at converge. So the committed lock must carry
+    // built-byte hashes, or a native (Mode-B) deploy from this repo can't
+    // resolve the wasm. Build every wasm module to a Component and override
+    // `wasm_modules` with their blake3, so committed-lock hash == R2 key ==
+    // converge-verified hash. The matching Component bytes are uploaded to the
+    // artifact store by the deploy/stage step (idempotent, content-addressed).
+    stamp_built_wasm_hashes(root, &graph)
+        .context("stamping built-byte wasm hashes into forge.lock")?;
+
     println!("{}", root.join(".forge").display());
-    eprintln!("workspace graph OK — generated .forge/ written");
+    eprintln!("workspace graph OK — generated .forge/ written + wasm hashes stamped");
+    Ok(())
+}
+
+/// Build every wasm module in the graph to a Component and rewrite
+/// `forge.lock`'s `wasm_modules` map with `blake3(Component bytes)` (the R2
+/// key the deploy + converge use). One `cargo build` produces all member
+/// cdylibs; each is wit-component-wrapped (skipped if already a Component) and
+/// hashed. Crate/file convention: domain → `forge-domain-<n>`, capability →
+/// `forge-cap-<n>`, platform → `forge-platform`; cargo maps `-`→`_` for the
+/// artifact filename. Lock key is `<name>::<name>`.
+fn stamp_built_wasm_hashes(
+    root: &std::path::Path,
+    graph: &forge_web_build::WorkspaceGraph,
+) -> Result<()> {
+    use forge_web_build::ModuleKind;
+
+    // crate name per module (matches the workspace member Cargo.toml [package].name).
+    let mut wanted: Vec<(String, String)> = Vec::new(); // (lock_key, crate_name)
+    for d in &graph.domains {
+        if d.has_wasm {
+            wanted.push((format!("{}::{}", d.name, d.name), format!("forge-domain-{}", d.name)));
+        }
+    }
+    for m in &graph.modules {
+        let crate_name = match m.kind {
+            ModuleKind::Platform => "forge-platform".to_string(),
+            ModuleKind::Capability => format!("forge-cap-{}", m.name),
+        };
+        wanted.push((format!("{}::{}", m.name, m.name), crate_name));
+    }
+    if wanted.is_empty() {
+        return Ok(());
+    }
+
+    eprintln!("building {} wasm module(s) for built-byte lock hashes …", wanted.len());
+    let mut cmd = Command::new("cargo");
+    cmd.arg("build")
+        .arg("--release")
+        .arg("--target")
+        .arg("wasm32-wasip1")
+        .current_dir(root);
+    let status = cmd
+        .status()
+        .with_context(|| "failed to spawn `cargo build` — is cargo on PATH?")?;
+    if !status.success() {
+        anyhow::bail!("cargo build (wasm32-wasip1) failed (exit {status})");
+    }
+
+    let rel = root.join("target").join("wasm32-wasip1").join("release");
+    let mut built: std::collections::BTreeMap<String, String> = std::collections::BTreeMap::new();
+    for (lock_key, crate_name) in &wanted {
+        let file = rel.join(format!("{}.wasm", crate_name.replace('-', "_")));
+        let bytes = std::fs::read(&file)
+            .with_context(|| format!("reading built wasm {}", file.display()))?;
+        let component = if is_component(&bytes) {
+            bytes
+        } else {
+            wrap_as_component(&bytes)
+                .with_context(|| format!("wit-component wrap {}", crate_name))?
+        };
+        let hash = blake3::hash(&component).to_hex().to_string();
+        built.insert(lock_key.clone(), hash);
+    }
+
+    // Rewrite forge.lock's wasm_modules in place (preserve everything else).
+    let lock_path = root.join("forge.lock");
+    let raw = std::fs::read_to_string(&lock_path)
+        .with_context(|| format!("reading {}", lock_path.display()))?;
+    let mut doc: serde_json::Value =
+        serde_json::from_str(&raw).context("parse forge.lock")?;
+    let wm = doc
+        .get_mut("wasm_modules")
+        .and_then(|v| v.as_object_mut())
+        .context("forge.lock has no wasm_modules object")?;
+    for (k, h) in &built {
+        wm.insert(k.clone(), serde_json::Value::String(h.clone()));
+    }
+    let out = serde_json::to_string_pretty(&doc).context("serialize forge.lock")?;
+    std::fs::write(&lock_path, out + "\n").with_context(|| format!("writing {}", lock_path.display()))?;
+    eprintln!("forge.lock: stamped {} built-byte wasm hash(es)", built.len());
     Ok(())
 }
 
