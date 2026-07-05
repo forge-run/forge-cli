@@ -29,7 +29,11 @@ forge ws use <workspace-id>              # pick one
 forge whoami                             # confirm you're authenticated
 ```
 
-After `ws use`, every other command (`schema apply`, `deploy`, `logs`, `static upload`, `tokens`) targets the active workspace. The CLI mints a workspace-scoped bearer on demand and caches it; you generally won't need to think about tokens.
+After `ws use`, every other command (`logs`, `secrets`, `tokens`, …) targets the active workspace. The CLI mints a workspace-scoped bearer on demand and caches it; you generally won't need to think about tokens.
+
+## Deploy is GitOps
+
+Your git repo is the desired state. You **`git push`** the source tree and the server compiles it and converges the running workspace (schema, seeds, services, pages). There is no imperative deploy step. The old `forge schema apply` / `forge ship` commands have been removed; `forge deploy` and `forge static upload` remain only as hidden primitives that `forge dev` uses for its local inner loop. Scaffold a GitOps repo with `forge init`; watch a deploy converge at `GET /api/v1/manage/reconcile/status`.
 
 ## Command reference
 
@@ -45,11 +49,8 @@ After `ws use`, every other command (`schema apply`, `deploy`, `logs`, `static u
 | `forge ws list` | List workspaces visible to the active portal session, scoped to the active tenant. |
 | `forge ws use <workspace-id>` | Set the active workspace. Subsequent commands mint a per-workspace bearer on demand. |
 | `forge new --template <name>` | Scaffold a new workload from a built-in template (`echo`, `mcp-tool`, `subscription-publisher`). |
-| `forge build` | Compile a Rust crate to a WASM Component for deploy. |
-| `forge deploy` | Upload `service.json` + the compiled WASM module to the active workspace. |
-| `forge schema apply <file>` | Push declarative schema changes to the active workspace. |
+| `forge build` | Compile a Rust crate to a WASM Component. Run before commit; stamps `forge.lock`. |
 | `forge logs` | Tail recent request log entries. `--follow` streams new entries via SSE. |
-| `forge static upload <path>` | Upload static assets (CSS / JS / images) to the workspace's `/static/` mount. |
 | `forge tokens mint --tier <user\|service\|admin>` | Mint a token for in-app use. |
 | `forge tokens list` | List active tokens for the active workspace. |
 | `forge tokens revoke <hash>` | Revoke a token by its hash prefix. |

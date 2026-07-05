@@ -43,18 +43,6 @@ pub struct UploadArgs {
     json: bool,
 }
 
-impl UploadArgs {
-    /// Build args to upload a directory tree with no prefix — used by
-    /// `forge ship` to run the static upload before the deploy.
-    pub fn for_dir(source: PathBuf) -> Self {
-        Self {
-            source,
-            prefix: String::new(),
-            json: false,
-        }
-    }
-}
-
 #[derive(Serialize)]
 struct UploadRequest<'a> {
     path: String,

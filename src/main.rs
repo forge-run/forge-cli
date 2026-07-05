@@ -13,12 +13,11 @@
 //! 3. Environment: `FORGE_BASE_URL`, `FORGE_TOKEN`.
 //! 4. Command-line flags: `--base-url`, `--token`.
 //!
-//! v0 ships `login` (RFC 8628 device flow → saves token to config)
-//! and `tokens mint` (System-tier; today only callable when the CLI
-//! holds an admin-tier token, which is provisioning-shaped, not
-//! customer-shaped). Other commands (`schema`, `ops`, `deploy`,
-//! `logs`, `new`, `build`) are stubbed and print "not implemented"
-//! so the command shape is visible immediately.
+//! Deploy is GitOps: your repo is the desired state, and `git push`
+//! hands the source to the server, which compiles and converges it.
+//! The old imperative deploy commands (`schema apply`, `ship`) have
+//! been removed; `deploy` and `static upload` are retained only as
+//! hidden primitives that `forge dev` uses for its inner loop.
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
@@ -90,32 +89,21 @@ enum Cmd {
     #[command(subcommand)]
     Email(cmd::email::EmailCmd),
 
-    /// Apply schema definitions to the workspace.
-    #[command(subcommand)]
-    Schema(cmd::schema::SchemaCmd),
-
     /// Generate a typed client SDK from the workspace's registry.
     /// `forge sdk generate` writes a self-contained TypeScript client
     /// package (content-addressed to the registry version) to `--out`.
     #[command(subcommand)]
     Sdk(cmd::sdk::SdkCmd),
 
-    /// Apply declarative operations to the workspace.
-    #[command(hide = true)]
-    Ops,
-
     /// Build a Rust crate to a workspace-deployable WASM module.
     Build(cmd::build::BuildArgs),
 
-    /// Upload a service manifest + compiled WASM module(s) to the
-    /// workspace.
+    /// Internal: imperative upload of a service manifest + compiled WASM
+    /// module(s). Superseded by `git push` (GitOps) as the deploy path;
+    /// kept hidden as the primitive `forge dev` shells out to for its
+    /// inner loop.
+    #[command(hide = true)]
     Deploy(cmd::deploy::DeployArgs),
-
-    /// Upload static assets, THEN deploy — in the correct order, from one
-    /// command. Use this instead of running `static upload` and `deploy`
-    /// separately: deploying first can leave the edge caching a 404 for a
-    /// freshly-hashed asset URL.
-    Ship(cmd::ship::ShipArgs),
 
     /// Tail recent request log entries from the workspace.
     Logs(cmd::logs::LogsArgs),
@@ -127,9 +115,10 @@ enum Cmd {
     /// git init). Push its `main` to deploy: `main` is the desired state.
     Init(cmd::init::InitArgs),
 
-    /// Upload static assets (CSS, JS, images) to the workspace's
-    /// static directory. Each file becomes reachable at
-    /// `https://<workspace>/static/<path>`.
+    /// Internal: imperative static-asset upload. Superseded by `git push`
+    /// (the server bundles static assets on converge); kept hidden as the
+    /// primitive `forge dev` shells out to for its inner loop.
+    #[command(hide = true)]
     #[command(subcommand)]
     Static(cmd::static_cmd::StaticCmd),
 
@@ -188,9 +177,8 @@ enum Cmd {
 
     /// List + select workspaces visible to the active portal
     /// session, scoped to the active tenant. Setting a workspace
-    /// here lets every other CLI command (`schema apply`,
-    /// `deploy`, `logs`, …) auto-mint a federated bearer
-    /// against it on first 401.
+    /// here lets every other CLI command (`logs`, `secrets`, …)
+    /// auto-mint a federated bearer against it on first 401.
     #[command(subcommand)]
     Ws(cmd::ws::WsCmd),
 }
@@ -228,11 +216,6 @@ async fn main() -> Result<()> {
             let client = client::ForgeClient::new(cfg)?;
             cmd::email::run(e, &client).await
         }
-        Cmd::Schema(s) => {
-            let cfg = config::resolve(cli.base_url, cli.token, cli.profile)?;
-            let client = client::ForgeClient::new(cfg)?;
-            cmd::schema::run(s, &client).await
-        }
         Cmd::Sdk(s) => {
             let cfg = config::resolve(cli.base_url, cli.token, cli.profile)?;
             let client = client::ForgeClient::new(cfg)?;
@@ -247,11 +230,6 @@ async fn main() -> Result<()> {
             let cfg = config::resolve(cli.base_url, cli.token, cli.profile)?;
             let client = client::ForgeClient::new(cfg)?;
             cmd::deploy::run(d, &client).await
-        }
-        Cmd::Ship(s) => {
-            let cfg = config::resolve(cli.base_url, cli.token, cli.profile)?;
-            let client = client::ForgeClient::new(cfg)?;
-            cmd::ship::run(s, &client).await
         }
         Cmd::New(args) => cmd::new::run(args).await,
         Cmd::Init(args) => cmd::init::run(args).await,
@@ -275,10 +253,5 @@ async fn main() -> Result<()> {
         Cmd::Brand(args) => cmd::brand::run(args).await,
         Cmd::Branch(b) => cmd::branch::run(b).await,
         Cmd::Ws(w) => cmd::ws::run(w).await,
-        Cmd::Ops => {
-            anyhow::bail!(
-                "not implemented yet — login/logout/whoami/tokens/schema/build/deploy/new/logs are wired",
-            )
-        }
     }
 }

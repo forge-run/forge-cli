@@ -4,6 +4,28 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This file mirrors the GitHub release notes; consult the release page
 for downloadable binaries and platform-specific tarballs.
 
+## [0.3.0] — 2026-07-05
+
+GitOps is the deploy path: your repo is the desired state and `git push`
+converges the workspace. This release removes the superseded imperative
+deploy commands from the public surface.
+
+### Removed
+
+- **`forge schema apply`** — schema now lands by committing the
+  `*.table.json` under `domains/<d>/schemas/` and `git push`; the server
+  applies it additively on converge (destructive deltas are refused).
+- **`forge ship`** — was a static-upload-then-deploy wrapper; superseded by
+  `git push`, which compiles and converges the whole workspace server-side.
+- **`ops`** — removed the hidden `not implemented` stub.
+
+### Changed
+
+- **`forge deploy`** and **`forge static upload`** are now **hidden**
+  (`--help` no longer lists them). They remain callable as internal
+  primitives that `forge dev` shells out to for its inner loop; `git push`
+  is the deploy path for everything else.
+
 ## [Unreleased] — Phase G + downstream-wave (2026-05-16)
 
 ### Added
