@@ -938,10 +938,16 @@ pub async fn upload_artifacts_by_hash(
         match client.head_status(&path).await.map_err(map_err)? {
             StatusCode::OK => {
                 deduped += 1;
-                eprintln!("artifact {} already stored (dedup)", &hash[..16.min(hash.len())]);
+                eprintln!(
+                    "artifact {} already stored (dedup)",
+                    &hash[..16.min(hash.len())]
+                );
             }
             StatusCode::NOT_FOUND => {
-                client.put_bytes(&path, bytes, content_type).await.map_err(map_err)?;
+                client
+                    .put_bytes(&path, bytes, content_type)
+                    .await
+                    .map_err(map_err)?;
                 uploaded += 1;
                 eprintln!(
                     "uploaded artifact {} ({} bytes)",

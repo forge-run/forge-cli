@@ -221,7 +221,10 @@ fn stamp_built_wasm_hashes(
     let mut wanted: Vec<(String, String)> = Vec::new(); // (lock_key, crate_name)
     for d in &graph.domains {
         if d.has_wasm {
-            wanted.push((format!("{}::{}", d.name, d.name), format!("forge-domain-{}", d.name)));
+            wanted.push((
+                format!("{}::{}", d.name, d.name),
+                format!("forge-domain-{}", d.name),
+            ));
         }
     }
     for m in &graph.modules {
@@ -235,7 +238,10 @@ fn stamp_built_wasm_hashes(
         return Ok(());
     }
 
-    eprintln!("building {} wasm module(s) for built-byte lock hashes …", wanted.len());
+    eprintln!(
+        "building {} wasm module(s) for built-byte lock hashes …",
+        wanted.len()
+    );
     let mut cmd = Command::new("cargo");
     cmd.arg("build")
         .arg("--release")
@@ -278,8 +284,7 @@ fn stamp_built_wasm_hashes(
     let lock_path = root.join("forge.lock");
     let raw = std::fs::read_to_string(&lock_path)
         .with_context(|| format!("reading {}", lock_path.display()))?;
-    let mut doc: serde_json::Value =
-        serde_json::from_str(&raw).context("parse forge.lock")?;
+    let mut doc: serde_json::Value = serde_json::from_str(&raw).context("parse forge.lock")?;
     let wm = doc
         .get_mut("wasm_modules")
         .and_then(|v| v.as_object_mut())
@@ -288,8 +293,12 @@ fn stamp_built_wasm_hashes(
         wm.insert(k.clone(), serde_json::Value::String(h.clone()));
     }
     let out = serde_json::to_string_pretty(&doc).context("serialize forge.lock")?;
-    std::fs::write(&lock_path, out + "\n").with_context(|| format!("writing {}", lock_path.display()))?;
-    eprintln!("forge.lock: stamped {} built-byte wasm hash(es)", built.len());
+    std::fs::write(&lock_path, out + "\n")
+        .with_context(|| format!("writing {}", lock_path.display()))?;
+    eprintln!(
+        "forge.lock: stamped {} built-byte wasm hash(es)",
+        built.len()
+    );
     Ok(())
 }
 
