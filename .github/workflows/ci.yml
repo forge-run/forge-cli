@@ -70,6 +70,17 @@ jobs:
           token: ${{ secrets.FORGE_CROSS_REPO_TOKEN }}
           path: forge-ui
 
+      # forge-web/core path-deps forge-sdk-v2 (../../forge-sdk-v2). `cargo fmt
+      # --all` / `cargo clippy` resolve forge-web's whole workspace graph, so
+      # this sibling must be present too (the narrower release BUILD doesn't
+      # pull core, which is why release.yml omits it).
+      - name: Checkout forge-sdk-v2
+        uses: actions/checkout@v4
+        with:
+          repository: forge-run/forge-sdk-v2
+          token: ${{ secrets.FORGE_CROSS_REPO_TOKEN }}
+          path: forge-sdk-v2
+
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
