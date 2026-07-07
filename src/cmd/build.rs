@@ -492,8 +492,19 @@ mod tests {
     #[test]
     fn forge_build_gates_a_valid_workspace() {
         let td = ws_fixture("\"billing\"");
-        compile_workspace_graph(td.path()).expect("valid workspace compiles");
-        assert!(td.path().join(".forge/forge.lock").is_file());
+        // The gate is graph compilation — consumes (D2) + capability config
+        // (D7) enforcement and the emitted `.forge/` set (incl. `forge.lock`).
+        // The built-byte wasm stamping that `compile_workspace_graph` runs
+        // afterward shells out to a real `cargo build --target wasm32-wasip1`,
+        // which needs a buildable cargo workspace — this JSON-only fixture
+        // isn't one — so exercise the gate directly.
+        let scratch = td.path().join("target").join("forge-workspace");
+        std::fs::create_dir_all(&scratch).unwrap();
+        forge_web_build::compile_workspace(td.path(), &scratch)
+            .expect("valid workspace compiles");
+        // `forge.lock` is committed at the repo root (the git-tracked
+        // source→artifact link), not inside the generated `.forge/` tree.
+        assert!(td.path().join("forge.lock").is_file());
     }
 
     #[test]
