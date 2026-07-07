@@ -500,8 +500,7 @@ mod tests {
         // isn't one — so exercise the gate directly.
         let scratch = td.path().join("target").join("forge-workspace");
         std::fs::create_dir_all(&scratch).unwrap();
-        forge_web_build::compile_workspace(td.path(), &scratch)
-            .expect("valid workspace compiles");
+        forge_web_build::compile_workspace(td.path(), &scratch).expect("valid workspace compiles");
         // `forge.lock` is committed at the repo root (the git-tracked
         // source→artifact link), not inside the generated `.forge/` tree.
         assert!(td.path().join("forge.lock").is_file());
