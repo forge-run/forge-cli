@@ -53,6 +53,23 @@ jobs:
           token: ${{ secrets.FORGE_CROSS_REPO_TOKEN }}
           path: forge-types
 
+      # forge-web-build = { path = "../forge-web/build" } — the workspace
+      # compiler (`forge wasm-build` graph + lock stamping). Needs forge-web as
+      # a sibling; forge-web/build in turn path-deps forge-ui (../../forge-ui).
+      - name: Checkout forge-web
+        uses: actions/checkout@v4
+        with:
+          repository: forge-run/forge-web
+          token: ${{ secrets.FORGE_CROSS_REPO_TOKEN }}
+          path: forge-web
+
+      - name: Checkout forge-ui
+        uses: actions/checkout@v4
+        with:
+          repository: forge-run/forge-ui
+          token: ${{ secrets.FORGE_CROSS_REPO_TOKEN }}
+          path: forge-ui
+
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
