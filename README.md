@@ -33,7 +33,15 @@ After `ws use`, every other command (`logs`, `secrets`, `tokens`, …) targets t
 
 ## Deploy is GitOps
 
-Your git repo is the desired state. You **`git push`** the source tree and the server compiles it and converges the running workspace (schema, seeds, services, pages). There is no imperative deploy step. The old `forge schema apply` / `forge ship` commands have been removed; `forge deploy` and `forge static upload` remain only as hidden primitives that `forge dev` uses for its local inner loop. Scaffold a GitOps repo with `forge init`; watch a deploy converge at `GET /api/v1/manage/reconcile/status`.
+Your git repo is the desired state. A deploy is three steps:
+
+1. **`forge wasm-build`** — compile the workspace graph to WebAssembly Components, stamp their content hashes into `forge.lock`, and persist the Components to `.forge/artifacts/`.
+2. **`forge wasm-upload`** — stage those Components to the workspace's content store, so the manifest the server converges resolves every module by hash.
+3. **`git push`** the source tree — the server records it as the desired state and converges the running workspace (schema, seeds, services, pages).
+
+`forge dev` runs this loop for you on every save during local development. There is no imperative deploy step: the old `forge schema apply` / `forge ship` commands have been removed, and `forge deploy` / `forge static upload` remain only as hidden primitives `forge dev` shells out to. Scaffold a GitOps repo with `forge init`; watch a deploy converge at `GET /api/v1/manage/reconcile/status`.
+
+> **Skipping `wasm-upload` is the classic silent failure.** If you `git push` without staging the Components first, the pushed manifest references bytes the content store doesn't hold, and the converge refuses. Recent runtimes report exactly which module is unstaged on `GET /api/v1/manage/reconcile/status`.
 
 ## Command reference
 
@@ -49,13 +57,14 @@ Your git repo is the desired state. You **`git push`** the source tree and the s
 | `forge ws list` | List workspaces visible to the active portal session, scoped to the active tenant. |
 | `forge ws use <workspace-id>` | Set the active workspace. Subsequent commands mint a per-workspace bearer on demand. |
 | `forge new --template <name>` | Scaffold a new workload from a built-in template (`echo`, `mcp-tool`, `subscription-publisher`). |
-| `forge build` | Compile a Rust crate to a WASM Component. Run before commit; stamps `forge.lock`. |
+| `forge wasm-build` | Compile the workspace graph to WASM Components, stamp `forge.lock`, and persist the Components to `.forge/artifacts/`. Run before commit. (Aliased as `forge build`.) |
+| `forge wasm-upload` | Stage the built Components (`.forge/artifacts/`) to the workspace's content store so a `git push` converge resolves each module by hash. Run after `wasm-build`, before pushing. |
 | `forge logs` | Tail recent request log entries. `--follow` streams new entries via SSE. |
 | `forge tokens mint --tier <user\|service\|admin>` | Mint a token for in-app use. |
 | `forge tokens list` | List active tokens for the active workspace. |
 | `forge tokens revoke <hash>` | Revoke a token by its hash prefix. |
 | `forge update` | Self-update from GitHub releases. `--check` reports availability without applying; `--force` re-installs the current version. |
-| `forge dev` | Watch the project tree and re-run `forge build` + `forge deploy` (+ `forge static upload`) on every save. Inner-loop driver for the agent + human authoring path. |
+| `forge dev` | Watch the project tree and re-run `forge wasm-build` + `forge deploy` (+ `forge static upload`) on every save. Inner-loop driver for the agent + human authoring path. |
 | `forge pages` | List `pages/**/*.page.json` artifacts in a routing table — auth tier, capabilities, rendering shape, sibling-file flags. `--json` for machine-readable output. |
 | `forge components` | List `components/**/*.component.json` artifacts with prop counts (total + required), slot counts, behavior triggers, sibling-file flags. `--json` supported. |
 | `forge brand` | Print app-local branding overrides from `app.json` plus the emitted `:root { --brand-*: …; }` CSS-variable block. `--css-only` for piping into a stylesheet; `--json` for tooling. |

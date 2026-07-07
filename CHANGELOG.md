@@ -4,6 +4,30 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This file mirrors the GitHub release notes; consult the release page
 for downloadable binaries and platform-specific tarballs.
 
+## [0.4.0] — 2026-07-07
+
+Split the build command and add explicit artifact staging, closing the gap
+that let a `git push` reference WASM Components the content store never
+received — a converge that then silently never applied.
+
+### Added
+
+- **`forge wasm-upload`** — stage the built WebAssembly Components (from
+  `.forge/artifacts/`) to the workspace's content store
+  (`/api/v1/manage/artifacts/{hash}`; HEAD-dedup then PUT), re-verifying each
+  file's blake3 hash before upload. This is the previously-missing step
+  between build and `git push`: `forge build` stamped `forge.lock` with each
+  Component's hash but never uploaded the bytes.
+
+### Changed
+
+- **`forge build` → `forge wasm-build`** (the old name remains as an alias).
+  Beyond compiling + stamping `forge.lock`, it now persists each
+  wit-componentized module to `.forge/artifacts/{hash}.wasm` — the file name
+  is the content address — so `wasm-upload` can stage it without recompiling.
+- **`forge deploy`**'s internal artifact staging and `wasm-upload` now share
+  one `upload_artifacts_by_hash` path.
+
 ## [0.3.0] — 2026-07-05
 
 GitOps is the deploy path: your repo is the desired state and `git push`
