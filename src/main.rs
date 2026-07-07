@@ -95,8 +95,17 @@ enum Cmd {
     #[command(subcommand)]
     Sdk(cmd::sdk::SdkCmd),
 
-    /// Build a Rust crate to a workspace-deployable WASM module.
-    Build(cmd::build::BuildArgs),
+    /// Compile the workspace graph to WebAssembly Components, stamp their
+    /// blake3 hashes into `forge.lock`, and persist the Components to
+    /// `.forge/artifacts/` for `forge wasm-upload` to stage. (Was `forge build`.)
+    #[command(name = "wasm-build", alias = "build")]
+    WasmBuild(cmd::build::BuildArgs),
+
+    /// Stage the built WebAssembly Components (from `.forge/artifacts/`) to the
+    /// workspace's content store so a `git push` (GitOps) converge resolves each
+    /// module by hash. Run after `forge wasm-build`, before pushing.
+    #[command(name = "wasm-upload")]
+    WasmUpload(cmd::wasm_upload::WasmUploadArgs),
 
     /// Internal: imperative upload of a service manifest + compiled WASM
     /// module(s). Superseded by `git push` (GitOps) as the deploy path;
@@ -221,10 +230,15 @@ async fn main() -> Result<()> {
             let client = client::ForgeClient::new(cfg)?;
             cmd::sdk::run(s, &client).await
         }
-        Cmd::Build(b) => {
-            // `build` doesn't talk to the network — it shells out
+        Cmd::WasmBuild(b) => {
+            // `wasm-build` doesn't talk to the network — it shells out
             // to cargo. Skip the config + client construction.
             cmd::build::run(b).await
+        }
+        Cmd::WasmUpload(u) => {
+            let cfg = config::resolve(cli.base_url, cli.token, cli.profile)?;
+            let client = client::ForgeClient::new(cfg)?;
+            cmd::wasm_upload::run(u, &client).await
         }
         Cmd::Deploy(d) => {
             let cfg = config::resolve(cli.base_url, cli.token, cli.profile)?;

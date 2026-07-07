@@ -823,38 +823,7 @@ pub async fn run(args: DeployArgs, client: &ForgeClient) -> Result<()> {
     // referenced bytes are guaranteed present when the runtime resolves
     // them — the upload-before-bump invariant `forge ship` mechanizes.
     // Skipped entirely in `--inline-wasm` mode (bytes ride in the payload).
-    for (hash, bytes, content_type) in &artifact_uploads {
-        let path = format!("/api/v1/manage/artifacts/{hash}");
-        let status = client.head_status(&path).await.map_err(map_err)?;
-        match status {
-            StatusCode::OK => {
-                eprintln!(
-                    "artifact {} already stored (dedup)",
-                    &hash[..16.min(hash.len())]
-                );
-            }
-            StatusCode::NOT_FOUND => {
-                client
-                    .put_bytes(&path, bytes, content_type)
-                    .await
-                    .map_err(map_err)?;
-                eprintln!(
-                    "uploaded artifact {} ({} bytes)",
-                    &hash[..16.min(hash.len())],
-                    bytes.len()
-                );
-            }
-            StatusCode::SERVICE_UNAVAILABLE => {
-                anyhow::bail!(
-                    "the artifact store is not available on this node (HEAD {path} → 503). \
-                     Re-run with --inline-wasm to send wasm bytes inline."
-                );
-            }
-            other => {
-                anyhow::bail!("unexpected status {other} from artifact HEAD {path}");
-            }
-        }
-    }
+    upload_artifacts_by_hash(client, &artifact_uploads).await?;
 
     // GitOps staging — `--no-apply` uploaded the artifacts above so the content
     // store holds the blobs the manifest references, but stops short of the
@@ -950,6 +919,43 @@ fn map_err(e: ForgeError) -> anyhow::Error {
         ForgeError::Http { status, body } => anyhow::anyhow!("{status}: {body}"),
         other => anyhow::anyhow!(other),
     }
+}
+
+/// HEAD-then-PUT each `(content_hash, bytes, content_type)` to the workspace's
+/// content-addressed artifact store (`/api/v1/manage/artifacts/{hash}`),
+/// skipping any the store already holds (dedup — an unchanged artifact transfers
+/// zero bytes). Shared by `forge deploy` (its inline staging) and the standalone
+/// `forge wasm-upload`. Returns `(uploaded, deduped)` counts. Runs BEFORE any
+/// apply so the referenced bytes are guaranteed present when the runtime — or a
+/// forge-git converge — resolves them by hash.
+pub async fn upload_artifacts_by_hash(
+    client: &ForgeClient,
+    uploads: &[(String, Vec<u8>, &'static str)],
+) -> Result<(usize, usize)> {
+    let (mut uploaded, mut deduped) = (0usize, 0usize);
+    for (hash, bytes, content_type) in uploads {
+        let path = format!("/api/v1/manage/artifacts/{hash}");
+        match client.head_status(&path).await.map_err(map_err)? {
+            StatusCode::OK => {
+                deduped += 1;
+                eprintln!("artifact {} already stored (dedup)", &hash[..16.min(hash.len())]);
+            }
+            StatusCode::NOT_FOUND => {
+                client.put_bytes(&path, bytes, content_type).await.map_err(map_err)?;
+                uploaded += 1;
+                eprintln!(
+                    "uploaded artifact {} ({} bytes)",
+                    &hash[..16.min(hash.len())],
+                    bytes.len()
+                );
+            }
+            StatusCode::SERVICE_UNAVAILABLE => anyhow::bail!(
+                "the artifact store is not available on this node (HEAD {path} → 503)."
+            ),
+            other => anyhow::bail!("unexpected status {other} from artifact HEAD {path}"),
+        }
+    }
+    Ok((uploaded, deduped))
 }
 
 // ─── Phase E.4 — app-bundle assembly + validation ───────────────

@@ -6,6 +6,7 @@ pub mod build;
 pub mod components;
 pub mod deploy;
 pub mod dev;
+pub mod wasm_upload;
 pub mod domain;
 pub mod email;
 pub mod init;

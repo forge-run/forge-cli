@@ -262,6 +262,15 @@ fn stamp_built_wasm_hashes(
                 .with_context(|| format!("wit-component wrap {}", crate_name))?
         };
         let hash = blake3::hash(&component).to_hex().to_string();
+        // Persist the Component bytes keyed by their blake3 hash so
+        // `forge wasm-upload` can stage them to the content store without
+        // recompiling. This is the same hash the lock records and the runtime
+        // verifies at converge, so the file name IS the content address.
+        let art_dir = root.join(".forge").join("artifacts");
+        std::fs::create_dir_all(&art_dir)
+            .with_context(|| format!("creating {}", art_dir.display()))?;
+        std::fs::write(art_dir.join(format!("{hash}.wasm")), &component)
+            .with_context(|| format!("persisting component {crate_name} ({hash})"))?;
         built.insert(lock_key.clone(), hash);
     }
 
