@@ -33,15 +33,21 @@ After `ws use`, every other command (`logs`, `secrets`, `tokens`, …) targets t
 
 ## Deploy is GitOps
 
-Your git repo is the desired state. A deploy is three steps:
+Your git repo is the desired state. One command deploys and waits:
+
+```sh
+forge ship        # wasm-build → wasm-upload → git push → wait for the converge
+```
+
+Under the hood that's three steps, which you can also run individually:
 
 1. **`forge wasm-build`** — compile the workspace graph to WebAssembly Components, stamp their content hashes into `forge.lock`, and persist the Components to `.forge/artifacts/`.
 2. **`forge wasm-upload`** — stage those Components to the workspace's content store, so the manifest the server converges resolves every module by hash.
-3. **`git push`** the source tree — the server records it as the desired state and converges the running workspace (schema, seeds, services, pages).
+3. **`forge push`** (or a plain `git push`) — the server records the source tree as desired state and converges the running workspace (schema, seeds, services, pages). `forge push` then **blocks until it's actually live** and decodes the failures; a bare `git push` only records desired state and returns.
 
-`forge dev` runs this loop for you on every save during local development. There is no imperative deploy step: the old `forge schema apply` / `forge ship` commands have been removed, and `forge deploy` / `forge static upload` remain only as hidden primitives `forge dev` shells out to. Scaffold a GitOps repo with `forge init`; watch a deploy converge at `GET /api/v1/manage/reconcile/status`.
+`forge dev` runs this loop for you on every save during local development. There is no imperative deploy step: the old `forge schema apply` / pre-GitOps `forge ship` commands were removed, and `forge deploy` / `forge static upload` remain only as hidden primitives `forge dev` shells out to. Scaffold a GitOps repo with `forge init`; watch a deploy converge at `GET /api/v1/manage/reconcile/status`.
 
-> **Skipping `wasm-upload` is the classic silent failure.** If you `git push` without staging the Components first, the pushed manifest references bytes the content store doesn't hold, and the converge refuses. Recent runtimes report exactly which module is unstaged on `GET /api/v1/manage/reconcile/status`.
+> **Skipping `wasm-upload` is the classic silent failure.** If you `git push` without staging the Components first, the pushed manifest references bytes the content store doesn't hold, and the converge silently never applies (`in_sync` stays false, `live_hash` unmoved, no error). `forge ship` bundles the steps so this can't happen, and `forge push` reports exactly this state instead of returning success.
 
 ## Command reference
 
@@ -59,6 +65,8 @@ Your git repo is the desired state. A deploy is three steps:
 | `forge new --template <name>` | Scaffold a new workload from a built-in template (`echo`, `mcp-tool`, `subscription-publisher`). |
 | `forge wasm-build` | Compile the workspace graph to WASM Components, stamp `forge.lock`, and persist the Components to `.forge/artifacts/`. Run before commit. (Aliased as `forge build`.) |
 | `forge wasm-upload` | Stage the built Components (`.forge/artifacts/`) to the workspace's content store so a `git push` converge resolves each module by hash. Run after `wasm-build`, before pushing. |
+| `forge ship` | The whole deploy in one: `wasm-build` → `wasm-upload` → `git push` → wait for the converge. `--no-build`, `--no-wait`, `--timeout <secs>`. |
+| `forge push` | Push to the forge-git remote and block until converged, decoding the silent failure modes. `--no-wait` records without waiting; non-zero exit on stuck/error/timeout (CI-friendly). |
 | `forge logs` | Tail recent request log entries. `--follow` streams new entries via SSE. |
 | `forge tokens mint --tier <user\|service\|admin>` | Mint a token for in-app use. |
 | `forge tokens list` | List active tokens for the active workspace. |

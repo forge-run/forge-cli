@@ -107,6 +107,15 @@ enum Cmd {
     #[command(name = "wasm-upload")]
     WasmUpload(cmd::wasm_upload::WasmUploadArgs),
 
+    /// Deploy in one command: wasm-build → wasm-upload → git push → wait for
+    /// the converge. The complete GitOps deploy; guarantees the step ordering.
+    Ship(cmd::ship::ShipArgs),
+
+    /// Push to the forge-git remote and block until the converge finishes,
+    /// decoding the silent failure modes (unstaged components, stuck, refused).
+    /// A raw `git push` only records desired state; this waits for it to be live.
+    Push(cmd::push::PushArgs),
+
     /// Internal: imperative upload of a service manifest + compiled WASM
     /// module(s). Superseded by `git push` (GitOps) as the deploy path;
     /// kept hidden as the primitive `forge dev` shells out to for its
@@ -239,6 +248,16 @@ async fn main() -> Result<()> {
             let cfg = config::resolve(cli.base_url, cli.token, cli.profile)?;
             let client = client::ForgeClient::new(cfg)?;
             cmd::wasm_upload::run(u, &client).await
+        }
+        Cmd::Ship(s) => {
+            let cfg = config::resolve(cli.base_url, cli.token, cli.profile)?;
+            let client = client::ForgeClient::new(cfg)?;
+            cmd::ship::run(s, &client).await
+        }
+        Cmd::Push(p) => {
+            let cfg = config::resolve(cli.base_url, cli.token, cli.profile)?;
+            let client = client::ForgeClient::new(cfg)?;
+            cmd::push::run(p, &client).await
         }
         Cmd::Deploy(d) => {
             let cfg = config::resolve(cli.base_url, cli.token, cli.profile)?;

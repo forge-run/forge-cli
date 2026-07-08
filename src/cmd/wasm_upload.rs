@@ -24,6 +24,13 @@ pub struct WasmUploadArgs {
     manifest_dir: Option<PathBuf>,
 }
 
+impl WasmUploadArgs {
+    /// Programmatic constructor for `forge ship`.
+    pub fn for_dir(manifest_dir: Option<PathBuf>) -> Self {
+        Self { manifest_dir }
+    }
+}
+
 pub async fn run(args: WasmUploadArgs, client: &ForgeClient) -> Result<()> {
     let root = args
         .manifest_dir

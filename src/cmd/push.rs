@@ -1,0 +1,258 @@
+//! `forge push` — push the workspace to its forge-git remote and block until
+//! the converge finishes, decoding the silent failure modes into real errors.
+//!
+//! A raw `git push` returns when desired state is *recorded*, not when the
+//! workspace is *live*. So "pushed" reads as "done" when the converge may not
+//! have happened at all, and the failures are silent (`in_sync: false`,
+//! `live_hash` unmoved, `last_error: null`). This command waits for
+//! `reconcile/status` to reach `in_sync && live_hash == desired_hash`, and on
+//! anything else translates the state into an actionable message:
+//!
+//! - live_hash never advances, no error → UNSTAGED components (did
+//!   `forge wasm-upload` run?); the runtime now names the module.
+//! - `stuck` / `last_error` → printed verbatim (destructive schema delta,
+//!   hash mismatch, route collision); the converge fails closed.
+//! - reconcile loop disabled + no progress → triggers `reconcile/now` once.
+//!
+//! Exit code is non-zero on stuck/error/timeout, so CI gates on real
+//! convergence, not on the push returning.
+
+use anyhow::{bail, Context, Result};
+use std::path::Path;
+use std::path::PathBuf;
+use std::process::Command;
+use std::time::{Duration, Instant};
+
+use crate::client::ForgeClient;
+
+#[derive(Debug, clap::Args)]
+pub struct PushArgs {
+    /// Git remote to push to — the forge-git remote `forge init` sets up.
+    #[arg(long, default_value = "forge")]
+    pub remote: String,
+    /// Branch to push. Defaults to the current branch.
+    #[arg(long)]
+    pub branch: Option<String>,
+    /// Push and return immediately; don't wait for the converge.
+    #[arg(long)]
+    pub no_wait: bool,
+    /// Seconds to wait for convergence before failing. Default 300.
+    #[arg(long, default_value_t = 300)]
+    pub timeout: u64,
+    /// Repo root (the git working tree). Defaults to the current directory.
+    #[arg(long)]
+    pub manifest_dir: Option<PathBuf>,
+}
+
+pub async fn run(args: PushArgs, client: &ForgeClient) -> Result<()> {
+    push_and_poll(
+        client,
+        args.manifest_dir.as_deref(),
+        &args.remote,
+        args.branch.as_deref(),
+        args.no_wait,
+        args.timeout,
+    )
+    .await
+}
+
+/// Shared entry so `forge ship` can compose push after build + upload.
+pub async fn push_and_poll(
+    client: &ForgeClient,
+    dir: Option<&Path>,
+    remote: &str,
+    branch: Option<&str>,
+    no_wait: bool,
+    timeout_secs: u64,
+) -> Result<()> {
+    let dir = dir.unwrap_or_else(|| Path::new("."));
+    let branch = match branch {
+        Some(b) => b.to_string(),
+        None => current_branch(dir)?,
+    };
+    let url = remote_url(dir, remote).with_context(|| {
+        format!(
+            "resolving remote '{remote}' — add it with \
+             `git remote add {remote} https://git.forge.run/<ws-id>/<repo>`"
+        )
+    })?;
+    let authed = inject_token(&url, &client.token())?;
+    let pushed_sha = head_sha(dir)?;
+
+    // Snapshot the pre-push commit so we can tell when the server has actually
+    // moved to OUR push (robust even when the forge-git repo's history differs
+    // from the local repo's, e.g. a source-mirror deploy).
+    let before_sha = fetch_status(client).await.map(|s| s.git_sha).unwrap_or_default();
+
+    eprintln!("push: git push {remote} {branch} …");
+    git_push(dir, &authed, &url, &branch)?;
+
+    if no_wait {
+        eprintln!(
+            "push: recorded (--no-wait). Convergence runs in the background — \
+             poll reconcile/status."
+        );
+        return Ok(());
+    }
+    poll_until_converged(client, &pushed_sha, &before_sha, Duration::from_secs(timeout_secs)).await
+}
+
+#[derive(serde::Deserialize, Default, Clone)]
+struct Reconcile {
+    #[serde(default)]
+    git_sha: String,
+    #[serde(default)]
+    desired_hash: String,
+    #[serde(default)]
+    live_hash: String,
+    #[serde(default)]
+    in_sync: bool,
+    #[serde(default)]
+    last_error: Option<String>,
+    #[serde(default)]
+    stuck: bool,
+    #[serde(default)]
+    reconcile_loop_enabled: bool,
+}
+
+async fn fetch_status(client: &ForgeClient) -> Result<Reconcile> {
+    client
+        .get_json("/api/v1/manage/reconcile/status")
+        .await
+        .map_err(|e| anyhow::anyhow!("reconcile/status: {e}"))
+}
+
+async fn poll_until_converged(
+    client: &ForgeClient,
+    pushed_sha: &str,
+    before_sha: &str,
+    timeout: Duration,
+) -> Result<()> {
+    let deadline = Instant::now() + timeout;
+    let short = |s: &str| s.chars().take(10).collect::<String>();
+    let mut last_live = String::new();
+    let mut stale = 0u32;
+    let mut nudged = false;
+    eprintln!("push: waiting for converge (git_sha {})…", short(pushed_sha));
+
+    loop {
+        let st = fetch_status(client).await?;
+
+        if st.stuck || st.last_error.is_some() {
+            bail!(
+                "converge FAILED CLOSED (the previous version keeps serving): {}",
+                st.last_error.unwrap_or_else(|| "stuck".into())
+            );
+        }
+
+        // Converged: in sync, live == desired, AND the server is on our push
+        // (matches our SHA, or has advanced past the pre-push commit).
+        let is_ours = st.git_sha == pushed_sha
+            || (!before_sha.is_empty() && st.git_sha != before_sha)
+            || before_sha.is_empty();
+        if st.in_sync && st.live_hash == st.desired_hash && is_ours {
+            eprintln!("push: ✅ converged @ {}", short(&st.git_sha));
+            return Ok(());
+        }
+
+        // No-progress detection.
+        if st.live_hash == last_live {
+            stale += 1;
+        } else {
+            stale = 0;
+            last_live = st.live_hash.clone();
+        }
+        // If the reconcile loop is off and nothing's moving, nudge it once.
+        if stale >= 2 && !nudged {
+            nudged = true;
+            if !st.reconcile_loop_enabled {
+                eprintln!("push: reconcile loop disabled + no progress — triggering reconcile/now …");
+                let _: std::result::Result<serde_json::Value, _> = client
+                    .post_json("/api/v1/manage/reconcile/now", &serde_json::json!({}))
+                    .await;
+            }
+        }
+
+        if Instant::now() >= deadline {
+            let hint = if !pushed_sha.is_empty() && st.git_sha != pushed_sha && st.git_sha == before_sha {
+                "the server never recorded your push — check the remote/branch (nothing new arrived).".to_string()
+            } else if !st.reconcile_loop_enabled {
+                "the reconcile loop is disabled on this node — recorded but not auto-converging.".to_string()
+            } else {
+                "live_hash never advanced with no error — the classic symptom of UNSTAGED \
+                 components. Did `forge wasm-upload` run before the push?"
+                    .to_string()
+            };
+            bail!(
+                "timed out after {}s (in_sync={}, git_sha={}, live!=desired). {}",
+                timeout.as_secs(),
+                st.in_sync,
+                short(&st.git_sha),
+                hint
+            );
+        }
+        tokio::time::sleep(Duration::from_secs(4)).await;
+    }
+}
+
+// ── git helpers (shell out; no git2 dependency) ─────────────────────────
+
+fn git(dir: &Path, args: &[&str]) -> Result<std::process::Output> {
+    Command::new("git")
+        .arg("-C")
+        .arg(dir)
+        .args(args)
+        .output()
+        .context("spawning git")
+}
+
+fn git_str(dir: &Path, args: &[&str]) -> Result<String> {
+    let out = git(dir, args)?;
+    if !out.status.success() {
+        bail!(
+            "git {}: {}",
+            args.join(" "),
+            String::from_utf8_lossy(&out.stderr).trim()
+        );
+    }
+    Ok(String::from_utf8_lossy(&out.stdout).trim().to_string())
+}
+
+fn current_branch(dir: &Path) -> Result<String> {
+    git_str(dir, &["rev-parse", "--abbrev-ref", "HEAD"])
+}
+fn head_sha(dir: &Path) -> Result<String> {
+    git_str(dir, &["rev-parse", "HEAD"])
+}
+fn remote_url(dir: &Path, remote: &str) -> Result<String> {
+    git_str(dir, &["remote", "get-url", remote])
+}
+
+fn git_push(dir: &Path, authed_url: &str, safe_url: &str, branch: &str) -> Result<()> {
+    // The authed URL carries the bearer as `x-token:<token>@` and is passed to
+    // the git subprocess only (local). Never printed; stderr is redacted.
+    let out = git(dir, &["push", authed_url, branch])?;
+    if !out.status.success() {
+        let err = redact(&String::from_utf8_lossy(&out.stderr).replace(authed_url, safe_url));
+        bail!("git push to {safe_url} failed:\n{}", err.trim());
+    }
+    Ok(())
+}
+
+/// Insert `x-token:<token>@` after the scheme, replacing any existing userinfo.
+fn inject_token(url: &str, token: &str) -> Result<String> {
+    let (scheme, rest) = url.split_once("://").context("remote URL missing scheme")?;
+    let host_path = rest.rsplit_once('@').map(|(_, r)| r).unwrap_or(rest);
+    Ok(format!("{scheme}://x-token:{token}@{host_path}"))
+}
+
+/// Strip a leaked `x-token:<...>@` from a string.
+fn redact(s: &str) -> String {
+    let needle = "x-token:";
+    if let Some(i) = s.find(needle)
+        && let Some(at) = s[i..].find('@')
+    {
+        return format!("{}x-token:***@{}", &s[..i], &s[i + at + 1..]);
+    }
+    s.to_string()
+}

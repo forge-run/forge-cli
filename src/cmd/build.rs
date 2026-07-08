@@ -36,6 +36,16 @@ pub struct BuildArgs {
     profile: String,
 }
 
+impl BuildArgs {
+    /// Programmatic constructor for `forge ship` — release profile.
+    pub fn for_dir(manifest_dir: Option<PathBuf>) -> Self {
+        Self {
+            manifest_dir,
+            profile: "release".to_string(),
+        }
+    }
+}
+
 pub async fn run(args: BuildArgs) -> Result<()> {
     let manifest_dir = args
         .manifest_dir

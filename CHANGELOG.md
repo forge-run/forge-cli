@@ -4,6 +4,33 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This file mirrors the GitHub release notes; consult the release page
 for downloadable binaries and platform-specific tarballs.
 
+## [0.5.0] — 2026-07-08
+
+Fold the whole GitOps deploy into the CLI. A raw `git push` returns when
+desired state is *recorded*, not when the workspace is *live* — so "pushed"
+read as "done" when the converge might not have happened, and the failures
+were silent. These commands wait for the converge and decode the failures.
+
+### Added
+
+- **`forge ship`** — the whole deploy in one command: `wasm-build` →
+  `wasm-upload` → `git push` → wait for the converge. Bundling the steps
+  guarantees the ordering the converge depends on. `--no-build` reuses
+  already-staged Components; `--no-wait` skips the poll; `--timeout <secs>`.
+- **`forge push`** — push to the forge-git remote and block until
+  `reconcile/status` reaches `in_sync && live_hash == desired_hash`, then
+  translate anything else into an actionable error: unstaged components (did
+  `wasm-upload` run?), a `stuck`/`last_error` converge (printed verbatim), or
+  a disabled reconcile loop (auto-triggers `reconcile/now`). Non-zero exit on
+  stuck/error/timeout, so CI gates on real convergence. Handles the bearer +
+  `x-token@git.forge.run` URL so nobody hand-assembles it.
+
+### Changed
+
+- The blessed deploy is now `forge ship`. Deploy scripts that hand-rolled
+  `git push` + a `reconcile/status` poll loop (e.g. a `gitops-ship.sh`) are
+  superseded.
+
 ## [0.4.0] — 2026-07-07
 
 Split the build command and add explicit artifact staging, closing the gap
