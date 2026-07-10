@@ -84,6 +84,7 @@ pub async fn run(args: BuildArgs) -> Result<()> {
         cmd.arg("--profile").arg(&args.profile);
     }
     cmd.current_dir(&manifest_dir);
+    apply_reproducible_flags(&mut cmd, &manifest_dir);
     cmd.stdout(Stdio::inherit()).stderr(Stdio::inherit());
 
     let status = cmd
@@ -258,6 +259,7 @@ fn stamp_built_wasm_hashes(
         .arg("--target")
         .arg("wasm32-wasip1")
         .current_dir(root);
+    apply_reproducible_flags(&mut cmd, root);
     let status = cmd
         .status()
         .with_context(|| "failed to spawn `cargo build` — is cargo on PATH?")?;
@@ -600,4 +602,36 @@ edition = "2024"
         let err = validate_wasm_artifact(&bytes).unwrap_err();
         assert!(format!("{err:#}").contains("no exports"));
     }
+}
+
+/// Make the wasm build byte-reproducible across machines. rustc bakes absolute
+/// paths into dependency panic `Location`s (`$CARGO_HOME/registry/...`) and the
+/// workspace root; those vary per machine, so identical source hashes
+/// differently on a laptop vs CI — defeating the runtime's on-disk AOT cache
+/// and warm-module reuse across rebuilds. We remap CARGO_HOME → `/cargo` and the
+/// build root → `/w` (rustc already remaps the std sysroot to `/rustc/<hash>`),
+/// so the module hash depends only on source + toolchain, not the build host.
+/// RUSTFLAGS is appended; a workspace pinning flags via `CARGO_ENCODED_RUSTFLAGS`
+/// is left untouched (it would silently ignore ours).
+fn apply_reproducible_flags(cmd: &mut Command, root: &std::path::Path) {
+    if std::env::var_os("CARGO_ENCODED_RUSTFLAGS").is_some() {
+        return;
+    }
+    let mut flags = std::env::var("RUSTFLAGS").unwrap_or_default();
+    flags.push_str(&format!(" --remap-path-prefix={}=/w", root.display()));
+    let cargo_home = std::env::var_os("CARGO_HOME")
+        .map(PathBuf::from)
+        .or_else(|| std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".cargo")));
+    if let Some(ch) = cargo_home {
+        flags.push_str(&format!(" --remap-path-prefix={}=/cargo", ch.display()));
+    }
+    // The rustup toolchain dir also leaks in (proc-macro / non-std toolchain
+    // paths that rustc's `/rustc/<hash>` std remap doesn't cover).
+    let rustup_home = std::env::var_os("RUSTUP_HOME")
+        .map(PathBuf::from)
+        .or_else(|| std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".rustup")));
+    if let Some(rh) = rustup_home {
+        flags.push_str(&format!(" --remap-path-prefix={}=/rustup", rh.display()));
+    }
+    cmd.env("RUSTFLAGS", flags.trim().to_string());
 }
