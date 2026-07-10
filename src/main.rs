@@ -116,6 +116,11 @@ enum Cmd {
     /// A raw `git push` only records desired state; this waits for it to be live.
     Push(cmd::push::PushArgs),
 
+    /// Fetch the workspace's live deploy state from its forge-git remote (the
+    /// mirror of `push`). Its history is server-derived and usually diverges
+    /// from local commits, so `--ff` is opt-in.
+    Pull(cmd::pull::PullArgs),
+
     /// Internal: imperative upload of a service manifest + compiled WASM
     /// module(s). Superseded by `git push` (GitOps) as the deploy path;
     /// kept hidden as the primitive `forge dev` shells out to for its
@@ -258,6 +263,11 @@ async fn main() -> Result<()> {
             let cfg = config::resolve(cli.base_url, cli.token, cli.profile)?;
             let client = client::ForgeClient::new(cfg)?;
             cmd::push::run(p, &client).await
+        }
+        Cmd::Pull(p) => {
+            let cfg = config::resolve(cli.base_url, cli.token, cli.profile)?;
+            let client = client::ForgeClient::new(cfg)?;
+            cmd::pull::run(p, &client).await
         }
         Cmd::Deploy(d) => {
             let cfg = config::resolve(cli.base_url, cli.token, cli.profile)?;

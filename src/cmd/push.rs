@@ -218,13 +218,13 @@ fn git_str(dir: &Path, args: &[&str]) -> Result<String> {
     Ok(String::from_utf8_lossy(&out.stdout).trim().to_string())
 }
 
-fn current_branch(dir: &Path) -> Result<String> {
+pub(crate) fn current_branch(dir: &Path) -> Result<String> {
     git_str(dir, &["rev-parse", "--abbrev-ref", "HEAD"])
 }
 fn head_sha(dir: &Path) -> Result<String> {
     git_str(dir, &["rev-parse", "HEAD"])
 }
-fn remote_url(dir: &Path, remote: &str) -> Result<String> {
+pub(crate) fn remote_url(dir: &Path, remote: &str) -> Result<String> {
     git_str(dir, &["remote", "get-url", remote])
 }
 
@@ -240,14 +240,14 @@ fn git_push(dir: &Path, authed_url: &str, safe_url: &str, branch: &str) -> Resul
 }
 
 /// Insert `x-token:<token>@` after the scheme, replacing any existing userinfo.
-fn inject_token(url: &str, token: &str) -> Result<String> {
+pub(crate) fn inject_token(url: &str, token: &str) -> Result<String> {
     let (scheme, rest) = url.split_once("://").context("remote URL missing scheme")?;
     let host_path = rest.rsplit_once('@').map(|(_, r)| r).unwrap_or(rest);
     Ok(format!("{scheme}://x-token:{token}@{host_path}"))
 }
 
 /// Strip a leaked `x-token:<...>@` from a string.
-fn redact(s: &str) -> String {
+pub(crate) fn redact(s: &str) -> String {
     let needle = "x-token:";
     if let Some(i) = s.find(needle)
         && let Some(at) = s[i..].find('@')
