@@ -1,34 +1,46 @@
-//! `forge branch` — ephemeral workspace branches.
+//! `forge branch` — ephemeral preview environments.
 //!
-//! Branchable workspaces + test-running = the agent CI/CD
-//! primitive (see [[project_ephemeral_branches]] in memory).
-//! Closes the third-party cliff gap by giving every customer
-//! a way to snapshot their workspace state, run an experimental
-//! migration / deploy / data-correction, observe results, then
-//! promote-or-discard.
+//! A preview is a **fresh, empty workspace running YOUR code with SEED data** —
+//! NOT a copy of production. `forge branch new` provisions a throwaway workspace
+//! (its own freshly-minted encryption key, empty substrate — a few MB, not a
+//! multi-GB clone), then deploys your working-tree code to it exactly like
+//! `forge ship` does: schema is created, the repo's declarative seed fixtures
+//! (`domains/*/seeds/*.json` → `config_data`) are projected, and the app is
+//! deployed. So you get a running, realistic copy of your app to test changes
+//! against — with test data, and zero production rows or PII.
+//!
+//! Why fresh + seeded instead of a production clone: cloning prod meant copying
+//! its whole substrate + per-workspace content store (which for a real workspace
+//! is huge), and "promoting" meant swapping those bytes back over production — a
+//! destructive, high-blast-radius operation. The preview here shares NOTHING
+//! with production, so its entire lifecycle (create / test / discard) can never
+//! affect prod, and "promote" is just a normal deploy of your code.
 //!
 //! CLI surface (this file):
 //!
-//! - `forge branch new <name>` — fork the active workspace's
-//!   substrate snapshot into a new ephemeral workspace.
-//! - `forge branch list` — list active branches.
-//! - `forge branch test <id>` — run the standard build + test
-//!   pipeline against a branch.
-//! - `forge branch promote <id>` — merge a branch's substrate
-//!   back to the source workspace.
-//! - `forge branch discard <id>` — destroy a branch.
+//! - `forge branch new <name> --source <ws>` — create a throwaway workspace and
+//!   deploy your current working tree + seed fixtures onto it. No prod data.
+//! - `forge branch list [--source <ws>]` — list active previews.
+//! - `forge branch test <id>` — smoke-check the preview serves (wakes it +
+//!   health-checks); records the result.
+//! - `forge branch promote <id> --yes` — deploy this preview's code to its
+//!   SOURCE workspace (a normal converge — ships code, never touches data).
+//! - `forge branch discard <id> --yes` — delete the throwaway workspace + its
+//!   key + substrate.
 //!
-//! All commands route through forge-cp's `/admin/branches`
-//! endpoints (`forge-control-plane/src/admin_branches.rs`).
+//! All commands route through forge-cp's `/admin/branches` endpoints
+//! (`forge-control-plane/src/admin_branches.rs`).
 //!
-//! Auth: direct-to-CP, mirrors `forge domain` — needs
-//! `FORGE_CP_URL` + `FORGE_ADMIN_TOKEN` env vars.
+//! Auth: direct-to-CP, mirrors `forge domain` — needs `FORGE_CP_URL` +
+//! `FORGE_ADMIN_TOKEN` env vars.
 //!
 //! # Status
 //!
-//! LIVE — the CP `/admin/branches` handlers are implemented end to end
-//! (fork clones DEK + substrate node-local, test smoke-checks the preview,
-//! promote atomically swaps the source's substrate, discard tears down).
+//! Create + discard are LIVE (cp v0.11.50): `new` provisions a fresh empty
+//! workspace with its own DEK; `discard` tears it down; neither touches prod.
+//! The working-tree code deploy inside `new` (the `forge ship` step) and
+//! `promote`-as-code-deploy are the in-flight wiring — until they land, `new`
+//! yields an empty preview and `promote` still routes to the legacy CP path.
 //! The CLI prints the CP's JSON response verbatim.
 
 use std::time::Duration;
@@ -39,22 +51,22 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Subcommand)]
 pub enum BranchCmd {
-    /// Fork the active workspace's substrate into a new
-    /// ephemeral workspace. The fork is byte-identical at fork
-    /// time; subsequent writes diverge.
+    /// Create a fresh, empty preview workspace and deploy your working-tree
+    /// code + seed fixtures onto it. No production data is copied — the preview
+    /// runs your code against test data (the repo's `domains/*/seeds/*.json`).
     New(NewArgs),
 
-    /// List ephemeral branches under the active tenant.
+    /// List active preview environments.
     List(ListArgs),
 
-    /// Run the standard build + test pipeline against a branch.
+    /// Smoke-check a preview: wake it and confirm it serves.
     Test(TestArgs),
 
-    /// Promote a branch's substrate back to its source workspace.
-    /// Equivalent to merging a PR.
+    /// Deploy this preview's code to its SOURCE workspace. Ships code via a
+    /// normal converge — it does NOT copy or overwrite the source's data.
     Promote(PromoteArgs),
 
-    /// Destroy a branch. Frees the underlying storage snapshot.
+    /// Delete a preview — its throwaway workspace, encryption key, and substrate.
     Discard(DiscardArgs),
 }
 
@@ -86,7 +98,8 @@ pub struct TestArgs {
 #[derive(Debug, Args)]
 pub struct PromoteArgs {
     pub branch_id: String,
-    /// Confirm the destructive merge without an interactive prompt.
+    /// Confirm deploying this preview's code to the live source workspace
+    /// (skips the interactive prompt). Ships code, not data.
     #[arg(long)]
     yes: bool,
 }
@@ -198,8 +211,7 @@ async fn list(cp: &CpClient, args: ListArgs) -> Result<()> {
     let status = resp.status();
     let body = resp.text().await.unwrap_or_default();
     if !status.is_success() {
-        // 501 / non-success path — surface raw so the operator
-        // sees the "substrate pending" message verbatim.
+        // Non-success: surface the CP's message verbatim.
         anyhow::bail!("{status}: {body}");
     }
     let parsed: ListBranchesResponse = match serde_json::from_str(&body) {
@@ -245,9 +257,12 @@ async fn test(cp: &CpClient, args: TestArgs) -> Result<()> {
 
 async fn promote(cp: &CpClient, args: PromoteArgs) -> Result<()> {
     if !args.yes {
-        // Promote is destructive (replaces source workspace
-        // substrate). Require explicit confirmation.
-        anyhow::bail!("promote replaces the source workspace's substrate. Pass --yes to confirm.");
+        // Promote deploys this preview's code to the LIVE source workspace (a
+        // normal converge — ships code, not data). Require explicit confirmation.
+        anyhow::bail!(
+            "promote deploys this preview's code to the live source workspace. \
+             Pass --yes to confirm."
+        );
     }
     let url = format!("{}/admin/branches/{}/promote", cp.base_url, args.branch_id);
     let resp = cp
@@ -262,7 +277,7 @@ async fn promote(cp: &CpClient, args: PromoteArgs) -> Result<()> {
 
 async fn discard(cp: &CpClient, args: DiscardArgs) -> Result<()> {
     if !args.yes {
-        anyhow::bail!("discard destroys the branch snapshot. Pass --yes to confirm.");
+        anyhow::bail!("discard deletes the preview's throwaway workspace. Pass --yes to confirm.");
     }
     let url = format!("{}/admin/branches/{}", cp.base_url, args.branch_id);
     let resp = cp
@@ -282,9 +297,7 @@ async fn print_response(resp: reqwest::Response) -> Result<()> {
         println!("{body}");
         Ok(())
     } else {
-        // 501 surfaces here verbatim — useful while the
-        // substrate work lands. Operator sees the raw error
-        // string from forge-cp's stub handlers.
+        // Surface the CP's error string verbatim.
         anyhow::bail!("{status}: {body}");
     }
 }

@@ -191,10 +191,9 @@ enum Cmd {
     /// inline at render time.
     Brand(cmd::brand::BrandArgs),
 
-    /// Ephemeral workspace branches (agent CI/CD primitive).
-    /// Fork the active workspace's substrate, run experimental
-    /// changes against the branch, promote-or-discard.
-    /// See [[project_ephemeral_branches]] in memory for context.
+    /// Ephemeral preview environments. Spin up a throwaway workspace running
+    /// your working-tree code with SEED data (no production data), test against
+    /// it, then promote (deploy the code to prod) or discard.
     #[command(subcommand)]
     Branch(cmd::branch::BranchCmd),
 
