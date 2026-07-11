@@ -26,9 +26,10 @@
 //!
 //! # Status
 //!
-//! Wire path live; CP handlers return 501 today. The CLI
-//! prints the CP's response verbatim so the operator can see
-//! the substrate-pending state for each verb.
+//! LIVE — the CP `/admin/branches` handlers are implemented end to end
+//! (fork clones DEK + substrate node-local, test smoke-checks the preview,
+//! promote atomically swaps the source's substrate, discard tears down).
+//! The CLI prints the CP's JSON response verbatim.
 
 use std::time::Duration;
 
