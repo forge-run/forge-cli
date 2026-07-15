@@ -51,7 +51,46 @@ const TEMPLATE_DESCRIPTIONS: &[(&str, &str)] = &[
         "subscription-publisher",
         "single-service crate — publishes to a channel (imperative deploy)",
     ),
+    (
+        "workspace",
+        "git-native workspace (one domain + op) — the GitOps `forge ship` golden path",
+    ),
 ];
+
+/// Workspace-graph templates. Unlike the single-service `TEMPLATES` (a bare
+/// crate for the imperative `forge deploy`), these scaffold a whole
+/// `workspace.json` domain/app/capability graph — the unit `forge ship`
+/// builds + pushes. Emitted paths carry a `{{domain}}` token substituted with
+/// the derived domain name; file contents carry `{{workspace_name}}`,
+/// `{{domain}}`, `{{domain_crate}}`, and the SDK-dep placeholder.
+const WORKSPACE_TEMPLATES: &[(&str, &[(&str, &str)])] = &[(
+    "workspace",
+    &[
+        (
+            "workspace.json",
+            include_str!("../../templates/workspace/workspace.json"),
+        ),
+        ("Cargo.toml", include_str!("../../templates/workspace/Cargo.toml")),
+        (".gitignore", include_str!("../../templates/workspace/gitignore")),
+        ("README.md", include_str!("../../templates/workspace/README.md")),
+        (
+            "domains/{{domain}}/domain.json",
+            include_str!("../../templates/workspace/domain.json"),
+        ),
+        (
+            "domains/{{domain}}/Cargo.toml",
+            include_str!("../../templates/workspace/domain-Cargo.toml"),
+        ),
+        (
+            "domains/{{domain}}/service.json",
+            include_str!("../../templates/workspace/service.json"),
+        ),
+        (
+            "domains/{{domain}}/services/lib.rs",
+            include_str!("../../templates/workspace/lib.rs"),
+        ),
+    ],
+)];
 
 /// Embedded templates. Each entry is `(template_name, [(relative_path, contents)...])`.
 /// The `forge-template-<name>` placeholder gets replaced with the
@@ -133,12 +172,21 @@ pub async fn run(args: NewArgs) -> Result<()> {
         anyhow::anyhow!("missing CRATE_NAME — usage: `forge new --template <t> <crate-name>`")
     })?;
 
+    validate_crate_name(crate_name)?;
+
+    // Workspace-graph templates take a different scaffolding path (multi-dir
+    // tree + `forge ship` next-steps).
+    if let Some((_, files)) = WORKSPACE_TEMPLATES.iter().find(|(name, _)| *name == template) {
+        return scaffold_workspace(crate_name, template, files);
+    }
+
     let files = TEMPLATES
         .iter()
         .find(|(name, _)| *name == template)
         .map(|(_, files)| files)
         .ok_or_else(|| {
-            let available: Vec<&str> = TEMPLATES.iter().map(|(n, _)| *n).collect();
+            let mut available: Vec<&str> = TEMPLATES.iter().map(|(n, _)| *n).collect();
+            available.extend(WORKSPACE_TEMPLATES.iter().map(|(n, _)| *n));
             anyhow::anyhow!(
                 "unknown template `{}` — available: {}",
                 template,
@@ -146,7 +194,6 @@ pub async fn run(args: NewArgs) -> Result<()> {
             )
         })?;
 
-    validate_crate_name(crate_name)?;
     let target_dir = PathBuf::from(crate_name);
     if target_dir.exists() {
         anyhow::bail!(
@@ -220,6 +267,86 @@ pub async fn run(args: NewArgs) -> Result<()> {
         "  forge deploy --manifest service.json \\\n    \
          --wasm target/wasm32-wasip1/release/{customer_artifact_name}.wasm"
     );
+    Ok(())
+}
+
+/// Derive a valid domain name (lower-kebab, no leading/trailing `-`) from the
+/// crate name. `forge_schema`'s domain validation requires this shape and the
+/// domain directory must match the name exactly; sanitising here avoids a
+/// confusing compile error after the tree is already written.
+fn derive_domain_name(crate_name: &str) -> String {
+    let lowered = crate_name.to_lowercase();
+    let trimmed = lowered.trim_matches('-');
+    if trimmed.is_empty() {
+        "app".to_string()
+    } else {
+        trimmed.to_string()
+    }
+}
+
+/// Scaffold a workspace-graph template: a `workspace.json` domain/app graph
+/// that `forge ship` (wasm-build → wasm-upload → git push) consumes directly.
+fn scaffold_workspace(
+    crate_name: &str,
+    template: &str,
+    files: &[(&str, &str)],
+) -> Result<()> {
+    let target_dir = PathBuf::from(crate_name);
+    if target_dir.exists() {
+        anyhow::bail!(
+            "directory `{}` already exists — pick a different name or remove it first",
+            target_dir.display(),
+        );
+    }
+
+    let domain = derive_domain_name(crate_name);
+    let domain_crate = format!("forge-domain-{domain}");
+    let (sdk_dep_line, sdk_resolved) = resolve_sdk_dep();
+
+    let subst = |s: &str| -> String {
+        s.replace("{{domain}}", &domain)
+            .replace("{{domain_crate}}", &domain_crate)
+            .replace("{{workspace_name}}", crate_name)
+            .replace("forge-sdk-v2 = { path = \"../..\" }", &sdk_dep_line)
+    };
+
+    for (rel_path, content) in files {
+        // `{{domain}}` appears in emitted paths too (the domain directory).
+        let rel = subst(rel_path);
+        let path = target_dir.join(&rel);
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent)
+                .with_context(|| format!("creating {}", parent.display()))?;
+        }
+        std::fs::write(&path, subst(content))
+            .with_context(|| format!("writing {}", path.display()))?;
+    }
+
+    git_init_scaffold(&target_dir);
+
+    eprintln!(
+        "created workspace {} from `{}` template (domain `{}`)",
+        target_dir.display(),
+        template,
+        domain,
+    );
+    if !sdk_resolved {
+        eprintln!();
+        eprintln!(
+            "⚠  forge-sdk-v2 could not be located automatically. `domains/{domain}/Cargo.toml`\n   \
+             points at `{sdk_dep_line}` — edit it (or set FORGE_SDK_PATH and re-scaffold)\n   \
+             before building. See docs/sdk-dependency-portability.md."
+        );
+    }
+    eprintln!();
+    eprintln!("next steps (the GitOps golden path):");
+    eprintln!("  cd {}", target_dir.display());
+    eprintln!("  forge wasm-build                       # compile the workspace graph");
+    eprintln!("  forge ws use <workspace-id>");
+    eprintln!(
+        "  git remote add forge https://git.forge.run/<workspace-id>/{crate_name}"
+    );
+    eprintln!("  forge ship                             # build → upload → push → converge");
     Ok(())
 }
 
@@ -350,12 +477,60 @@ mod tests {
                 "template `{name}` has no entry in TEMPLATE_DESCRIPTIONS (`--list` would omit it)"
             );
         }
-        for (name, _) in TEMPLATE_DESCRIPTIONS {
+        for (name, _) in WORKSPACE_TEMPLATES {
             assert!(
-                TEMPLATES.iter().any(|(n, _)| n == name),
+                TEMPLATE_DESCRIPTIONS.iter().any(|(n, _)| n == name),
+                "workspace template `{name}` has no TEMPLATE_DESCRIPTIONS entry"
+            );
+        }
+        for (name, _) in TEMPLATE_DESCRIPTIONS {
+            let known = TEMPLATES.iter().any(|(n, _)| n == name)
+                || WORKSPACE_TEMPLATES.iter().any(|(n, _)| n == name);
+            assert!(
+                known,
                 "TEMPLATE_DESCRIPTIONS lists `{name}` which is not a real template"
             );
         }
+    }
+
+    #[test]
+    fn workspace_template_has_ship_able_graph_shape() {
+        let (_, files) = WORKSPACE_TEMPLATES
+            .iter()
+            .find(|(n, _)| *n == "workspace")
+            .expect("workspace template exists");
+        let paths: Vec<&str> = files.iter().map(|(p, _)| *p).collect();
+        // The unit `forge ship` builds is a workspace.json graph with a cargo
+        // workspace + at least one wasm domain. Assert the load-bearing files.
+        for required in [
+            "workspace.json",
+            "Cargo.toml",
+            "domains/{{domain}}/domain.json",
+            "domains/{{domain}}/Cargo.toml",
+            "domains/{{domain}}/service.json",
+            "domains/{{domain}}/services/lib.rs",
+        ] {
+            assert!(paths.contains(&required), "workspace template missing {required}");
+        }
+        // The domain crate must be the `forge-domain-<name>` the workspace
+        // compiler's hash-stamp step looks for.
+        let domain_cargo = files
+            .iter()
+            .find(|(p, _)| *p == "domains/{{domain}}/Cargo.toml")
+            .map(|(_, c)| *c)
+            .unwrap();
+        assert!(
+            domain_cargo.contains("name = \"{{domain_crate}}\""),
+            "domain Cargo.toml must use the forge-domain-<name> crate name token"
+        );
+    }
+
+    #[test]
+    fn derive_domain_name_produces_valid_names() {
+        assert_eq!(derive_domain_name("my-app"), "my-app");
+        assert_eq!(derive_domain_name("MyApp"), "myapp");
+        assert_eq!(derive_domain_name("my-app-"), "my-app");
+        assert_eq!(derive_domain_name("-"), "app");
     }
 
     #[test]

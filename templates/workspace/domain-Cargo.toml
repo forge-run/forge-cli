@@ -1,0 +1,16 @@
+[package]
+name = "{{domain_crate}}"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "{{domain}} bounded-context wasm module."
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+path = "services/lib.rs"
+
+[dependencies]
+# Rewritten by `forge new` to a resolved path/registry/git dependency.
+# See docs/sdk-dependency-portability.md in forge-cli.
+forge-sdk-v2 = { path = "../.." }
+serde_json = "1"

@@ -1,0 +1,16 @@
+{
+  "name": "{{domain}}",
+  "namespace": "{{domain}}",
+  "operations": [
+    {
+      "name": "hello",
+      "kind": "query",
+      "idempotency": "idempotent",
+      "input_schema": {},
+      "output_schema": {},
+      "error_codes": [],
+      "summary": "Return a greeting.",
+      "description": "The starter op. Proves the workspace builds, ships, and serves. Bind it from a page with @op:{{domain}}::hello."
+    }
+  ]
+}

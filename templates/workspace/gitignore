@@ -1,0 +1,8 @@
+# Build + generated artifacts — never part of the desired state.
+/target
+/.forge
+*.wasm
+.DS_Store
+
+# forge.lock IS committed (it pins each module's content hash for the
+# converge) — do NOT ignore it.

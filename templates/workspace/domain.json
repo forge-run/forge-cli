@@ -1,0 +1,7 @@
+{
+  "schema_version": "0.1",
+  "name": "{{domain}}",
+  "description": "{{domain}} bounded context.",
+  "consumes": [],
+  "secrets": []
+}

@@ -1,0 +1,15 @@
+# Virtual cargo workspace — the unit `forge ship` builds + pushes.
+# Add more members (domains/<name>, apps/<name>) as the workspace grows.
+[workspace]
+members = ["domains/{{domain}}"]
+resolver = "2"
+
+# Workspace-level profile — member crates inherit it (a `[profile.release]`
+# in a member Cargo.toml is ignored by cargo). WASM size matters: the
+# artifact is uploaded, stored, and faulted in on cold start.
+[profile.release]
+strip = true
+lto = true
+opt-level = "z"
+codegen-units = 1
+panic = "abort"

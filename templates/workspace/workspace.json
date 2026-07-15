@@ -1,0 +1,9 @@
+{
+  "schema_version": "0.1",
+  "workspace": {
+    "name": "{{workspace_name}}",
+    "version": "0.1.0",
+    "description": "{{workspace_name}} — a git-native Forge workspace."
+  },
+  "hosts": {}
+}
