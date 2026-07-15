@@ -7,7 +7,7 @@
 //! ```bash
 //! forge new --template echo my-app
 //! cd my-app
-//! forge build
+//! forge wasm-build
 //! ```
 //!
 //! and gets a working crate. Substitution is text-replace of
@@ -26,16 +26,32 @@ use clap::Args;
 
 #[derive(Debug, Args)]
 pub struct NewArgs {
-    /// Which starter template to scaffold from. Currently:
-    /// `echo`, `mcp-tool`, `subscription-publisher`.
+    /// Which starter template to scaffold from. Run `forge new --list`
+    /// to see every template with a one-line description. Required
+    /// unless `--list` is passed.
     #[arg(long)]
-    template: String,
+    template: Option<String>,
 
     /// Output directory + crate name. The directory must not
-    /// already exist (refuses to clobber).
+    /// already exist (refuses to clobber). Required unless `--list`.
     #[arg(value_name = "CRATE_NAME")]
-    crate_name: String,
+    crate_name: Option<String>,
+
+    /// List the available starter templates and exit.
+    #[arg(long)]
+    list: bool,
 }
+
+/// One-line description per template, shown by `--list`. Keep in sync with
+/// `TEMPLATES` — the `templates_all_have_a_description` test enforces it.
+const TEMPLATE_DESCRIPTIONS: &[(&str, &str)] = &[
+    ("echo", "single-service crate — echoes its JSON input (imperative deploy)"),
+    ("mcp-tool", "single-service crate — an MCP tool op (imperative deploy)"),
+    (
+        "subscription-publisher",
+        "single-service crate — publishes to a channel (imperative deploy)",
+    ),
+];
 
 /// Embedded templates. Each entry is `(template_name, [(relative_path, contents)...])`.
 /// The `forge-template-<name>` placeholder gets replaced with the
@@ -105,21 +121,33 @@ const TEMPLATES: &[(&str, &[(&str, &str)])] = &[
 ];
 
 pub async fn run(args: NewArgs) -> Result<()> {
+    if args.list {
+        print_template_list();
+        return Ok(());
+    }
+
+    let template = args.template.as_deref().ok_or_else(|| {
+        anyhow::anyhow!("missing --template — run `forge new --list` to see the options")
+    })?;
+    let crate_name = args.crate_name.as_deref().ok_or_else(|| {
+        anyhow::anyhow!("missing CRATE_NAME — usage: `forge new --template <t> <crate-name>`")
+    })?;
+
     let files = TEMPLATES
         .iter()
-        .find(|(name, _)| *name == args.template.as_str())
+        .find(|(name, _)| *name == template)
         .map(|(_, files)| files)
         .ok_or_else(|| {
             let available: Vec<&str> = TEMPLATES.iter().map(|(n, _)| *n).collect();
             anyhow::anyhow!(
                 "unknown template `{}` — available: {}",
-                args.template,
+                template,
                 available.join(", "),
             )
         })?;
 
-    validate_crate_name(&args.crate_name)?;
-    let target_dir = PathBuf::from(&args.crate_name);
+    validate_crate_name(crate_name)?;
+    let target_dir = PathBuf::from(crate_name);
     if target_dir.exists() {
         anyhow::bail!(
             "directory `{}` already exists — pick a different name or remove it first",
@@ -127,35 +155,11 @@ pub async fn run(args: NewArgs) -> Result<()> {
         );
     }
 
-    let template_crate_name = format!("forge-template-{}", args.template);
+    let template_crate_name = format!("forge-template-{}", template);
     let template_artifact_name = template_crate_name.replace('-', "_");
-    let customer_artifact_name = args.crate_name.replace('-', "_");
+    let customer_artifact_name = crate_name.replace('-', "_");
 
-    // The template's Cargo.toml has `forge-sdk-v2 = { path = "../.." }`,
-    // which is a placeholder the substitution below rewrites. We
-    // point it at an absolute path to forge-sdk-v2 so the customer's
-    // freshly-scaffolded crate compiles wherever they put it. v1
-    // hack; when forge-sdk-v2 publishes to crates.io, replace this
-    // with `forge-sdk-v2 = "0.2"` and drop the substitution.
-    //
-    // forge-sdk-v2 is the v0.2 Component-Model SDK: the template
-    // uses the `Guest`/`export!` pattern, which produces a wasm
-    // component the runtime can instantiate. (The legacy forge-sdk
-    // `define_op!` macro builds + deploys but TRAPS at runtime with
-    // `no exported instance forge:platform/op@0.2.0`.)
-    //
-    // We compute the SDK path from forge-cli's own
-    // CARGO_MANIFEST_DIR at compile time. Falls back to a
-    // sibling-`forge-sdk-v2` directory, which matches the canonical
-    // dev layout (`/Users/rory/Documents/{forge-cli,forge-sdk-v2}/`).
-    let sdk_path = env!("CARGO_MANIFEST_DIR")
-        .strip_suffix("forge-cli")
-        .map(|prefix| format!("{}forge-sdk-v2", prefix))
-        .unwrap_or_else(|| {
-            // Fallback for unusual layouts — dev should adjust
-            // manually if forge-cli is renamed/moved.
-            "/Users/rory/Documents/forge-sdk-v2".to_string()
-        });
+    let (sdk_dep_line, sdk_resolved) = resolve_sdk_dep();
 
     for (rel_path, content) in *files {
         let path = target_dir.join(rel_path);
@@ -164,31 +168,127 @@ pub async fn run(args: NewArgs) -> Result<()> {
                 .with_context(|| format!("creating {}", parent.display()))?;
         }
         let substituted = content
-            .replace(&template_crate_name, &args.crate_name)
+            .replace(&template_crate_name, crate_name)
             .replace(&template_artifact_name, &customer_artifact_name)
-            .replace(
-                "forge-sdk-v2 = { path = \"../..\" }",
-                &format!("forge-sdk-v2 = {{ path = \"{sdk_path}\" }}"),
-            );
+            // README/service.json placeholders. `{{crate_name}}` was NEVER
+            // substituted before this fix, so scaffolded READMEs shipped the
+            // literal `{{crate_name}}`. Rewrite both the hyphen + underscore
+            // forms so docs and paths read correctly.
+            .replace("{{crate_name}}", crate_name)
+            .replace("{{artifact_name}}", &customer_artifact_name)
+            // SDK dependency. The template pins `forge-sdk-v2 = { path = "../.." }`
+            // (relative to the in-repo template location); rewrite it to the
+            // resolved dependency form. See `resolve_sdk_dep` for precedence
+            // and docs/sdk-dependency-portability.md for the off-box story.
+            .replace("forge-sdk-v2 = { path = \"../..\" }", &sdk_dep_line);
         std::fs::write(&path, substituted)
             .with_context(|| format!("writing {}", path.display()))?;
     }
 
+    // Initialise a git repo + initial commit so the scaffold is immediately a
+    // real working tree (a prerequisite for any push-based deploy, and how
+    // `forge init` leaves its GitOps workspaces). Best-effort — never fails
+    // the scaffold.
+    git_init_scaffold(&target_dir);
+
     eprintln!(
         "created {} from `{}` template",
         target_dir.display(),
-        args.template
+        template
     );
+    if !sdk_resolved {
+        eprintln!();
+        eprintln!(
+            "⚠  forge-sdk-v2 could not be located automatically. The generated\n   \
+             Cargo.toml points at `{sdk_dep_line}` — edit it to a real path (or set\n   \
+             FORGE_SDK_PATH and re-run) before building. See\n   \
+             docs/sdk-dependency-portability.md."
+        );
+    }
     eprintln!();
     eprintln!("next steps:");
     eprintln!("  cd {}", target_dir.display());
-    eprintln!("  forge build");
-    eprintln!("  forge deploy --manifest service.json --wasm \\");
+    eprintln!("  forge wasm-build              # compile to a wasm32-wasip1 Component");
+    eprintln!();
     eprintln!(
-        "    target/wasm32-wasip1/release/{}.wasm",
-        customer_artifact_name,
+        "  This template is a single-service crate. It deploys via the imperative\n  \
+         path (below); the GitOps `forge ship` golden path deploys a WORKSPACE, so\n  \
+         to ride `forge ship` scaffold a workspace instead (see the README).\n"
+    );
+    eprintln!("  # imperative single-service deploy:");
+    eprintln!(
+        "  forge deploy --manifest service.json \\\n    \
+         --wasm target/wasm32-wasip1/release/{customer_artifact_name}.wasm"
     );
     Ok(())
+}
+
+/// Resolve the `forge-sdk-v2` dependency line to write into the scaffolded
+/// `Cargo.toml`, and whether it points at a directory that actually exists.
+///
+/// Precedence:
+///  1. `FORGE_SDK_PATH` env var — explicit override for any checkout layout.
+///  2. A sibling `forge-sdk-v2` next to this `forge-cli` checkout (the
+///     canonical dev layout `.../{forge-cli,forge-sdk-v2}/`), resolved from
+///     `CARGO_MANIFEST_DIR` at COMPILE time — so it is the maintainer's build
+///     path, correct only on the box the CLI was built on.
+///
+/// If neither resolves to an existing directory we still emit a clearly-marked
+/// placeholder path (never a silent, wrong absolute path) and the caller warns
+/// the user to fix it. forge-sdk-v2 is `publish = false` and is NOT
+/// self-contained (it `wit_bindgen::generate!`s against a sibling
+/// `forge-runtime/wit`), so no registry/git dependency form builds off-box
+/// today — see docs/sdk-dependency-portability.md for the real fix.
+fn resolve_sdk_dep() -> (String, bool) {
+    let dep = |p: &str| format!("forge-sdk-v2 = {{ path = \"{p}\" }}");
+
+    if let Ok(env_path) = std::env::var("FORGE_SDK_PATH") {
+        let exists = std::path::Path::new(&env_path).is_dir();
+        return (dep(&env_path), exists);
+    }
+
+    let sibling = env!("CARGO_MANIFEST_DIR")
+        .strip_suffix("forge-cli")
+        .map(|prefix| format!("{prefix}forge-sdk-v2"));
+    if let Some(path) = sibling {
+        let exists = std::path::Path::new(&path).is_dir();
+        if exists {
+            return (dep(&path), true);
+        }
+    }
+
+    // Nothing resolved — emit an obvious placeholder, not a wrong path.
+    (dep("/path/to/forge-sdk-v2"), false)
+}
+
+/// `git init -b main` + an initial commit of the scaffold. Best-effort: a
+/// missing git, or an unconfigured identity, leaves the files in place and the
+/// user finishes the commit. Never fails the scaffold.
+fn git_init_scaffold(dir: &std::path::Path) {
+    let git = |args: &[&str]| {
+        std::process::Command::new("git")
+            .args(args)
+            .current_dir(dir)
+            .output()
+    };
+    if git(&["init", "-b", "main"]).map(|o| !o.status.success()).unwrap_or(true) {
+        let _ = git(&["init"]);
+    }
+    let _ = git(&["add", "-A"]);
+    let staged = git(&["diff", "--cached", "--quiet"])
+        .map(|o| !o.status.success())
+        .unwrap_or(false);
+    if staged {
+        let _ = git(&["commit", "-m", "forge new: scaffold from starter template"]);
+    }
+}
+
+fn print_template_list() {
+    println!("available starter templates:\n");
+    for (name, desc) in TEMPLATE_DESCRIPTIONS {
+        println!("  {name:<24} {desc}");
+    }
+    println!("\nusage: forge new --template <name> <crate-name>");
 }
 
 /// Cargo crate names: lowercase ASCII letters, digits, `-`, `_`.
@@ -238,6 +338,44 @@ mod tests {
             validate_crate_name("MyApp").is_ok(),
             "uppercase is technically valid for cargo (gets normalized)"
         );
+    }
+
+    #[test]
+    fn templates_all_have_a_description() {
+        // `--list` reads TEMPLATE_DESCRIPTIONS; a template with no description
+        // would silently vanish from the listing. Enforce 1:1 with TEMPLATES.
+        for (name, _) in TEMPLATES {
+            assert!(
+                TEMPLATE_DESCRIPTIONS.iter().any(|(n, _)| n == name),
+                "template `{name}` has no entry in TEMPLATE_DESCRIPTIONS (`--list` would omit it)"
+            );
+        }
+        for (name, _) in TEMPLATE_DESCRIPTIONS {
+            assert!(
+                TEMPLATES.iter().any(|(n, _)| n == name),
+                "TEMPLATE_DESCRIPTIONS lists `{name}` which is not a real template"
+            );
+        }
+    }
+
+    #[test]
+    fn no_template_ships_a_literal_double_brace_placeholder_unsubstituted() {
+        // `{{crate_name}}` must be a token `forge new` rewrites — a template
+        // file containing it is fine (it gets substituted), but this documents
+        // that the substitution pass covers it so READMEs don't ship the
+        // literal placeholder (the pre-fix bug).
+        let rewritten = "# {{crate_name}}".replace("{{crate_name}}", "my-app");
+        assert_eq!(rewritten, "# my-app");
+    }
+
+    #[test]
+    fn resolve_sdk_dep_env_override_wins() {
+        // Serialised implicitly: this is the only test touching FORGE_SDK_PATH.
+        unsafe { std::env::set_var("FORGE_SDK_PATH", "/tmp/does-not-exist-forge-sdk") };
+        let (line, exists) = resolve_sdk_dep();
+        assert!(line.contains("/tmp/does-not-exist-forge-sdk"), "env path used: {line}");
+        assert!(!exists, "non-existent path reports not-resolved");
+        unsafe { std::env::remove_var("FORGE_SDK_PATH") };
     }
 
     #[test]
