@@ -21,6 +21,7 @@ pub mod ship;
 pub mod secrets;
 pub mod sso;
 pub mod static_cmd;
+pub mod surface_lint;
 pub mod tenant;
 pub mod tokens;
 pub mod update;

@@ -94,7 +94,99 @@ pub async fn push_and_poll(
         );
         return Ok(());
     }
-    poll_until_converged(client, &pushed_sha, &before_sha, Duration::from_secs(timeout_secs)).await
+    poll_until_converged(client, &pushed_sha, &before_sha, Duration::from_secs(timeout_secs)).await?;
+
+    // Validation #59 — post-converge surface smoke gate. The deploy is live;
+    // verify the declared landing hosts actually route host-first and don't
+    // bounce off to another surface's host (the app→code redirect outage).
+    smoke_check_surfaces(dir).await?;
+    Ok(())
+}
+
+/// After convergence, GET the root `/` of each declared landing host and assert
+/// it does NOT redirect to a DIFFERENT host. A cross-host root bounce is the
+/// signature of a broken/absent surface config (`app.forge.run/` → `code`).
+/// Definite bounces fail the deploy loudly; unreachable hosts warn and are
+/// skipped (never fail a good deploy on a transient network/DNS blip).
+async fn smoke_check_surfaces(dir: &Path) -> Result<()> {
+    let Some(domains) = crate::cmd::surface_lint::agreed_domains(dir) else {
+        return Ok(()); // no surface config → nothing to smoke-test.
+    };
+    let Some(hosts) = domains.get("hosts").and_then(|h| h.as_object()) else {
+        return Ok(());
+    };
+    // Landing hosts = those serving an interactive `app` or public `marketing`
+    // surface; their root is a user entry point that must stay on-host.
+    let landing: Vec<String> = hosts
+        .iter()
+        .filter(|(_, p)| {
+            p.get("allowed_surfaces")
+                .and_then(|a| a.as_array())
+                .map(|a| a.iter().any(|s| s.as_str() == Some("app") || s.as_str() == Some("marketing")))
+                .unwrap_or(false)
+        })
+        .map(|(h, _)| h.clone())
+        .collect();
+    if landing.is_empty() {
+        return Ok(());
+    }
+
+    let http = match reqwest::Client::builder()
+        .redirect(reqwest::redirect::Policy::none())
+        .timeout(Duration::from_secs(10))
+        .build()
+    {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!("push: ⚠ smoke gate skipped — HTTP client init failed: {e}");
+            return Ok(());
+        }
+    };
+
+    let mut bounces = Vec::new();
+    for host in &landing {
+        let url = format!("https://{host}/");
+        match http.get(&url).send().await {
+            Ok(resp) => {
+                let status = resp.status();
+                if status.is_redirection() {
+                    let loc = resp
+                        .headers()
+                        .get(reqwest::header::LOCATION)
+                        .and_then(|v| v.to_str().ok())
+                        .unwrap_or("");
+                    let dest_host = reqwest::Url::parse(loc)
+                        .ok()
+                        .and_then(|u| u.host_str().map(|s| s.to_string()));
+                    match dest_host {
+                        Some(dh) if &dh != host => {
+                            bounces.push(format!(
+                                "  ✗ {host}/ → {} {} (bounced OFF-HOST to `{dh}`)",
+                                status.as_u16(),
+                                loc
+                            ));
+                        }
+                        _ => eprintln!("push:   ✓ {host}/ → {} (stays on host)", status.as_u16()),
+                    }
+                } else {
+                    eprintln!("push:   ✓ {host}/ → {} (serves in place)", status.as_u16());
+                }
+            }
+            Err(e) => eprintln!("push:   ⚠ {host}/ unreachable, smoke check skipped: {e}"),
+        }
+    }
+
+    if !bounces.is_empty() {
+        bail!(
+            "push: ✗ SURFACE SMOKE GATE FAILED — {} landing host(s) bounce off-host at root:\n{}\n\
+             The deploy is live but host routing is broken (the surface config is absent or wrong). \
+             Check each app.json `domains` block and roll forward with a fix.",
+            bounces.len(),
+            bounces.join("\n"),
+        );
+    }
+    eprintln!("push: ✅ surface smoke gate passed ({} landing host(s) route on-host)", landing.len());
+    Ok(())
 }
 
 #[derive(serde::Deserialize, Default, Clone)]

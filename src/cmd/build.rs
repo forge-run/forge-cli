@@ -163,6 +163,12 @@ pub(crate) fn compile_workspace_graph(root: &std::path::Path) -> Result<()> {
     let graph = forge_web_build::compile_workspace(root, &scratch)
         .map_err(|e| anyhow::anyhow!("workspace compile failed: {e}"))?;
 
+    // Validation #58/#61 — surface-config coherence across apps. Fails the build
+    // if the per-host `domains` blocks are inconsistent, incoherent, or would
+    // wipe each other at ingest (the app→code redirect outage). Loud at build,
+    // never silent in production.
+    crate::cmd::surface_lint::lint_surface_config(root)?;
+
     let domain_modules = graph.domains.iter().filter(|d| d.has_wasm).count();
     let app_modules = graph.apps.iter().filter(|a| a.has_wasm).count();
     eprintln!(
