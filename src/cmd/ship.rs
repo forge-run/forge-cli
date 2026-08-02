@@ -35,8 +35,10 @@ pub struct ShipArgs {
 
 pub async fn run(args: ShipArgs, client: &ForgeClient) -> Result<()> {
     if !args.no_build {
-        crate::cmd::build::run(crate::cmd::build::BuildArgs::for_dir(args.manifest_dir.clone()))
-            .await?;
+        crate::cmd::build::run(crate::cmd::build::BuildArgs::for_dir(
+            args.manifest_dir.clone(),
+        ))
+        .await?;
     }
     crate::cmd::wasm_upload::run(
         crate::cmd::wasm_upload::WasmUploadArgs::for_dir(args.manifest_dir.clone()),

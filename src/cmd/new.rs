@@ -45,8 +45,14 @@ pub struct NewArgs {
 /// One-line description per template, shown by `--list`. Keep in sync with
 /// `TEMPLATES` — the `templates_all_have_a_description` test enforces it.
 const TEMPLATE_DESCRIPTIONS: &[(&str, &str)] = &[
-    ("echo", "single-service crate — echoes its JSON input (imperative deploy)"),
-    ("mcp-tool", "single-service crate — an MCP tool op (imperative deploy)"),
+    (
+        "echo",
+        "single-service crate — echoes its JSON input (imperative deploy)",
+    ),
+    (
+        "mcp-tool",
+        "single-service crate — an MCP tool op (imperative deploy)",
+    ),
     (
         "subscription-publisher",
         "single-service crate — publishes to a channel (imperative deploy)",
@@ -70,9 +76,18 @@ const WORKSPACE_TEMPLATES: &[(&str, &[(&str, &str)])] = &[(
             "workspace.json",
             include_str!("../../templates/workspace/workspace.json"),
         ),
-        ("Cargo.toml", include_str!("../../templates/workspace/Cargo.toml")),
-        (".gitignore", include_str!("../../templates/workspace/gitignore")),
-        ("README.md", include_str!("../../templates/workspace/README.md")),
+        (
+            "Cargo.toml",
+            include_str!("../../templates/workspace/Cargo.toml"),
+        ),
+        (
+            ".gitignore",
+            include_str!("../../templates/workspace/gitignore"),
+        ),
+        (
+            "README.md",
+            include_str!("../../templates/workspace/README.md"),
+        ),
         (
             "domains/{{domain}}/domain.json",
             include_str!("../../templates/workspace/domain.json"),
@@ -176,7 +191,10 @@ pub async fn run(args: NewArgs) -> Result<()> {
 
     // Workspace-graph templates take a different scaffolding path (multi-dir
     // tree + `forge ship` next-steps).
-    if let Some((_, files)) = WORKSPACE_TEMPLATES.iter().find(|(name, _)| *name == template) {
+    if let Some((_, files)) = WORKSPACE_TEMPLATES
+        .iter()
+        .find(|(name, _)| *name == template)
+    {
         return scaffold_workspace(crate_name, template, files);
     }
 
@@ -286,11 +304,7 @@ fn derive_domain_name(crate_name: &str) -> String {
 
 /// Scaffold a workspace-graph template: a `workspace.json` domain/app graph
 /// that `forge ship` (wasm-build → wasm-upload → git push) consumes directly.
-fn scaffold_workspace(
-    crate_name: &str,
-    template: &str,
-    files: &[(&str, &str)],
-) -> Result<()> {
+fn scaffold_workspace(crate_name: &str, template: &str, files: &[(&str, &str)]) -> Result<()> {
     let target_dir = PathBuf::from(crate_name);
     if target_dir.exists() {
         anyhow::bail!(
@@ -343,9 +357,7 @@ fn scaffold_workspace(
     eprintln!("  cd {}", target_dir.display());
     eprintln!("  forge wasm-build                       # compile the workspace graph");
     eprintln!("  forge ws use <workspace-id>");
-    eprintln!(
-        "  git remote add forge https://git.forge.run/<workspace-id>/{crate_name}"
-    );
+    eprintln!("  git remote add forge https://git.forge.run/<workspace-id>/{crate_name}");
     eprintln!("  forge ship                             # build → upload → push → converge");
     Ok(())
 }
@@ -398,7 +410,10 @@ fn git_init_scaffold(dir: &std::path::Path) {
             .current_dir(dir)
             .output()
     };
-    if git(&["init", "-b", "main"]).map(|o| !o.status.success()).unwrap_or(true) {
+    if git(&["init", "-b", "main"])
+        .map(|o| !o.status.success())
+        .unwrap_or(true)
+    {
         let _ = git(&["init"]);
     }
     let _ = git(&["add", "-A"]);
@@ -510,7 +525,10 @@ mod tests {
             "domains/{{domain}}/service.json",
             "domains/{{domain}}/services/lib.rs",
         ] {
-            assert!(paths.contains(&required), "workspace template missing {required}");
+            assert!(
+                paths.contains(&required),
+                "workspace template missing {required}"
+            );
         }
         // The domain crate must be the `forge-domain-<name>` the workspace
         // compiler's hash-stamp step looks for.
@@ -548,7 +566,10 @@ mod tests {
         // Serialised implicitly: this is the only test touching FORGE_SDK_PATH.
         unsafe { std::env::set_var("FORGE_SDK_PATH", "/tmp/does-not-exist-forge-sdk") };
         let (line, exists) = resolve_sdk_dep();
-        assert!(line.contains("/tmp/does-not-exist-forge-sdk"), "env path used: {line}");
+        assert!(
+            line.contains("/tmp/does-not-exist-forge-sdk"),
+            "env path used: {line}"
+        );
         assert!(!exists, "non-existent path reports not-resolved");
         unsafe { std::env::remove_var("FORGE_SDK_PATH") };
     }

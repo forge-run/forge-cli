@@ -17,7 +17,7 @@
 //! Exit code is non-zero on stuck/error/timeout, so CI gates on real
 //! convergence, not on the push returning.
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command;
@@ -82,7 +82,10 @@ pub async fn push_and_poll(
     // Snapshot the pre-push commit so we can tell when the server has actually
     // moved to OUR push (robust even when the forge-git repo's history differs
     // from the local repo's, e.g. a source-mirror deploy).
-    let before_sha = fetch_status(client).await.map(|s| s.git_sha).unwrap_or_default();
+    let before_sha = fetch_status(client)
+        .await
+        .map(|s| s.git_sha)
+        .unwrap_or_default();
 
     eprintln!("push: git push {remote} {branch} …");
     git_push(dir, &authed, &url, &branch)?;
@@ -94,7 +97,13 @@ pub async fn push_and_poll(
         );
         return Ok(());
     }
-    poll_until_converged(client, &pushed_sha, &before_sha, Duration::from_secs(timeout_secs)).await?;
+    poll_until_converged(
+        client,
+        &pushed_sha,
+        &before_sha,
+        Duration::from_secs(timeout_secs),
+    )
+    .await?;
 
     // Validation #59 — post-converge surface smoke gate. The deploy is live;
     // verify the declared landing hosts actually route host-first and don't
@@ -122,7 +131,10 @@ async fn smoke_check_surfaces(dir: &Path) -> Result<()> {
         .filter(|(_, p)| {
             p.get("allowed_surfaces")
                 .and_then(|a| a.as_array())
-                .map(|a| a.iter().any(|s| s.as_str() == Some("app") || s.as_str() == Some("marketing")))
+                .map(|a| {
+                    a.iter()
+                        .any(|s| s.as_str() == Some("app") || s.as_str() == Some("marketing"))
+                })
                 .unwrap_or(false)
         })
         .map(|(h, _)| h.clone())
@@ -185,7 +197,10 @@ async fn smoke_check_surfaces(dir: &Path) -> Result<()> {
             bounces.join("\n"),
         );
     }
-    eprintln!("push: ✅ surface smoke gate passed ({} landing host(s) route on-host)", landing.len());
+    eprintln!(
+        "push: ✅ surface smoke gate passed ({} landing host(s) route on-host)",
+        landing.len()
+    );
     Ok(())
 }
 
@@ -225,7 +240,10 @@ async fn poll_until_converged(
     let mut last_live = String::new();
     let mut stale = 0u32;
     let mut nudged = false;
-    eprintln!("push: waiting for converge (git_sha {})…", short(pushed_sha));
+    eprintln!(
+        "push: waiting for converge (git_sha {})…",
+        short(pushed_sha)
+    );
 
     loop {
         let st = fetch_status(client).await?;
@@ -258,7 +276,9 @@ async fn poll_until_converged(
         if stale >= 2 && !nudged {
             nudged = true;
             if !st.reconcile_loop_enabled {
-                eprintln!("push: reconcile loop disabled + no progress — triggering reconcile/now …");
+                eprintln!(
+                    "push: reconcile loop disabled + no progress — triggering reconcile/now …"
+                );
                 let _: std::result::Result<serde_json::Value, _> = client
                     .post_json("/api/v1/manage/reconcile/now", &serde_json::json!({}))
                     .await;
@@ -266,10 +286,14 @@ async fn poll_until_converged(
         }
 
         if Instant::now() >= deadline {
-            let hint = if !pushed_sha.is_empty() && st.git_sha != pushed_sha && st.git_sha == before_sha {
+            let hint = if !pushed_sha.is_empty()
+                && st.git_sha != pushed_sha
+                && st.git_sha == before_sha
+            {
                 "the server never recorded your push — check the remote/branch (nothing new arrived).".to_string()
             } else if !st.reconcile_loop_enabled {
-                "the reconcile loop is disabled on this node — recorded but not auto-converging.".to_string()
+                "the reconcile loop is disabled on this node — recorded but not auto-converging."
+                    .to_string()
             } else {
                 "live_hash never advanced with no error — the classic symptom of UNSTAGED \
                  components. Did `forge wasm-upload` run before the push?"
