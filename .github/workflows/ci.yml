@@ -22,17 +22,6 @@ jobs:
         with:
           path: forge-cli
 
-      # forge-cli's `new` command embeds forge-sdk's templates via
-      # include_str! at `../../../forge-sdk/...`, so the SDK source
-      # must be checked out as a sibling at compile time. Same PAT
-      # setup as forge-runtime / forge-control-plane.
-      - name: Checkout forge-sdk
-        uses: actions/checkout@v4
-        with:
-          repository: forge-run/forge-sdk
-          token: ${{ secrets.FORGE_CROSS_REPO_TOKEN }}
-          path: forge-sdk
-
       # forge-cli has a `forge-schema = { path = "../forge-schema" }` dep —
       # the schema crate must be checked out as a sibling or the build/test
       # can't resolve it (this is why CI + release were both red).
