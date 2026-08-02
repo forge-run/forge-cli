@@ -5,7 +5,7 @@
 //! local commits, so a plain fast-forward often won't apply — `--ff` opts into
 //! it and fails loudly when it can't, pointing you at the fetched ref to rebase.
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 

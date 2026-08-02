@@ -17,7 +17,7 @@
 //! and — the inverse lesson — every key here is annotated as consumed so no one
 //! deletes a live one as inert again.
 
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use std::collections::BTreeMap;
 use std::path::Path;
 
@@ -98,8 +98,15 @@ fn lint_manifests(apps: &[AppManifest]) -> Result<()> {
              Deploy ingest replaces the surface config wholesale PER APP, so the app(s) without \
              `domains` will wipe it (register_surface_config(ws, None)) and break host routing \
              (this is the app→code redirect outage). Every app must carry the SAME `domains` block.",
-            with.iter().map(|a| a.name.as_str()).collect::<Vec<_>>().join(", "),
-            without.iter().map(|a| a.name.as_str()).collect::<Vec<_>>().join(", "),
+            with.iter()
+                .map(|a| a.name.as_str())
+                .collect::<Vec<_>>()
+                .join(", "),
+            without
+                .iter()
+                .map(|a| a.name.as_str())
+                .collect::<Vec<_>>()
+                .join(", "),
         );
     }
 
@@ -118,7 +125,8 @@ fn lint_manifests(apps: &[AppManifest]) -> Result<()> {
                 "surface-lint: apps/{}/app.json `domains` differs from apps/{}/app.json. \
                  All apps must declare an IDENTICAL `domains` block — ingest replaces the \
                  workspace surface config wholesale, so divergent blocks race on deploy.",
-                app.name, with[0].name,
+                app.name,
+                with[0].name,
             );
         }
     }
@@ -133,11 +141,19 @@ fn lint_domain_block(domains: &serde_json::Value, app: &str) -> Result<()> {
     let hosts = domains
         .get("hosts")
         .and_then(|h| h.as_object())
-        .ok_or_else(|| anyhow::anyhow!("surface-lint: apps/{app}/app.json `domains.hosts` missing or not an object"))?;
+        .ok_or_else(|| {
+            anyhow::anyhow!(
+                "surface-lint: apps/{app}/app.json `domains.hosts` missing or not an object"
+            )
+        })?;
     let canonical = domains
         .get("canonical")
         .and_then(|c| c.as_object())
-        .ok_or_else(|| anyhow::anyhow!("surface-lint: apps/{app}/app.json `domains.canonical` missing or not an object"))?;
+        .ok_or_else(|| {
+            anyhow::anyhow!(
+                "surface-lint: apps/{app}/app.json `domains.canonical` missing or not an object"
+            )
+        })?;
 
     // Collect every surface that is served on some host.
     let mut served: BTreeMap<String, Vec<String>> = BTreeMap::new(); // surface → hosts
@@ -255,7 +271,11 @@ mod tests {
         if domains.is_some() {
             keys.push("domains".to_string());
         }
-        AppManifest { name: name.into(), domains, top_level_keys: keys }
+        AppManifest {
+            name: name.into(),
+            domains,
+            top_level_keys: keys,
+        }
     }
 
     fn good_domains() -> serde_json::Value {
@@ -285,12 +305,12 @@ mod tests {
     #[test]
     fn none_wipe_hazard_is_rejected() {
         // The 99339aa failure: one app drops `domains`, wiping the shared config.
-        let apps = vec![
-            app("portal", Some(good_domains())),
-            app("code", None),
-        ];
+        let apps = vec![app("portal", Some(good_domains())), app("code", None)];
         let err = lint_manifests(&apps).unwrap_err().to_string();
-        assert!(err.contains("wipe") || err.contains("inconsistent"), "got: {err}");
+        assert!(
+            err.contains("wipe") || err.contains("inconsistent"),
+            "got: {err}"
+        );
     }
 
     #[test]
@@ -322,7 +342,10 @@ mod tests {
             app("portal", Some(good_domains())),
             app("code", Some(reordered)),
         ];
-        assert!(lint_manifests(&apps).is_ok(), "reordered-but-equal must pass");
+        assert!(
+            lint_manifests(&apps).is_ok(),
+            "reordered-but-equal must pass"
+        );
     }
 
     #[test]
@@ -331,7 +354,10 @@ mod tests {
         d["hosts"]["app.forge.run"]["allowed_surfaces"] = json!(["app", "auth", "docs", "beta"]);
         let apps = vec![app("portal", Some(d))];
         let err = lint_manifests(&apps).unwrap_err().to_string();
-        assert!(err.contains("beta") && err.contains("canonical"), "got: {err}");
+        assert!(
+            err.contains("beta") && err.contains("canonical"),
+            "got: {err}"
+        );
     }
 
     #[test]
