@@ -780,6 +780,7 @@ dependencies = [
  "forge-schema",
  "lightningcss",
  "minijinja",
+ "parcel_selectors",
  "serde",
  "serde_json",
 ]
@@ -796,6 +797,7 @@ dependencies = [
  "oxc_codegen",
  "oxc_parser",
  "oxc_span",
+ "parcel_selectors",
  "proc-macro2",
  "serde",
  "serde_json",
