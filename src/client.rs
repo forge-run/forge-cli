@@ -115,9 +115,17 @@ impl ForgeClient {
             // legacy consume returns a 302. We follow neither
             // automatically — both branches are handled explicitly
             // by the 401-retry interceptor below.
-            .redirect(reqwest::redirect::Policy::none())
-            .build()
-            .context("building HTTP client")?;
+            .redirect(reqwest::redirect::Policy::none());
+        // Dev-harness only: the local edge terminates TLS with a self-signed
+        // cert, which would otherwise make every https call fail before the
+        // request leaves the machine. Never set against a real deployment.
+        let inner = if std::env::var("FORGE_INSECURE_TLS").as_deref() == Ok("1") {
+            eprintln!("forge: WARNING — FORGE_INSECURE_TLS=1, certificate verification disabled");
+            inner.danger_accept_invalid_certs(true)
+        } else {
+            inner
+        };
+        let inner = inner.build().context("building HTTP client")?;
         Ok(Self {
             inner,
             state: Arc::new(Mutex::new(ClientState {
