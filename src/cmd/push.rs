@@ -77,6 +77,48 @@ pub async fn push_and_poll(
         )
     })?;
     let authed = inject_token(&url, &client.token())?;
+
+    // Auto-commit a dirty `forge.lock` before pushing. `forge build` stamps
+    // built-byte hashes into the lock in the WORKING TREE; pushing the
+    // pre-stamp HEAD ships a tree whose lock is missing or stale, and the
+    // server refuses to converge it ('pushed a workspace.json with no
+    // committed forge.lock'). Every fresh-tree `forge ship` hit this — the
+    // build succeeded, the push succeeded, and the converge silently never
+    // happened. Scoped to forge.lock only: user source stays untouched.
+    let lock_dirty = Command::new("git")
+        .args(["status", "--porcelain", "--", "forge.lock"])
+        .current_dir(dir)
+        .output()
+        .map(|o| !o.stdout.is_empty())
+        .unwrap_or(false);
+    if lock_dirty {
+        eprintln!("push: committing stamped forge.lock");
+        let add = Command::new("git")
+            .args(["add", "forge.lock"])
+            .current_dir(dir)
+            .status()?;
+        if !add.success() {
+            bail!("git add forge.lock failed");
+        }
+        let commit = Command::new("git")
+            .args([
+                "-c",
+                "user.email=forge-ship@forge.run",
+                "-c",
+                "user.name=forge ship",
+                "commit",
+                "-q",
+                "-m",
+                "forge ship: stamp built-byte lock hashes",
+                "--",
+                "forge.lock",
+            ])
+            .current_dir(dir)
+            .status()?;
+        if !commit.success() {
+            bail!("git commit forge.lock failed");
+        }
+    }
     let pushed_sha = head_sha(dir)?;
 
     // Snapshot the pre-push commit so we can tell when the server has actually
