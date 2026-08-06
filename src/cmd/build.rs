@@ -107,8 +107,12 @@ pub async fn run(args: BuildArgs) -> Result<()> {
     // Mirror the transform so the validator looks where cargo
     // actually wrote the file.
     let artifact_name = crate_name.replace('-', "_");
-    let wasm_path = manifest_dir
-        .join("target")
+    // Honor CARGO_TARGET_DIR exactly as cargo does — see the same handling
+    // in the built-byte stamping path below.
+    let target_root = std::env::var_os("CARGO_TARGET_DIR")
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|| manifest_dir.join("target"));
+    let wasm_path = target_root
         .join("wasm32-wasip1")
         .join(profile_dir)
         .join(format!("{artifact_name}.wasm"));
@@ -273,7 +277,14 @@ fn stamp_built_wasm_hashes(
         anyhow::bail!("cargo build (wasm32-wasip1) failed (exit {status})");
     }
 
-    let rel = root.join("target").join("wasm32-wasip1").join("release");
+    // cargo honors CARGO_TARGET_DIR; reading the artifact must honor it
+    // identically or a caller that redirects the target dir (the e2e suite
+    // shares one across probe ships to avoid N cold builds) builds fine and
+    // then dies here on a path that was never written.
+    let target_root = std::env::var_os("CARGO_TARGET_DIR")
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|| root.join("target"));
+    let rel = target_root.join("wasm32-wasip1").join("release");
     let mut built: std::collections::BTreeMap<String, String> = std::collections::BTreeMap::new();
     for (lock_key, crate_name) in &wanted {
         let file = rel.join(format!("{}.wasm", crate_name.replace('-', "_")));
