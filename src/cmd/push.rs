@@ -204,13 +204,23 @@ async fn smoke_check_surfaces(dir: &Path) -> Result<()> {
     Ok(())
 }
 
+/// `#[serde(default)]` covers an ABSENT field but not an explicit `null` —
+/// and a freshly-provisioned workspace's reconcile/status returns
+/// `{"git_sha": null, "desired_hash": null, "live_hash": null, ...}` until
+/// its first converge lands. Decoding that as `String` aborted the CLI's
+/// converge wait on exactly the workspaces the wait exists for.
+fn null_string<'de, D: serde::Deserializer<'de>>(d: D) -> Result<String, D::Error> {
+    use serde::Deserialize as _;
+    Ok(Option::<String>::deserialize(d)?.unwrap_or_default())
+}
+
 #[derive(serde::Deserialize, Default, Clone)]
 struct Reconcile {
-    #[serde(default)]
+    #[serde(default, deserialize_with = "null_string")]
     git_sha: String,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "null_string")]
     desired_hash: String,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "null_string")]
     live_hash: String,
     #[serde(default)]
     in_sync: bool,
