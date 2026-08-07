@@ -399,7 +399,19 @@ pub(crate) fn remote_url(dir: &Path, remote: &str) -> Result<String> {
 fn git_push(dir: &Path, authed_url: &str, safe_url: &str, branch: &str) -> Result<()> {
     // The authed URL carries the bearer as `x-token:<token>@` and is passed to
     // the git subprocess only (local). Never printed; stderr is redacted.
-    let out = git(dir, &["push", authed_url, branch])?;
+    //
+    // `--no-thin` is REQUIRED, not an optimisation toggle. git (default, and
+    // aggressively so on >= 2.54) sends a THIN pack: deltas whose base objects
+    // it believes the remote already has are omitted. forge-git completes a
+    // thin pack against its own object store, but on a COLD deploy (a fresh
+    // workspace repo — every CI runner, every first ship) that store is EMPTY,
+    // so an omitted base has nowhere to resolve and forge-git rejects the push
+    // with `missing-necessary-objects` after ingesting the rest. A complete
+    // (non-thin) pack is self-contained and always accepted. git 2.50 happened
+    // to send a complete pack here and worked; 2.54's thinner packing exposed
+    // the latent assumption. Deploy pushes are small — the size cost of
+    // non-thin is negligible against never failing a first deploy.
+    let out = git(dir, &["push", "--no-thin", authed_url, branch])?;
     if !out.status.success() {
         let err = redact(&String::from_utf8_lossy(&out.stderr).replace(authed_url, safe_url));
         bail!("git push to {safe_url} failed:\n{}", err.trim());
