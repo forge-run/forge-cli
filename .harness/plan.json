@@ -178,6 +178,7 @@
     "pre-tool",
     "session-start"
   ],
+  "post_edit_budget_seconds": 8,
   "scratch_env": [],
   "verifiers": []
 }
