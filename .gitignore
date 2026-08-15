@@ -1,3 +1,7 @@
 target/
 Cargo.lock.bak
 .forge/
+.harness/evidence/
+.harness/state/
+.harness/wip
+.harness/log/

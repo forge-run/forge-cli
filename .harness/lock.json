@@ -1,0 +1,136 @@
+{
+  "emitted": [
+    {
+      "path": ".claude/agents/forge-implementer.md",
+      "sha256": "d82074ff61343171532eaf8c20f32de69fe76adf44ad511da67335fac4fd925d"
+    },
+    {
+      "keys": [
+        "PostToolUse",
+        "PreToolUse",
+        "Stop"
+      ],
+      "path": ".claude/settings.json#hooks",
+      "sha256": "f9d60aea1b55489cc1afdc193a456b03f0d55a4379efa1b619116afab915e6bf"
+    },
+    {
+      "path": ".claude/skills/forge-build/SKILL.md",
+      "sha256": "8f4b9a5d25160ba9cd51b0a4fdc1c7cfeaa4f6988b1af45bedddcd05692980e8"
+    },
+    {
+      "path": ".claude/skills/forge-wire-change/SKILL.md",
+      "sha256": "5de9eefd3d873efcf2005ccd20eee59c423a6db2facdcf4b1daf901c5aa0d077"
+    },
+    {
+      "path": ".claude/skills/thin-intent/SKILL.md",
+      "sha256": "fc2c146adbce31a40a7c782e0c62e6dca70f2b22c7e9bc3fcc74932c6f1f9bc9"
+    },
+    {
+      "path": ".github/workflows/harness-gates.yml",
+      "sha256": "4d02ea73e5da22644434aed111548bb7d8c6b97d0569aa57cddbd5013fd9f010"
+    },
+    {
+      "path": ".harness/plan.json",
+      "sha256": "a75509709fb1479c57c4d9170035edecc9b29ec3d62d4b1c2338919e9d3a5ece"
+    },
+    {
+      "path": ".harness/runner.py",
+      "sha256": "eacc87eb35e4677c3551bd6655cd01ba7aa44b653c1d04a71b6625e7cbd85a92"
+    }
+  ],
+  "entries": [
+    {
+      "kind": "skill",
+      "params": {
+        "cargo": "cargo",
+        "cargo_wrap": "bash -c"
+      },
+      "sha256": "96d2d9e39688db815fa58173a0fc28f33a3412aae5b67ed311469d76cbb21a76",
+      "source": "../../core/skills/forge-build"
+    },
+    {
+      "kind": "skill",
+      "params": {
+        "cargo": "cargo"
+      },
+      "sha256": "764996ba01804de0f223c3cd322181b0affdcd035e30c1bd0f2b98f2e270687d",
+      "source": "../../core/skills/forge-wire-change"
+    },
+    {
+      "kind": "agent",
+      "params": {
+        "cargo": "cargo",
+        "cargo_wrap": "bash -c"
+      },
+      "sha256": "430690fc45807c79063eb12448cb03495de82aaeb16454f0b8a8f4a95a22e5f8",
+      "source": "../../core/agents/forge-implementer"
+    },
+    {
+      "kind": "gate",
+      "sha256": "870d0a5707d91a9a509800ed091d0c98acfc081ee7e105bed1fe22edd88d029e",
+      "source": "../../core/gates/cargo-fmt"
+    },
+    {
+      "kind": "gate",
+      "params": {
+        "focused_args": "--tests --locked",
+        "scope": "tiered",
+        "test_args": "--workspace --locked"
+      },
+      "sha256": "be06dc9a6968b7aad99629a1d2a231c20cd7e5b8475774ed5d37baf4f244c09d",
+      "source": "../../core/gates/cargo-tests"
+    },
+    {
+      "kind": "gate",
+      "sha256": "7b82c91221c4e61b484f5d813fbac9529ba45a7e6baac68932150a5cd8d359e6",
+      "source": "../../core/gates/emitted-committed"
+    },
+    {
+      "kind": "fence",
+      "sha256": "eb5863341abf0eb7bdc5e48d8e6de2ca4601b96ea6ee1fd64ad0a6626cb7c750",
+      "source": "local/no-substrate-path-deps"
+    },
+    {
+      "kind": "skill",
+      "sha256": "c81d0309514554a8378b94639b81bc8cba265f1498b5fabedc6d6b7ba2737a8f",
+      "source": "local/thin-intent"
+    },
+    {
+      "kind": "gate",
+      "params": {
+        "e2e_repo": "../forge-portal-e2e",
+        "map": "e2e-map.json"
+      },
+      "sha256": "9294e3a120c8ef23b08c424d3aadcca33b4548a63160112c7e52f00cfc643943",
+      "source": "local/e2e-matching"
+    },
+    {
+      "kind": "gate",
+      "params": {
+        "roots": ""
+      },
+      "sha256": "a07a63daa3902618ef826efe8ba53021a876c3e9e04a5c8d322b529fc6d9e38e",
+      "source": "local/no-silent-catch"
+    },
+    {
+      "kind": "gate",
+      "params": {
+        "vendor_dir": "static/vendor"
+      },
+      "sha256": "5b03679bcb2b74d038a7bec3a14021683377096b34e3ed1363d818e9d732d98f",
+      "source": "local/vendor-integrity"
+    }
+  ],
+  "harness": "hybrid",
+  "source": {
+    "kind": "commit",
+    "ref": "main",
+    "sha": "81817eee00af7fee550daa0080cd21b67dc892dd"
+  },
+  "targets": [
+    "claude-code",
+    "ci"
+  ],
+  "tool_version": "0.1.0",
+  "version": 1
+}

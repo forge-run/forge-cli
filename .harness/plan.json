@@ -1,0 +1,181 @@
+{
+  "build_env": {},
+  "fences": [
+    {
+      "description": "Hybrid code dogfoods the customer surface: portal, CLI, and observability-UI code may not path-dep substrate crates. Reach the platform through the public surface (forge-sdk-v2, the HTTP APIs) instead. Escapes are legal with a named reason — every escape is a discovered gap in the customer surface, and the escape log is the customer-harness backlog.\n",
+      "escape_allowed": true,
+      "exempt": [],
+      "forbidden_dependencies": [
+        "forge-runtime",
+        "forge-storage",
+        "forge-secrets",
+        "forge-agent",
+        "forge-control-plane",
+        "forge-edge",
+        "forge-platform-wire"
+      ],
+      "id": "no-substrate-path-deps",
+      "kind": "dependency-boundary",
+      "lock_scope": null,
+      "match": [],
+      "protected_paths": [],
+      "require_worktree": false,
+      "require_wrapper": null,
+      "requires_reason": true,
+      "session": "deny"
+    }
+  ],
+  "gates": [
+    {
+      "blocking": true,
+      "check": "check.sh",
+      "ci_skip": false,
+      "description": "rustfmt must be clean whenever Rust sources change. Enable only on a tree that is already fmt-clean — a gate that lands red hides everything behind it (forge-cli lesson). Promoted from hybrid local on second consumer (substrate).\n",
+      "events": [
+        "post-edit",
+        "pre-done",
+        "pre-commit"
+      ],
+      "exclude": [],
+      "id": "cargo-fmt",
+      "include": [
+        "**/*.rs"
+      ],
+      "memoize": true,
+      "params": {},
+      "source": "core/gates/cargo-fmt",
+      "timeout_seconds": 120
+    },
+    {
+      "blocking": true,
+      "check": "check.sh",
+      "ci_skip": false,
+      "description": "The repo's own cargo test suite must be green before completion is accepted or a commit lands. Session-local tier of \"tests green\" — heavier suites (e2e, cross-repo) bind at the merge boundary instead (D-010). Promoted from hybrid local/portal-tests on second consumer (substrate).\n",
+      "events": [
+        "pre-done",
+        "pre-commit"
+      ],
+      "exclude": [
+        ".harness/**",
+        ".claude/**"
+      ],
+      "id": "cargo-tests",
+      "include": [
+        "**/*.rs",
+        "**/Cargo.toml",
+        "**/*.html",
+        "**/*.json",
+        "**/*.css",
+        "**/*.js"
+      ],
+      "memoize": true,
+      "params": {
+        "focused_args": "--tests --locked",
+        "scope": "tiered",
+        "test_args": "--workspace --locked"
+      },
+      "source": "core/gates/cargo-tests",
+      "timeout_seconds": 900
+    },
+    {
+      "blocking": true,
+      "check": "check.py",
+      "ci_skip": false,
+      "description": "Fails when a generated artifact is uncommitted. CI checks out the COMMITTED tree and runs the drift gate against it, so an emitted file left dirty is a red build that no local check can see — `self-check` compares the lockfile against DISK, which is clean in exactly this case.\nWritten after a fleet roll staged `.harness`, `.github` and `.gitignore` by hand and missed `.claude/settings.json#hooks`, across thirteen repos. The verification used the same hand-typed list, so it confirmed the blind spot instead of catching it. The lockfile already records what was emitted; this gate reads it rather than remembering.\n",
+      "events": [
+        "pre-done"
+      ],
+      "exclude": [],
+      "id": "emitted-committed",
+      "include": [],
+      "memoize": false,
+      "params": {},
+      "source": "core/gates/emitted-committed",
+      "timeout_seconds": 30
+    },
+    {
+      "blocking": true,
+      "check": "check.sh",
+      "ci_skip": true,
+      "description": "Targeted local e2e tier (D-019): when a session's changed paths touch surfaces the consumer's e2e-map.json declares coverage for, the matching Playwright specs run against the LOCAL dev platform at pre-done. The full suite stays at the merge boundary (CI dispatch, D-010) — this tier exists so e2e-visible regressions surface at the session boundary, not a merge later. Paths with no mapping pass with that fact recorded; a matched path with the platform down is an infrastructure error (never a silent pass) — boot dev/up.sh or use WIP mode.\n",
+      "events": [
+        "pre-done"
+      ],
+      "exclude": [
+        ".harness/**",
+        ".claude/**",
+        "**/*.md"
+      ],
+      "id": "e2e-matching",
+      "include": [
+        "**/*"
+      ],
+      "memoize": true,
+      "params": {
+        "e2e_repo": "../forge-portal-e2e",
+        "map": "e2e-map.json"
+      },
+      "source": "harnesses/hybrid/local/e2e-matching",
+      "timeout_seconds": 600
+    },
+    {
+      "blocking": true,
+      "check": "check.sh",
+      "ci_skip": false,
+      "description": "A promise `.catch()` with an empty or comment-only body swallows the error and turns a failure into a feature that quietly never works. A federated-mint 400 rode `.catch(function(){})` on every portal deploys-page load for days; the only symptom was a thing that did not work, and finding it took a trace-ID hunt through the observability lake.\nBLOCKING from day one because apps/ is at zero violations. That distinction is the whole point: a gate at zero PREVENTS a regression, while a gate standing over existing violations only decorates them — and a warn-only version of this would emit noise that trains people to skim past harness output, taking the real signals with it.\nDeliberately narrow, because each exclusion came from a real occurrence: synchronous `catch (e) {}` is out of scope (eighty-plus exist and many are correct — localStorage probes, ws.close() guards); comments and string literals are blanked before matching, since workspace_deploys.page.html documents this very antipattern in prose and a naive matcher reports the documentation of a rule as a violation of it.\nThe repair is not \"add a comment\". Use a forge.flow degrade mode, or a one-line console.debug naming what failed — somewhere a person debugging can actually see it.\n",
+      "events": [
+        "pre-done",
+        "pre-commit"
+      ],
+      "exclude": [
+        ".harness/**",
+        ".claude/**"
+      ],
+      "id": "no-silent-catch",
+      "include": [
+        "apps/**/*.html"
+      ],
+      "memoize": true,
+      "params": {
+        "roots": ""
+      },
+      "source": "harnesses/hybrid/local/no-silent-catch",
+      "timeout_seconds": 60
+    },
+    {
+      "blocking": true,
+      "check": "check.sh",
+      "ci_skip": false,
+      "description": "Every file under the vendored-JS directory must appear in `manifest.toml` with the sha256 of its bytes, and every declared file must be present and unmodified. Checked in BOTH directions, because they fail differently: the manifest -> disk walk catches tampering and in-place edits, while the disk -> manifest walk catches the file nobody declared — which no manifest-driven check can see, by construction.\nThat second direction is the one that already bit. forge-portal-web's manifest header has always claimed every vendor file is listed; nothing in the repo enforced it, and an unpinned console script shipped on 22 page templates alongside a byte-identical dead copy of itself, with no build ever objecting.\nThis duplicates a rule the substrate already implements, and that is a deliberate call rather than an oversight. `forge_web_build::verify_vendor_manifest` is not a verifier: it also writes `asset-manifest.json` and emits `VENDOR_*_HREF` consts, so adopting it means importing an asset-href codegen pipeline the consumer has no use for, and making a repo whose whole purpose is to dogfood the customer surface path-dep the substrate to check its own static files. Roughly thirty lines of hashing, duplicated, buys the check with no build-graph change, no lockfile churn, and no substrate dependency.\nBLOCKING from day one, on the same reasoning as no-silent-catch: the tree is at zero violations (all ten files re-hashed clean on 2026-08-09), and a gate that starts at zero PREVENTS a regression, while a gate standing over existing violations only decorates them.\nRequires python3 (already a hard dependency of the runner). It does NOT require `tomllib` — that is 3.11+, and the session tier runs on macOS system python 3.9, so the manifest parser is hand-rolled, narrow, and fail-closed: any construct outside `[[dep]]` tables of scalars is exit 2, never a silent skip.\n",
+      "events": [
+        "pre-done",
+        "pre-commit"
+      ],
+      "exclude": [
+        ".harness/**",
+        ".claude/**"
+      ],
+      "id": "vendor-integrity",
+      "include": [
+        "static/vendor/**"
+      ],
+      "memoize": true,
+      "params": {
+        "vendor_dir": "static/vendor"
+      },
+      "source": "harnesses/hybrid/local/vendor-integrity",
+      "timeout_seconds": 60
+    }
+  ],
+  "harness": "hybrid",
+  "known_events": [
+    "post-edit",
+    "pre-commit",
+    "pre-done",
+    "pre-review",
+    "pre-tool",
+    "session-start"
+  ],
+  "scratch_env": [],
+  "verifiers": []
+}

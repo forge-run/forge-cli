@@ -1,0 +1,6 @@
+# forge-cli is a Rust CLI with no HTML surface — the portal silent-catch
+# scan is declared not applicable.
+overrides:
+  no-silent-catch:
+    params:
+      roots: ""

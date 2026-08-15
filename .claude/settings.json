@@ -1,0 +1,39 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "command": "python3 \"$CLAUDE_PROJECT_DIR\"/.harness/runner.py post-edit --hook",
+            "timeout": 300,
+            "type": "command"
+          }
+        ],
+        "matcher": "Edit|Write|MultiEdit|NotebookEdit"
+      }
+    ],
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "command": "python3 \"$CLAUDE_PROJECT_DIR\"/.harness/runner.py pre-commit --hook",
+            "timeout": 7200,
+            "type": "command"
+          }
+        ],
+        "matcher": "Bash"
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "command": "python3 \"$CLAUDE_PROJECT_DIR\"/.harness/runner.py pre-done --claude-stop",
+            "timeout": 7200,
+            "type": "command"
+          }
+        ]
+      }
+    ]
+  }
+}
