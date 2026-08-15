@@ -209,5 +209,11 @@
   ],
   "post_edit_budget_seconds": 8,
   "scratch_env": [],
-  "verifiers": []
+  "verifiers": [],
+  "watch_gates": [
+    "cargo-fmt",
+    "cargo-check",
+    "cargo-tests"
+  ],
+  "watch_stale_seconds": 30
 }

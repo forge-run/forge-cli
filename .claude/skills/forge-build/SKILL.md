@@ -206,6 +206,53 @@ compilation failure naming a dependency that is in fact fine — and the obvious
 go debug source that was never broken. If you need a genuine before/after comparison, give
 each run its own `CARGO_TARGET_DIR` rather than interleaving them in one.
 
+## Start a warm watcher in the lane you are working in
+
+The gates pull today: you edit, the hook fires, the gate compiles, you wait. A **watcher**
+pushes instead — it runs the same gates on every save and publishes each verdict under the
+fileset fingerprint it was computed for, so by the time the hook fires the answer usually
+already exists. Measured on a fixture whose gate takes 3 s: post-edit falls from ~3.4 s to
+~30 ms.
+
+```bash
+cd <repo-or-worktree>
+python3 .harness/runner.py watch &        # one per lane; leave it running
+python3 .harness/runner.py watch --status # what it holds, and how old
+python3 .harness/runner.py watch --once   # one pass, then exit
+```
+
+It watches the consumer with `watchexec` when that is installed (`~/.local/bin/watchexec`)
+and falls back to a 1 s poll otherwise — which one is in use is in the status output, never
+guessed at. Results land in `.harness/state/watch/`: one `<gate>.json` per watched gate plus
+an `alive.json` heartbeat, refreshed every 5 s and **removed when the watcher exits**.
+
+**What the hook does with it.** Before running a memoizing gate at post-edit or pre-done, the
+runner compares its own fingerprint against the published one. It adopts the result only when
+they match exactly *and* the heartbeat is younger than `watch_stale_seconds` (30) *and* the
+watcher's process is still alive. Otherwise it runs the gate live and records why in the
+evidence entry — `absent`, `stale`, `mismatch` or `dead`. There is no fourth outcome and no
+silent one: a gate that did not run never looks like a gate that passed.
+
+An adopted **fail** blocks exactly as a live fail would, with the watcher's own output as the
+repair text. What adoption saves is the rebuild, never the failure. A check that could not
+*run* publishes nothing at all — an infrastructure error is about the watcher's environment,
+not about your tree, so the hook runs the gate live and reports its own.
+
+Three things worth knowing before you rely on it:
+
+- **Nothing starts it for you.** Hooks do not spawn watchers — a hook that starts daemons is
+  a surprise — so a lane without one simply runs gates the old way.
+- **Its builds take the build lock**, through `.harness/cargo` like everything else, so while
+  the watcher is compiling a hook-side live run queues behind it (visible in
+  `.harness/log/lock.jsonl`). That is the v0 trade: per-lane locks are what fix it.
+- **`--once` is for tests and one-off checks.** It leaves a heartbeat behind but its process
+  is gone, and adoption requires a live PID — so a `--once` run from a shell answers nothing
+  afterwards.
+
+Which gates it runs is `watch_gates` in `.harness/plan.json` (`cargo-fmt`, `cargo-check`,
+`cargo-tests`). A named gate that is not in the consumer's plan, or that does not memoize,
+is reported as a note when the watcher starts rather than watched silently.
+
 ## When a fence fails
 
 `forge-runtime` CI has grep-based fences (e.g. the legacy auth-carrier fence) that run
