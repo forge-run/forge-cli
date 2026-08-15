@@ -63,17 +63,23 @@ Now a cargo workspace (member crates under `crates/`), so the lib unit
 tests run as their own step. Chaos/HA tests are a **CI-only tier**
 (D-021), compile-gated behind `--features chaos-tests` — omit the
 feature locally (they won't compile; that's by design) and add it only
-for the full CI-equivalent run.
+for the full CI-equivalent run. The same feature now also un-ignores the
+**slow tier**: single tests over 60 s, marked
+`#[cfg_attr(not(feature = "chaos-tests"), ignore)]` so their helpers stay
+live code locally. Two of them are unit tests in `forge-storage-tx`, which
+the root's feature cannot reach on a `--exclude forge-storage` run — hence
+the explicit `-F forge-storage-tx/chaos-tests` below.
 ```bash
 cargo fmt --all -- --check
 cargo clippy --tests --locked -- -D warnings
 cargo build --tests --locked
-cargo test  --tests --no-fail-fast --locked                # integration tests (local: chaos excluded)
+cargo test  --tests --no-fail-fast --locked                # integration tests (local: chaos + slow excluded)
 cargo test  --workspace --lib --no-fail-fast --locked      # workspace member-crate unit tests
 cargo test  --tests --no-fail-fast --locked strict_mode    # separate strict-declarations pass
 ./scripts/verify-sdk-tsc.sh                                # @forge/client TypeScript guard
-# CI-equivalent full run also enables the chaos/HA tier (D-021):
+# CI-equivalent full run also enables the chaos/HA + slow tiers (D-021):
 cargo test  --tests --no-fail-fast --locked --features chaos-tests
+cargo test  --workspace --exclude forge-storage --no-fail-fast --locked -F forge-storage-tx/chaos-tests
 ```
 
 ### forge-agent, forge-control-plane

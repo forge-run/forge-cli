@@ -5,7 +5,7 @@
         "hooks": [
           {
             "command": "python3 \"$CLAUDE_PROJECT_DIR\"/.harness/runner.py post-edit --hook",
-            "timeout": 300,
+            "timeout": 10,
             "type": "command"
           }
         ],
