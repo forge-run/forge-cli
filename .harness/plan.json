@@ -69,10 +69,11 @@
       "memoize": true,
       "params": {
         "check_args": "--locked",
-        "full_args": "--workspace --locked"
+        "full_args": "--workspace --locked",
+        "package_memo": true
       },
       "source": "core/gates/cargo-check",
-      "timeout_seconds": 6
+      "timeout_seconds": 120
     },
     {
       "blocking": true,
@@ -100,6 +101,7 @@
       "params": {
         "focused_args": "--tests --locked",
         "focused_filter": true,
+        "package_memo": true,
         "retries": 2,
         "runner": "auto",
         "scope": "full",

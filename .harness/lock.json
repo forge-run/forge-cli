@@ -15,7 +15,7 @@
     },
     {
       "path": ".claude/skills/forge-build/SKILL.md",
-      "sha256": "04be97ff1c28624f05407f95e927a0c6289f4d967a603f12ae0b81d630850db0"
+      "sha256": "e41c06d0050da336ac33eebd15e3eceaf41d79d625eb63f37a689ac78d8d05cb"
     },
     {
       "path": ".claude/skills/forge-wire-change/SKILL.md",
@@ -27,11 +27,11 @@
     },
     {
       "path": ".github/workflows/harness-gates.yml",
-      "sha256": "97eacf680d333556236f8f9ce26badb1fba15b2bf06f1097d4578142a26df6e9"
+      "sha256": "a8e0ca8c2651244bba87b4228f15c41c0deff37b62e3b4d18ba2fadd6ad8e6fd"
     },
     {
       "path": ".harness/plan.json",
-      "sha256": "ba440af30f8e2c35c0b2f1a4c1532550579ff4d86599767484aabb14bb3d6964"
+      "sha256": "05e10f48dfd68a83484d1a8bba00afc9d4916ac66c5901dba7fb19eebddea5d9"
     },
     {
       "path": ".harness/runner.py",
@@ -45,7 +45,7 @@
         "cargo": "cargo",
         "cargo_wrap": "bash -c"
       },
-      "sha256": "2928d250f499ec0f0a2480fe2c14701b21a69a5e94ce534d5bca9b514b56e5cc",
+      "sha256": "d742ef4fdb1e4fa43229a33a9afee25cf5c5208960e0f58a78afea08a7ab86da",
       "source": "../../core/skills/forge-build"
     },
     {
@@ -77,9 +77,10 @@
       "kind": "gate",
       "params": {
         "check_args": "--locked",
-        "full_args": "--workspace --locked"
+        "full_args": "--workspace --locked",
+        "package_memo": true
       },
-      "sha256": "e223e2be41ce363010430f633895094a524ecd80d2f4d2db263a75a7e2ba39c6",
+      "sha256": "383f858e41c40f0a085debac5124eb07659a974d8d80da559fdb555d1d2e3f63",
       "source": "../../core/gates/cargo-check"
     },
     {
@@ -87,12 +88,13 @@
       "params": {
         "focused_args": "--tests --locked",
         "focused_filter": true,
+        "package_memo": true,
         "retries": 2,
         "runner": "auto",
         "scope": "full",
         "test_args": "--workspace --locked"
       },
-      "sha256": "25acd7239d11ecfaf5c748a3d4f5b28c3bcdba199cb534c2e62c309d5721ecc7",
+      "sha256": "bab0410ab2fd6a96efd005679498447b0bf9cc31e2dd8d4db116e1b17ef521ed",
       "source": "../../core/gates/cargo-tests"
     },
     {
@@ -139,8 +141,8 @@
   "harness": "hybrid",
   "source": {
     "kind": "commit",
-    "ref": "de0db79",
-    "sha": "de0db790535e98dd92b38335ad395e7e2b5ea551"
+    "ref": "b7f0135",
+    "sha": "b7f0135e1fab9e5d1c11955c9fedf978d7874c70"
   },
   "targets": [
     "claude-code",

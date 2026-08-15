@@ -289,4 +289,49 @@ it never appears on the command line, so its absence from a command proves nothi
 A bare `sccache --show-stats` **starts a server with the default 10 GiB cap** if none is
 running, and that server will evict more than half the fleet cache on its next write.
 Probe stats only when a wrapper-started server is already running, or prefix the
-probe with `SCCACHE_CACHE_SIZE=25G`.
+probe with the size you actually want.
+
+### On this Mac: `SCCACHE_CACHE_SIZE=100G`
+
+25G is the **CI-safe** number — forge-home reached 82% disk on accumulated build dirs, and
+that constraint has not changed. This machine is not forge-home: per-lane target dirs mean
+several worktrees' worth of artefacts in one cache, and 25G is already full (measured
+2026-08-16: `cache_size` 26,843,295,906 of `max_cache_size` 26,843,545,600 — 99.999%). A
+cache at its cap is an eviction treadmill: it reads as a low hit rate and looks like the
+cache not helping, when it is the cache being too small.
+
+So the **machine wins**. The wrapper treats an `SCCACHE_CACHE_SIZE` already in the
+environment as authoritative and does not overwrite it with the declared 25G; the lock
+record says which it used (`sccache_size_from`: `machine` | `declared` | `unset`).
+
+Source `core/runner/lane-env.sh` from your shell profile, or export the same line:
+
+```sh
+export SCCACHE_CACHE_SIZE=100G
+```
+
+A **running server keeps the cap it was started with.** Changing the env changes nothing
+until it restarts, so a 100G profile and a 10G server look identical from outside. The
+wrapper prints once per lane when the two disagree and never restarts the server itself —
+killing one mid-build fails that build. Fix it by hand, with nothing compiling:
+
+```sh
+sccache --stop-server && SCCACHE_CACHE_SIZE=100G sccache --start-server
+```
+
+## Lanes: locks, job budgets and path remapping
+
+A **lane is a worktree**. The build lock is per lane (`lock_scope: consumer`, keyed on the
+worktree basename), so `forge-storage--a` and `forge-storage--b` build at the same time
+instead of queueing: their target dirs are separate by construction and sccache dedups the
+compile work between them.
+
+Because they run at once, the wrapper carves the CPU rather than letting each lane ask for
+all of it. `CARGO_BUILD_JOBS` and `NEXTEST_TEST_THREADS` are set to
+`clamp(cores / active lanes, 4, cores)` — active meaning holding a build lock or running a
+watcher. **Set either variable yourself and yours wins**, recorded as `jobs_from: caller` in
+`.harness/log/lock.jsonl` alongside `active_lanes`.
+
+The wrapper also appends `--remap-path-prefix=<lane>=/forge/<repo>` to `RUSTFLAGS` so the
+lane's absolute path does not reach the sccache key — without it every worktree recompiles
+our own crates cold. It **appends**; your `RUSTFLAGS` survives.
