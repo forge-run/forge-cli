@@ -4,3 +4,12 @@ overrides:
   no-silent-catch:
     params:
       roots: ""
+  # templates/*/ are scaffold crates copied out by `forge new`, not workspace
+  # members. At the pinned harness the tiered cargo-tests focus walks a
+  # changed template file up to its own [package] Cargo.toml and runs
+  # `-p forge-template-echo`, which cargo cannot resolve. forge-cli is a
+  # single-package repo, so the full run costs the same — always run full.
+  # (main@dee34ce falls back to full on its own; drop this at the next roll.)
+  cargo-tests:
+    params:
+      scope: full
