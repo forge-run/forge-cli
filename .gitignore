@@ -5,3 +5,4 @@ Cargo.lock.bak
 .harness/state/
 .harness/wip
 .harness/log/
+.harness/halt

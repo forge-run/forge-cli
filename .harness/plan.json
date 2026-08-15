@@ -52,6 +52,32 @@
       "blocking": true,
       "check": "check.sh",
       "ci_skip": false,
+      "description": "Compile first, run second. `cargo check -p <owning closure>` on every edit catches most of what an edit breaks in seconds; the test suite stays at pre-done where it has the wall clock to finish. Before this, post-edit's only Rust gate fleet-wide was cargo-fmt — an edit that did not compile was not discovered until the agent said it was done.\n",
+      "events": [
+        "post-edit",
+        "pre-done"
+      ],
+      "exclude": [
+        ".harness/**",
+        ".claude/**"
+      ],
+      "id": "cargo-check",
+      "include": [
+        "**/*.rs",
+        "**/Cargo.toml"
+      ],
+      "memoize": true,
+      "params": {
+        "check_args": "--locked",
+        "full_args": "--workspace --locked"
+      },
+      "source": "core/gates/cargo-check",
+      "timeout_seconds": 6
+    },
+    {
+      "blocking": true,
+      "check": "check.sh",
+      "ci_skip": false,
       "description": "The repo's own cargo test suite must be green before completion is accepted or a commit lands. Session-local tier of \"tests green\" — heavier suites (e2e, cross-repo) bind at the merge boundary instead (D-010). Promoted from hybrid local/portal-tests on second consumer (substrate).\n",
       "events": [
         "pre-done",
@@ -73,6 +99,7 @@
       "memoize": true,
       "params": {
         "focused_args": "--tests --locked",
+        "focused_filter": true,
         "scope": "tiered",
         "test_args": "--workspace --locked"
       },
@@ -178,7 +205,6 @@
     "pre-tool",
     "session-start"
   ],
-  "post_edit_budget_seconds": 8,
   "scratch_env": [],
   "verifiers": []
 }
