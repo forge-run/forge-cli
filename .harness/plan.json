@@ -42,7 +42,9 @@
         "**/*.rs"
       ],
       "memoize": true,
-      "params": {},
+      "params": {
+        "manifest_path": ""
+      },
       "source": "core/gates/cargo-fmt",
       "timeout_seconds": 120
     },

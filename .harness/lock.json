@@ -27,11 +27,11 @@
     },
     {
       "path": ".github/workflows/harness-gates.yml",
-      "sha256": "4d02ea73e5da22644434aed111548bb7d8c6b97d0569aa57cddbd5013fd9f010"
+      "sha256": "8b2e2e10bd2aa235a7391715c4696786ad3acf792d6c57712b7e5d3295be8150"
     },
     {
       "path": ".harness/plan.json",
-      "sha256": "a75509709fb1479c57c4d9170035edecc9b29ec3d62d4b1c2338919e9d3a5ece"
+      "sha256": "23ac1e454c0f33437ac915c8c3ee3e153f809f96484627387d184ea2173c446c"
     },
     {
       "path": ".harness/runner.py",
@@ -67,7 +67,10 @@
     },
     {
       "kind": "gate",
-      "sha256": "870d0a5707d91a9a509800ed091d0c98acfc081ee7e105bed1fe22edd88d029e",
+      "params": {
+        "manifest_path": ""
+      },
+      "sha256": "769f41b72c2ca6bce7b29deb6068d199e604891f61162a5c2f1fc1e030f796eb",
       "source": "../../core/gates/cargo-fmt"
     },
     {
@@ -125,7 +128,7 @@
   "source": {
     "kind": "commit",
     "ref": "main",
-    "sha": "81817eee00af7fee550daa0080cd21b67dc892dd"
+    "sha": "9ae391e52c7a2953c609651391b723cd47654564"
   },
   "targets": [
     "claude-code",
