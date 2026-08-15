@@ -52,7 +52,7 @@ pub fn service_manifest_warnings(label: &str, doc: &Value) -> Vec<String> {
     if legacy_service_key || legacy_module_key {
         lines.push(format!(
             "warning: {label} uses `namespace`; the field is now `domain` (ADR-0031) \
-             — accepted for now"
+             — still accepted on read; the emitted key is `domain`"
         ));
     }
 
@@ -78,7 +78,7 @@ pub fn service_manifest_warnings(label: &str, doc: &Value) -> Vec<String> {
     if missing_api_version.len() > SUMMARY_THRESHOLD {
         lines.push(format!(
             "warning: {} services without `api_version` in {label} — declare \
-             `api_version: 1` to opt into /api/domains/{{domain}}/{{service}}/v1/… \
+             `api_version: 1` — the deploy validator now REJECTS undeclared services; routes are /api/domains/{{domain}}/{{service}}/v1/… \
              routes (ADR-0031)",
             missing_api_version.len(),
         ));
@@ -86,7 +86,7 @@ pub fn service_manifest_warnings(label: &str, doc: &Value) -> Vec<String> {
         for svc in &missing_api_version {
             lines.push(format!(
                 "warning: service `{svc}` in {label} declares no `api_version` — declare \
-                 `api_version: 1` to opt into /api/domains/{{domain}}/{{service}}/v1/… \
+                 `api_version: 1` — the deploy validator now REJECTS undeclared services; routes are /api/domains/{{domain}}/{{service}}/v1/… \
                  routes (ADR-0031)"
             ));
         }
@@ -95,16 +95,14 @@ pub fn service_manifest_warnings(label: &str, doc: &Value) -> Vec<String> {
     if missing_auth.len() > SUMMARY_THRESHOLD {
         lines.push(format!(
             "warning: {} ops without `auth` in {label} — declare \
-             `auth: anonymous|authenticated|admin`; undeclared is enforced as \
-             anonymous (ADR-0030)",
+             `auth: anonymous|authenticated|admin`; the deploy validator now REJECTS undeclared ops (ADR-0030)",
             missing_auth.len(),
         ));
     } else {
         for op in &missing_auth {
             lines.push(format!(
                 "warning: operation `{op}` in {label} declares no `auth` — declare \
-                 `auth: anonymous|authenticated|admin`; undeclared is enforced as \
-                 anonymous (ADR-0030)"
+                 `auth: anonymous|authenticated|admin`; the deploy validator now REJECTS undeclared ops (ADR-0030)"
             ));
         }
     }
