@@ -637,6 +637,87 @@ mod tests {
         }
     }
 
+    /// ADR-0030 / ADR-0031: a scaffold must not hand the customer a
+    /// contract the deploy validator immediately warns about. Every
+    /// template service declares `domain` (never the legacy `namespace`)
+    /// and `api_version`; every op declares `auth`. Declaring
+    /// `api_version` also opts the service into
+    /// `/api/domains/{domain}/{service}/v{major}/`, and an explicit
+    /// `http.path` outside that prefix is a deploy VIOLATION — so the
+    /// declared paths are pinned here too.
+    #[test]
+    fn template_service_json_declares_domain_api_version_and_auth() {
+        let workspace = WORKSPACE_TEMPLATES.iter().flat_map(|(name, files)| {
+            files
+                .iter()
+                .filter(|(p, _)| p.ends_with("service.json"))
+                .map(move |(_, c)| (*name, *c))
+        });
+        let single = TEMPLATES.iter().map(|(name, files)| {
+            let c = files
+                .iter()
+                .find(|(p, _)| *p == "service.json")
+                .map(|(_, c)| *c)
+                .unwrap();
+            (*name, c)
+        });
+        for (name, body) in single.chain(workspace) {
+            let doc: serde_json::Value =
+                serde_json::from_str(body).expect("template service.json parses");
+            let services: Vec<&serde_json::Value> = match doc.get("services") {
+                Some(list) => list.as_array().unwrap().iter().collect(),
+                None => vec![&doc],
+            };
+            for svc in services {
+                assert!(
+                    svc.get("namespace").is_none(),
+                    "template `{name}` service.json still uses the legacy `namespace` key",
+                );
+                let domain = svc
+                    .get("domain")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or_else(|| panic!("template `{name}` service declares no `domain`"));
+                let major = svc
+                    .get("api_version")
+                    .and_then(|v| v.as_u64())
+                    .unwrap_or_else(|| {
+                        panic!("template `{name}` service declares no `api_version`")
+                    });
+                let svc_name = svc.get("name").and_then(|v| v.as_str()).unwrap();
+                let prefix = format!("/api/domains/{domain}/{svc_name}/v{major}/");
+                for op in svc["operations"].as_array().unwrap() {
+                    let op_name = op["name"].as_str().unwrap();
+                    assert!(
+                        op.get("auth").and_then(|v| v.as_str()).is_some(),
+                        "template `{name}` op `{op_name}` declares no `auth` — new scaffolds \
+                         are secure by default (ADR-0030)",
+                    );
+                    if let Some(path) = op.get("http").and_then(|h| h.get("path")) {
+                        let path = path.as_str().unwrap();
+                        assert!(
+                            path.starts_with(&prefix),
+                            "template `{name}` op `{op_name}` declares `{path}`, outside its \
+                             service prefix `{prefix}` — the deploy validator refuses that \
+                             for a service that declared `api_version` (ADR-0031)",
+                        );
+                    }
+                }
+            }
+            // The wasm-module rows take the same rename.
+            for m in doc
+                .get("wasm_modules")
+                .and_then(|v| v.as_array())
+                .into_iter()
+                .flatten()
+            {
+                assert!(
+                    m.get("service_namespace").is_none() && m.get("service_domain").is_some(),
+                    "template `{name}` wasm_modules entry must use `service_domain`",
+                );
+            }
+        }
+    }
+
     #[test]
     fn template_cargo_toml_uses_canonical_placeholder_name() {
         // The substitution logic depends on each template's

@@ -26,6 +26,7 @@ use tracing_subscriber::{EnvFilter, fmt};
 mod client;
 mod cmd;
 mod config;
+mod contract_lint;
 
 #[derive(Debug, Parser)]
 #[command(name = "forge", version, about, long_about = None)]

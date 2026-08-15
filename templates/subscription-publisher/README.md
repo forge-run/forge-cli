@@ -23,7 +23,7 @@ forge-runtime exposes Subscription ops via Server-Sent Events:
 curl -N \
   -H "Authorization: Bearer $FORGE_TOKEN" \
   -H "Accept: text/event-stream" \
-  https://<workspace>.forge.run/api/v1/services/events/pings/trigger
+  https://<workspace>.forge.run/api/domains/events/pings/v1/trigger
 ```
 
 Leave that running.
@@ -35,7 +35,7 @@ curl -X POST \
   -H "Authorization: Bearer $FORGE_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"reason": "manual test"}' \
-  https://<workspace>.forge.run/api/v1/services/events/pings/trigger
+  https://<workspace>.forge.run/api/domains/events/pings/v1/trigger
 ```
 
 The subscriber's stream prints the published payload.

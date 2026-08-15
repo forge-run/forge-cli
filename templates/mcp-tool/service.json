@@ -2,7 +2,8 @@
   "services": [
     {
       "name": "calc",
-      "namespace": "tools",
+      "domain": "tools",
+      "api_version": 1,
       "tables_accessed": [],
       "permissions": [],
       "limits": {},
@@ -10,6 +11,7 @@
         {
           "name": "add",
           "kind": "query",
+          "auth": "authenticated",
           "idempotency": "idempotent",
           "input_schema": {
             "type": "object",
@@ -29,7 +31,7 @@
           "error_codes": [],
           "http": {
             "method": "POST",
-            "path": "/api/v1/services/calc/add",
+            "path": "/api/domains/tools/calc/v1/add",
             "has_request_body": true,
             "success_status": 200
           },
@@ -40,6 +42,7 @@
         {
           "name": "sub",
           "kind": "query",
+          "auth": "authenticated",
           "idempotency": "idempotent",
           "input_schema": {
             "type": "object",
@@ -59,7 +62,7 @@
           "error_codes": [],
           "http": {
             "method": "POST",
-            "path": "/api/v1/services/calc/sub",
+            "path": "/api/domains/tools/calc/v1/sub",
             "has_request_body": true,
             "success_status": 200
           },
@@ -73,7 +76,7 @@
   ],
   "wasm_modules": [
     {
-      "service_namespace": "tools",
+      "service_domain": "tools",
       "service_name": "calc",
       "wasm_path": "target/wasm32-wasip1/release/forge_template_mcp_tool.wasm"
     }

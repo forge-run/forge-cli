@@ -38,7 +38,7 @@ curl -X POST \
   -H "Authorization: Bearer $FORGE_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"a": 2, "b": 3}' \
-  https://<workspace>.forge.run/api/v1/services/tools/calc/add
+  https://<workspace>.forge.run/api/domains/tools/calc/v1/add
 # => {"result": 5}
 ```
 

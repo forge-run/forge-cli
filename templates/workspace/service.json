@@ -1,10 +1,12 @@
 {
   "name": "{{domain}}",
-  "namespace": "{{domain}}",
+  "domain": "{{domain}}",
+  "api_version": 1,
   "operations": [
     {
       "name": "hello",
       "kind": "query",
+      "auth": "authenticated",
       "idempotency": "idempotent",
       "input_schema": {},
       "output_schema": {},

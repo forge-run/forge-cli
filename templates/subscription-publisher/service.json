@@ -2,7 +2,8 @@
   "services": [
     {
       "name": "pings",
-      "namespace": "events",
+      "domain": "events",
+      "api_version": 1,
       "tables_accessed": [],
       "permissions": [],
       "limits": {},
@@ -10,6 +11,7 @@
         {
           "name": "trigger",
           "kind": "subscription",
+          "auth": "authenticated",
           "idempotency": "non_idempotent",
           "input_schema": {
             "type": "object",
@@ -27,7 +29,7 @@
           "error_codes": [],
           "http": {
             "method": "GET",
-            "path": "/api/v1/subscriptions/pings/trigger",
+            "path": "/api/domains/events/pings/v1/trigger",
             "has_request_body": false,
             "success_status": 200
           },
@@ -44,7 +46,7 @@
   ],
   "wasm_modules": [
     {
-      "service_namespace": "events",
+      "service_domain": "events",
       "service_name": "pings",
       "wasm_path": "target/wasm32-wasip1/release/forge_template_subscription_publisher.wasm"
     }

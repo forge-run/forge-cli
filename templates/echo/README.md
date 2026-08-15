@@ -22,7 +22,11 @@ forge deploy --manifest service.json --wasm target/wasm32-wasip1/release/{{crate
 
 The manifest declares one service `echo::echo` with one query op
 `ping`. After deploy, forge-runtime exposes it at
-`POST /api/v1/services/echo/ping`.
+`POST /api/domains/echo/echo/v1/ping` — the service declares
+`api_version: 1`, so it routes under
+`/api/domains/{domain}/{service}/v{major}/{op}` (ADR-0031). A service
+that declares no `api_version` keeps the legacy
+`/api/v1/services/{domain}/{service}/{op}` path.
 
 ## Invoke
 
@@ -31,7 +35,7 @@ curl -X POST \
   -H "Authorization: Bearer $FORGE_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"hello":"world"}' \
-  https://<workspace>.forge.run/api/v1/services/echo/ping
+  https://<workspace>.forge.run/api/domains/echo/echo/v1/ping
 ```
 
 Response:
@@ -47,7 +51,7 @@ Response:
 
 - Edit `src/lib.rs` to change the handler.
 - Run `forge build && forge deploy ...` again — re-deploy is
-  idempotent on `(namespace, name)`; the service id is preserved,
+  idempotent on `(domain, name)`; the service id is preserved,
   the wasm hash updates.
 - Try the `mcp-tool` or `subscription-publisher` templates for
   workloads that talk to the MCP adapter or publish events.

@@ -173,6 +173,12 @@ pub(crate) fn compile_workspace_graph(root: &std::path::Path) -> Result<()> {
     // never silent in production.
     crate::cmd::surface_lint::lint_surface_config(root)?;
 
+    // ADR-0030 / ADR-0031 declaration lint over every authored
+    // `service.json` in the graph. Warnings only — the deploy validator
+    // reports the same findings, but `forge wasm-build` is where the author
+    // is still holding the contract.
+    crate::contract_lint::warn_on_workspace_contracts(root);
+
     let domain_modules = graph.domains.iter().filter(|d| d.has_wasm).count();
     let app_modules = graph.apps.iter().filter(|a| a.has_wasm).count();
     eprintln!(

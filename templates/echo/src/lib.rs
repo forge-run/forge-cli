@@ -16,7 +16,7 @@
 //!   curl -X POST -H "Authorization: Bearer $TOKEN" \
 //!        -H "Content-Type: application/json" \
 //!        -d '{"hello":"world"}' \
-//!        https://<workspace>.forge.run/api/v1/services/echo/ping
+//!        https://<workspace>.forge.run/api/domains/echo/echo/v1/ping
 
 use forge_sdk_v2::{Guest, OpError, OpInput, OpOutput};
 use serde_json::Value;

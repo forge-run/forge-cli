@@ -8,7 +8,7 @@
 //! - `--wasm path/to/module.wasm` — the compiled module the manifest
 //!   references. Repeat the flag once per module if the manifest
 //!   ships multiple services. The CLI matches by service
-//!   `(namespace, name)`.
+//!   `(domain, name)`.
 //!
 //! Sends a `DeployServicesRequest` JSON body to
 //! `/api/v1/manage/wasm/deploy`. The runtime side validates the
@@ -54,7 +54,7 @@ pub struct DeployArgs {
 
     /// Path to a compiled `.wasm` module. Repeat once per service
     /// listed in the manifest. The CLI matches each module to a
-    /// service by (namespace, name) — pass them in any order.
+    /// service by (domain, name) — pass them in any order.
     #[arg(long)]
     wasm: Vec<PathBuf>,
 
@@ -172,7 +172,7 @@ pub struct DeployArgs {
 #[derive(Debug, Deserialize, Serialize)]
 struct DeployManifest {
     services: Value,
-    /// Customer writes this with `service_namespace` + `service_name` +
+    /// Customer writes this with `service_domain` + `service_name` +
     /// `wasm_path` (relative to the manifest); CLI replaces `wasm_path`
     /// with `wasm_bytes` before sending.
     wasm_modules: Vec<WasmModuleEntry>,
@@ -180,7 +180,10 @@ struct DeployManifest {
 
 #[derive(Debug, Deserialize, Serialize)]
 struct WasmModuleEntry {
-    service_namespace: String,
+    /// Renamed from `service_namespace` (ADR-0031); the old key is still
+    /// accepted on read so an existing `service.json` keeps deploying.
+    #[serde(alias = "service_namespace")]
+    service_domain: String,
     service_name: String,
     /// Path on disk, relative to the manifest's directory. Used to
     /// resolve `--wasm` flags by name when only one --wasm is given,
@@ -191,7 +194,10 @@ struct WasmModuleEntry {
 
 #[derive(Debug, Deserialize)]
 struct DeployedService {
-    namespace: String,
+    /// Renamed from `namespace` (ADR-0031); alias accepted on read so an
+    /// older runtime's response still decodes.
+    #[serde(alias = "namespace")]
+    domain: String,
     name: String,
     service_id: u32,
     wasm_hash_hex: String,
@@ -220,6 +226,12 @@ struct DeployResponse {
     /// `AppBundleSummary` shape.
     #[serde(default)]
     app_bundle: Option<DeployAppBundleSummary>,
+    /// Non-fatal deploy-validator findings (ADR-0030 `missing_auth_declaration`,
+    /// ADR-0031 `missing_api_version` / `legacy_namespace_field`, …). Each is a
+    /// JSON object with a `kind` and a `message`/`hint`, the same shape a
+    /// rejection's `violations[]` carry. Printed, never fatal.
+    #[serde(default)]
+    warnings: Vec<Value>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -542,8 +554,16 @@ pub async fn run(args: DeployArgs, client: &ForgeClient) -> Result<()> {
         .with_context(|| format!("reading manifest {}", args.manifest.display()))?;
     let manifest: DeployManifest = serde_json::from_slice(&manifest_bytes)
         .with_context(|| format!("parsing manifest {}", args.manifest.display()))?;
+    // ADR-0030 / ADR-0031 declaration lint, at the point the contract is
+    // authored. The server warns about the same three findings on the deploy
+    // response; warning here means a `--json` dry-run or an offline read
+    // surfaces them too. Best-effort — a shape this can't parse is the
+    // deploy's error to report, not the lint's.
+    if let Ok(doc) = serde_json::from_slice::<Value>(&manifest_bytes) {
+        crate::contract_lint::warn_on_service_manifest(&args.manifest, &doc);
+    }
 
-    // Build a lookup from `(namespace, name)` → wasm bytes by
+    // Build a lookup from `(domain, name)` → wasm bytes by
     // resolving every entry. Sources, in priority order:
     //   1. A `--wasm` whose filename stem matches `<service_name>.wasm`.
     //   2. The manifest entry's `wasm_path` (resolved relative to
@@ -583,7 +603,7 @@ pub async fn run(args: DeployArgs, client: &ForgeClient) -> Result<()> {
                 anyhow::anyhow!(
                     "no wasm file resolved for service {}::{} — pass --wasm path/to/{}.wasm \
                      or set wasm_path in the manifest",
-                    entry.service_namespace,
+                    entry.service_domain,
                     entry.service_name,
                     entry.service_name,
                 )
@@ -610,7 +630,7 @@ pub async fn run(args: DeployArgs, client: &ForgeClient) -> Result<()> {
         // runtime stores AND the content address the artifact upload uses.
         let content_hash = blake3::hash(&bytes).to_hex().to_string();
         wasm_artifacts.push(manifest_artifact(
-            format!("wasm:{}::{}", entry.service_namespace, entry.service_name),
+            format!("wasm:{}::{}", entry.service_domain, entry.service_name),
             "wasm",
             &bytes,
         ));
@@ -619,7 +639,7 @@ pub async fn run(args: DeployArgs, client: &ForgeClient) -> Result<()> {
         // via the `wasm:<ns>::<name>` manifest row's content_hash. Inline
         // mode keeps the bytes in the payload for older runtimes.
         let mut module = serde_json::json!({
-            "service_namespace": entry.service_namespace,
+            "service_domain": entry.service_domain,
             "service_name": entry.service_name,
         });
         if args.inline_wasm {
@@ -865,6 +885,7 @@ pub async fn run(args: DeployArgs, client: &ForgeClient) -> Result<()> {
                     .unwrap_or_default(),
             );
         }
+        crate::contract_lint::print_deploy_warnings(&resp.warnings);
         return Ok(());
     }
 
@@ -876,7 +897,7 @@ pub async fn run(args: DeployArgs, client: &ForgeClient) -> Result<()> {
                 "services": resp.services
                     .iter()
                     .map(|s| serde_json::json!({
-                        "namespace": s.namespace,
+                        "domain": s.domain,
                         "name": s.name,
                         "service_id": s.service_id,
                         "wasm_hash_hex": s.wasm_hash_hex,
@@ -891,7 +912,7 @@ pub async fn run(args: DeployArgs, client: &ForgeClient) -> Result<()> {
         for s in &resp.services {
             eprintln!(
                 "  {}::{}  (id={}, sha256={}, {})",
-                s.namespace,
+                s.domain,
                 s.name,
                 s.service_id,
                 &s.wasm_hash_hex[..16],
@@ -905,6 +926,10 @@ pub async fn run(args: DeployArgs, client: &ForgeClient) -> Result<()> {
             );
         }
     }
+    // ADR-0030 / ADR-0031 warn phase: the deploy succeeded, and the validator
+    // has findings the author should act on before the gate flips to deny.
+    // After the summary, on stderr, so `--json` stdout stays machine-readable.
+    crate::contract_lint::print_deploy_warnings(&resp.warnings);
     Ok(())
 }
 
@@ -1559,6 +1584,73 @@ fn collect_component_jsons(dir: &PathBuf) -> Result<Vec<BundledComponent>> {
 // `forge-manifest` crate (crates/forge-manifest/src/lib.rs), where the
 // cross-repo hash contract is now pinned for every producer (forge-cli +
 // forge-git). See `forge_manifest::manifest_hash_tests`.
+
+#[cfg(test)]
+mod deploy_response_tests {
+    use super::*;
+
+    /// A success response carrying the ADR-0030 / ADR-0031 warn-phase
+    /// findings. `warnings` is `#[serde(default)]` on both sides, so an
+    /// older runtime that sends none still decodes — and a warning the
+    /// CLI has never heard of still reaches the author.
+    #[test]
+    fn success_response_warnings_decode_and_render() {
+        let body = r#"{
+            "services": [
+                {"domain": "billing", "name": "checkout", "service_id": 7,
+                 "wasm_hash_hex": "0123456789abcdef0123456789abcdef", "action": "created"}
+            ],
+            "registry_version": 12,
+            "warnings": [
+                {"kind": "missing_auth_declaration",
+                 "service": "billing::checkout",
+                 "operation": "run",
+                 "hint": "declare `auth: anonymous | authenticated | admin` on the op; undeclared is enforced as anonymous — ADR-0030"}
+            ]
+        }"#;
+        let resp: DeployResponse = serde_json::from_str(body).expect("response decodes");
+        assert_eq!(resp.services.len(), 1);
+        assert_eq!(resp.services[0].domain, "billing");
+        assert_eq!(resp.warnings.len(), 1);
+        let line = crate::contract_lint::deploy_warning_line(&resp.warnings[0]);
+        assert!(
+            line.starts_with("warning: missing_auth_declaration [billing::checkout::run] — "),
+            "{line}"
+        );
+        // Printing must never fail the command.
+        crate::contract_lint::print_deploy_warnings(&resp.warnings);
+    }
+
+    /// The old field name still decodes — a runtime that has not yet taken
+    /// the rename answers with `namespace`.
+    #[test]
+    fn legacy_namespace_key_still_decodes_and_warnings_default_empty() {
+        let body = r#"{
+            "services": [
+                {"namespace": "billing", "name": "checkout", "service_id": 7,
+                 "wasm_hash_hex": "0123456789abcdef0123456789abcdef", "action": "updated"}
+            ],
+            "registry_version": 3
+        }"#;
+        let resp: DeployResponse = serde_json::from_str(body).expect("legacy response decodes");
+        assert_eq!(resp.services[0].domain, "billing");
+        assert!(resp.warnings.is_empty());
+    }
+
+    /// `service_namespace` in an authored manifest still deserializes to
+    /// `service_domain` — the transition alias, not a break.
+    #[test]
+    fn wasm_module_entry_accepts_both_keys() {
+        let legacy: WasmModuleEntry = serde_json::from_str(
+            r#"{"service_namespace":"echo","service_name":"echo","wasm_path":"a.wasm"}"#,
+        )
+        .unwrap();
+        assert_eq!(legacy.service_domain, "echo");
+        let current: WasmModuleEntry =
+            serde_json::from_str(r#"{"service_domain":"echo","service_name":"echo"}"#).unwrap();
+        assert_eq!(current.service_domain, "echo");
+    }
+}
 
 #[cfg(test)]
 mod app_bundle_tests {
