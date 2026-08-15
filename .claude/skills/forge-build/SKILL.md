@@ -22,7 +22,7 @@ correct flat layout — **always run cargo from inside the repo directory**, nev
 
 Run in this order; stop at the first failure. All commands assume `cd <repo>` first.
 
-Where these commands show a `.harness/build-lock` prefix, that repo is a harness consumer:
+Where these commands show a `.harness/cargo` prefix, that repo is a harness consumer:
 builds there run in a flat-sibling worktree and take a root-wide lock, and a bare `cargo`
 is denied before it starts. Repos without a `.harness/` directory — `forge-cli`,
 `forge-platform-e2e` — have no wrapper and no fence; run `cargo` directly there. If a
@@ -231,9 +231,9 @@ session's model tier. Delegation also keeps that bulk out of the orchestrator's 
 ## sccache: don't probe stats with a bare invocation
 
 The fleet's compiler cache is declared once (`build_env` → `RUSTC_WRAPPER=sccache`,
-`SCCACHE_CACHE_SIZE=25G`) and exported by the build-lock wrapper and the gate runner —
+`SCCACHE_CACHE_SIZE=25G`) and exported by the `.harness/cargo` wrapper and the gate runner —
 it never appears on the command line, so its absence from a command proves nothing.
 A bare `sccache --show-stats` **starts a server with the default 10 GiB cap** if none is
 running, and that server will evict more than half the fleet cache on its next write.
-Probe stats only when a build-lock-started server is already running, or prefix the
+Probe stats only when a wrapper-started server is already running, or prefix the
 probe with `SCCACHE_CACHE_SIZE=25G`.
