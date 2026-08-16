@@ -210,14 +210,26 @@ The isolation seam already exists — `cache_root()` honours `FORGE_STORAGE_TEST
 machines export neither, and the code comment says so outright: *"Unset on dev machines, so
 local behaviour is unchanged."*
 
+**You do not export it by hand.** The variable is declared once in `.harness/consumer.yaml`
+as `scratch_env`, and both seams that invoke cargo — the wrapper and the runner's own gate
+checks — point it at a fresh per-run directory (`~/.cache/forge-harness-runs/<lane>.<pid>`)
+and reap it afterwards. So the isolated run is the ordinary one:
+
+```bash
+cargo test --tests --no-fail-fast --locked
+```
+
+A hand export is for the case the harness is not managing: bare `cargo` outside the wrapper,
+or a repo that has not declared the variable yet. It is not the recommended form, and typing
+it in front of a wrapped command only overrides a directory the wrapper already made:
+
 ```bash
 FORGE_STORAGE_TEST_ROOT="$(mktemp -d)" cargo test --tests --no-fail-fast --locked
 ```
 
-Where the harness manages the run this is automatic: declare the variable once in
-`.harness/consumer.yaml` as `scratch_env`, and both seams that invoke cargo — the build lock
-and the runner's own gate checks — point it at a fresh per-run directory and remove it
-afterwards.
+If a suite of yours anchors fixtures outside the target dir and the variable is NOT in
+`scratch_env`, that declaration is the fix — not a line in your shell profile, which no
+other session and no gate will ever see.
 
 **Serializing builds does not substitute for this.** They solve different problems: a lock
 makes runs sequential, isolation makes them independent. Gate-internal cargo does not take
