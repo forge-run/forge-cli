@@ -23,11 +23,37 @@ correct flat layout — **always run cargo from inside the repo directory**, nev
 Run in this order; stop at the first failure. All commands assume `cd <repo>` first.
 
 Where these commands show a `.harness/cargo` prefix, that repo is a harness consumer:
-builds there run in a flat-sibling worktree and take a root-wide lock, and a bare `cargo`
-is denied before it starts. Repos without a `.harness/` directory — `forge-cli`,
-`forge-platform-e2e` — have no wrapper and no fence; run `cargo` directly there. If a
-command is refused, the denial names the repair; don't reach for `.harness/escapes.json`
-before reading it, and report a refusal that looks wrong rather than working around it.
+builds there run in a flat-sibling worktree and take a per-lane lock. Repos without a
+`.harness/` directory — `forge-cli`, `forge-platform-e2e` — have no wrapper and no fence;
+run `cargo` directly there. If a command is refused, the denial names the repair; don't
+reach for `.harness/escapes.json` before reading it, and report a refusal that looks wrong
+rather than working around it.
+
+### `cargo` IS the harness now
+
+The `cargo` first on your PATH is the harness's shim (`~/.local/forge-harness/bin/cargo`,
+installed by the root's `harness build`; the PATH line comes from
+`core/runner/lane-env.sh`, which your shell profile already sources). In a lane, **`cargo test --tests --locked` just
+works**: the shim resolves which repo you are in, then execs that lane's `.harness/cargo`
+with `cargo` prepended — the lock, the scratch env, the build env and the preflights all
+still happen. `cargo --version`, `cargo metadata` and `cargo fmt` go straight through, so
+a version probe no longer queues behind somebody's twenty-minute build.
+
+The explicit `.harness/cargo cargo …` form below stays correct and is what CI runs; write
+either. What the shim adds is that a *script*, a subprocess, or a peer's `bash -c` gets the
+same treatment — it is the binary being invoked, not a guess at a command string. Two
+things it refuses outright, from anywhere:
+
+- **cargo in an unenrolled directory** (D-043). Escape: `FORGE_HARNESS_UNGOVERNED=1 cargo …`,
+  recorded in `.harness/log/denials.jsonl` under fence `cargo-shim`.
+- **a substrate build in a MAIN checkout** (D-027). The refusal prints the `git worktree add`
+  line; there is no escape, because the worktree is the point.
+
+One known bypass, documented rather than closed: calling `~/.cargo/bin/cargo` by absolute
+path skips the shim. It is advisory-only — the session hook still warns on the text form —
+and it is a deliberate hatch, not a loophole to reach for. If the shim is missing, stale or
+edited, the hook goes back to a hard **deny** and tells you to run `harness install-shim`:
+enforcement never quietly disappears with the enforcer.
 
 ### forge-runtime
 The feature set is mandatory — a bare `cargo build` skips the server binary entirely and
