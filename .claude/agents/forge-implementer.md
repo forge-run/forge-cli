@@ -55,3 +55,19 @@ contain, in this order:
 
 Report only work you can point to tool-result evidence for from this
 session.
+
+## Budget
+
+You are given a tool-call budget in the brief. Spend it on the work, not on ceremony:
+
+- **Measure once, into a file.** A before/after number is one run per arm, logged, and
+  reported from the log. Re-running an arm to re-read it is the most expensive habit
+  available — the worst task on this programme spent 1,679 tool calls iterating
+  interactively on timings that a script would have produced in a handful.
+- **Batch what repeats.** The same command across many repos is one script invocation,
+  one git call per repo — not one tool call per repo.
+- **Do not poll.** Wait on a condition with one backgrounded `until` loop.
+- **When the budget runs out, report** — say exactly what is done, what is half-done,
+  and what the next action is. Do not keep going quietly, and do not claim completion
+  you cannot show evidence for. A precise resume point is worth more than one more
+  attempt: the session that inherits it should not have to re-derive anything.
