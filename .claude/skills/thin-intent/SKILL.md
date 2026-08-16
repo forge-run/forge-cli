@@ -10,35 +10,77 @@ Before building anything non-trivial, record the intent. It is the
 reference every later review diffs against — without it, "done" is a
 feeling, not a check.
 
+Record it with the **verb**, not by hand. The harness reads what the verb
+writes; a file you author yourself is prose the machinery cannot see, which
+is exactly the gap this skill used to leave.
+
 ## Recording intent (minutes, not meetings)
 
-Create `.harness/intent/<short-slug>.md` (committed) with three short
-sections — sentences, not specs:
+```
+python3 <working-root>/.harness/dispatch.py intent record \
+  --statement "what is true when this is done, as behavior a reviewer could observe" \
+  --acceptance "the first checkable outcome" \
+  --acceptance "the second" \
+  --out-of-scope "what this deliberately does not do" \
+  --ref  "ADR-00xx"  --ref "plan:H-x"
+```
 
-- **Outcome** — what is true when this is done, stated as behavior a
-  reviewer could observe.
-- **Constraints** — invariants that must hold: auth/RLS behavior, design
-  system rules, performance floors, contracts that must not change.
-- **Touches** — the surfaces, domains, or pages expected to change.
+Run it from inside the worktree you are working in — intent is **lane-scoped**,
+and the lane is the worktree. Or name the lane explicitly with `--lane <dir>`.
 
-Then add **Test intentions**: the promises the tests must encode, one line
-each. These are the durable spec — the implementation must satisfy them
-now and every day after.
+It writes `<lane>/.harness/intent/<slug>.json` (committed) and points the
+lane's `.harness/intent/CURRENT` at it. Every evidence bundle written in that
+lane from then on carries `intent_ref`; a lane with nothing recorded carries
+`intent_status: none-recorded`, so absent never looks like unsupported.
+
+What to put in each field — sentences, not specs:
+
+- **`--statement`** — the outcome: what is true when this is done, stated as
+  behavior a reviewer could observe.
+- **`--acceptance`** (repeatable, at least one) — the checkable outcomes,
+  including the promises the tests must encode. These are the durable spec:
+  the implementation must satisfy them now and every day after.
+- **`--out-of-scope`** (repeatable) — what this deliberately does not do.
+  Scope creep is the gap review's most common finding, and it cannot be
+  found against an intent that never bounded itself.
+- **`--ref`** (repeatable) — the ADR, plan step or issue this is downstream of.
+
+Constraints that must hold — auth/RLS behavior, design-system rules,
+performance floors, contracts that must not change — belong in
+`--acceptance` as things a reviewer can check.
 
 Keep it thin. Ambiguity is resolved by building; the working prototype is
-the requirements conversation. If a genuinely irreversible call surfaces
-(data-model change on live data, external contract), stop and get it
-approved before building — the loop applies downstream of those.
+the requirements conversation. Re-running `intent record` with the same
+slug **updates** it (the first timestamp, the revision count and every gap
+review are preserved), so sharpening intent as you learn is the expected
+path, not a workaround. If a genuinely irreversible call surfaces (data-model
+change on live data, external contract), stop and get it approved before
+building — the loop applies downstream of those.
+
+`intent show` prints what the lane currently has, and `intent show --json`
+is what the machinery sees.
 
 ## The gap review (before claiming done)
 
-At the done-boundary, diff the result against the intent file:
+At the done-boundary, diff the result against the recorded intent:
 
-1. Enumerate gaps — outcome not met, constraint bent, test intention not
-   encoded, surface touched that wasn't declared.
+1. Enumerate gaps — outcome not met, acceptance item not encoded, scope
+   bound crossed, surface touched that wasn't declared.
 2. Fix each gap, or explicitly accept it with a written reason.
-3. Append a **Gap review** section to the intent file recording each
-   gap and its resolution (fixed / accepted + why).
+3. Record it with the verb:
+
+```
+python3 <working-root>/.harness/dispatch.py intent gap-review \
+  --boundary "build->verify" \
+  --fixed    "the second acceptance item had no test; added one" \
+  --accepted "renamed a helper that was not in Touches :: mechanical, no caller outside this file"
+```
+
+Every accepted gap needs its reason — acceptance without one is how a gap
+stops being a gap. The record lands in the intent artifact (committed, so it
+survives evidence reaping and can be cited from a plan's `evidence[]`) and is
+mirrored into the evidence bundle's `gap_reviews` in the shape the evidence
+schema declares.
 
 Only then claim completion. Machine gates prove the mechanics; the gap
 review proves the intent — neither substitutes for the other.

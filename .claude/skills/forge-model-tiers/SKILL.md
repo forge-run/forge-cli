@@ -42,9 +42,59 @@ That matters more than it looks — a fallback that ran on the cheap tier and lo
 identical to a pinned run is a measurement that lies. When reading eval numbers, check
 the fallback column before believing the model attribution.
 
+## Scoring a corpus is scheduled work, not ambient work
+
+A judge call is not a cheap call. Each one is a fresh headless `claude -p`
+session that pays for a full agent context before it reads a word of your
+prompt — 5–20× an interactive step, and the harness strips what it can (see
+`VERIFIER_CONTEXT_FLAGS`) but the floor is still real. An 84-case corpus × two
+model legs is ~170 of them. That is how one usage window disappeared in under an
+hour (D-049).
+
+So, three habits:
+
+- **Iterating on a rubric? Score the affected subset.** The cases your change can
+  plausibly move, not the corpus. Iteration is what subsets are for.
+- **The full corpus runs at a step boundary**, deliberately, never sharing a window
+  with a fleet of implementers. Sequence it the way you sequence a roll.
+- **A scoring report carries its call count and wall time**, next to the agreement
+  number. A mechanism whose cost was never measured is the same shape as a gate that
+  cannot execute: invisible until it bites.
+
+## There is a second provider now
+
+Judges are no longer all Anthropic. `runner.py` holds a static
+`MODEL_PROVIDERS` registry that maps a model name to the API it is reached
+through — `anthropic` via the `claude` CLI, `deepseek` via its
+chat-completions endpoint (`DEEPSEEK_API_KEY`) — and a name absent from that
+table **refuses loud** rather than defaulting to a vendor, both when a
+`verifier.yaml` declares `model:` and when `HARNESS_VERIFIER_MODEL` /
+`verify-eval score --models=a,b` overrides it. Adding a model is one line in
+the registry, and that line is the review.
+
+Three consequences worth holding onto:
+
+- **The loud fallback is Anthropic-only.** A pin that errors retries on the
+  fleet default *within its own provider*; a cross-provider pin runs alone.
+  Falling back across vendors would change who judged a diff mid-verdict and
+  file the number under the wrong provider.
+- **Every verdict carries `_provider` next to `_model`,** and the verdict memo
+  is keyed on provider-and-model. Read the provider column before comparing
+  two eval runs; "cheaper model" and "different vendor" are not the same
+  claim, and only one of them is what a table usually means.
+- **A second provider is a cost lever, not a trust lever.** Cheaper per call
+  changes what you can afford to run, not what you can afford to believe.
+
 ## Earn the assignment, do not assert it
 
 Which tier a judge belongs in is an **eval question**, not a preference: the corpus
 scores each model on labelled cases, and a cheap judge that matches the frontier on a
 class of work should keep that class. Assertions about model capability age badly;
 the corpus does not.
+
+**The rule applies to providers identically** (D-048). That a second provider is
+wired and works is a statement about dispatch, not about judgment: no provider goes
+on a blocking gate until the labelled corpus has been run through it and the
+agreement/precision/recall numbers are on the table beside the incumbent's. A price
+per token is not evidence about verdicts. Until those numbers exist, a new provider
+is something you may compare against — never something you may block on.
