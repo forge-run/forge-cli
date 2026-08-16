@@ -5,6 +5,10 @@
       "sha256": "175f09bf4c6da1bddbe40e4d37928d6b303c3eb98dc4240006d44d0864aac07b"
     },
     {
+      "path": ".claude/agents/forge-mechanic.md",
+      "sha256": "dd52e2d05dbe2e376f34eddb01062f294d44c36abb93239486b9bec6b22c0018"
+    },
+    {
       "keys": [
         "PostToolUse",
         "PreToolUse",
@@ -16,6 +20,10 @@
     {
       "path": ".claude/skills/forge-build/SKILL.md",
       "sha256": "82c5ce02725a8e9530454d9ceb0d30704d20f263b1a2964f1da116295e8ad168"
+    },
+    {
+      "path": ".claude/skills/forge-model-tiers/SKILL.md",
+      "sha256": "23becf1ada86c0b36d836ca5196b51e330773c1446048dbbaa9f09071192cfce"
     },
     {
       "path": ".claude/skills/forge-session-economy/SKILL.md",
@@ -31,7 +39,7 @@
     },
     {
       "path": ".github/workflows/harness-gates.yml",
-      "sha256": "b1954646036f9bed8d59db597cbc64139fb1e1d59bc8b4168e87b1f8a6d91700"
+      "sha256": "99823ef3ee673faf0a240fc4b21924816514ccc0b9e6cbada200c88032fdbc28"
     },
     {
       "path": ".harness/plan.json",
@@ -43,6 +51,11 @@
     }
   ],
   "entries": [
+    {
+      "kind": "skill",
+      "sha256": "64b65d85c35a27b43d6289db4b4ed4fb22e79bb734d35744f134a69aa023c185",
+      "source": "../../core/skills/forge-model-tiers"
+    },
     {
       "kind": "skill",
       "sha256": "a30bafbec5ad8779cf15529d7396fae99c692b725aabac42aecec5ad0065e270",
@@ -64,6 +77,15 @@
       },
       "sha256": "764996ba01804de0f223c3cd322181b0affdcd035e30c1bd0f2b98f2e270687d",
       "source": "../../core/skills/forge-wire-change"
+    },
+    {
+      "kind": "agent",
+      "params": {
+        "cargo": "cargo",
+        "cargo_wrap": "bash -c"
+      },
+      "sha256": "7c705f19c31f21d27f382b860400f3cd3418b96496618580a02e928bcf335efc",
+      "source": "../../core/agents/forge-mechanic"
     },
     {
       "kind": "agent",
@@ -151,8 +173,8 @@
   "harness_dir": "harnesses/hybrid",
   "source": {
     "kind": "commit",
-    "ref": "4cc64bf",
-    "sha": "4cc64bffab910dff914a9e9ec7d432fe71857630"
+    "ref": "43fa0e4",
+    "sha": "43fa0e457577aa244608922457f93aeaea2e2621"
   },
   "targets": [
     "claude-code",
