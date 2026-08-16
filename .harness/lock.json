@@ -15,7 +15,7 @@
         "Stop"
       ],
       "path": ".claude/settings.json#hooks",
-      "sha256": "1864027e43eed97c5cce142b0a8853013b06336df8cf6669b0e7de2eae23819d"
+      "sha256": "e9c729c6eb24227489cb3ea6d5f1f956d07265cc0029a83c8c19b172722280e6"
     },
     {
       "path": ".claude/skills/forge-build/SKILL.md",
@@ -39,7 +39,7 @@
     },
     {
       "path": ".github/workflows/harness-gates.yml",
-      "sha256": "34c876edcf238c17dab0bd012bcddab2818d779b0253d02a17b811056dda62b6"
+      "sha256": "3bc42823be79ca16d8ac49f7cb417d867b934647e0bc64ddb89a6d83c4548850"
     },
     {
       "path": ".harness/plan.json",
@@ -173,8 +173,8 @@
   "harness_dir": "harnesses/hybrid",
   "source": {
     "kind": "commit",
-    "ref": "f9a8dd9",
-    "sha": "f9a8dd9be1d64f4f37070714b1ba6a696cc42315"
+    "ref": "09dab77",
+    "sha": "09dab773007a37431cb2c67c8e0d8ff720b6da16"
   },
   "targets": [
     "claude-code",
