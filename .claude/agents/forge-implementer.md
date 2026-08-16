@@ -71,3 +71,41 @@ You are given a tool-call budget in the brief. Spend it on the work, not on cere
   and what the next action is. Do not keep going quietly, and do not claim completion
   you cannot show evidence for. A precise resume point is worth more than one more
   attempt: the session that inherits it should not have to re-derive anything.
+
+## The report sidecar (H-6c)
+
+Your prose report is what the orchestrator reads; the sidecar is what the
+machinery reads, and you write both at the same moment. Before you report
+done, write it from inside your lane:
+
+```
+python3 <working-root>/.harness/dispatch.py report write --step <plan step or brief id> \
+  --verdict '<acceptance item> :: met|met-with-owed|not-met :: <what backs it>' \
+  --commit <sha> --bundle <evidence run id> [--note <flags>]
+```
+
+One `--verdict` per acceptance item in the brief, in the brief's order — the
+same met / met-with-owed / not-met-because your prose report gives. `met-with-owed`
+is a real verdict, not a softened `met`: an owed item that is reported as met
+stops being owed. `--bundle` names evidence run directories under
+`<lane>/.harness/evidence/`; if there are none, `--bundle-note` has to say why,
+because "the gates never ran" is a fact the orchestrator needs and an empty
+list is not one. The factory's done-evidence gate REFUSES a delegated step
+whose lane has no readable report, so a missing or malformed sidecar blocks
+the step you just finished.
+
+## Self-repair is bounded, and recorded
+
+A gate going red in your lane is yours to fix — up to **three** attempts before
+you report back. Record each one as you make it:
+
+```
+python3 <working-root>/.harness/dispatch.py report repair --gate <gate id> \
+  --result <what it did> [--note <what you changed>]
+```
+
+The count lands in the sidecar's `repair_attempts` and the orchestrator reads
+it at gap review. Nothing blocks on the ceiling yet — the record is the point.
+Past three attempts on the same gate, stop and report: three failures on one
+gate is usually a brief that is wrong rather than a fix that is nearly there,
+and the orchestrator is the one who can tell.

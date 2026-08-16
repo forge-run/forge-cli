@@ -2,7 +2,7 @@
   "emitted": [
     {
       "path": ".claude/agents/forge-implementer.md",
-      "sha256": "175f09bf4c6da1bddbe40e4d37928d6b303c3eb98dc4240006d44d0864aac07b"
+      "sha256": "996cc097134d12e7900514fcf9c3284520a9ae978935ea278dea0405b8f9383b"
     },
     {
       "path": ".claude/agents/forge-mechanic.md",
@@ -39,7 +39,7 @@
     },
     {
       "path": ".github/workflows/harness-gates.yml",
-      "sha256": "3bc42823be79ca16d8ac49f7cb417d867b934647e0bc64ddb89a6d83c4548850"
+      "sha256": "371e0cc039713e8a5a36b1423e7bfddd6ae751b551121eeca18a7d215b0eb756"
     },
     {
       "path": ".harness/plan.json",
@@ -93,7 +93,7 @@
         "cargo": "cargo",
         "cargo_wrap": "bash -c"
       },
-      "sha256": "346f8fd086586a62dbee80ddf68c9d3529ba91b8110b406bee682b176418a623",
+      "sha256": "26f19beece0a4fc15f4326c1d8599a8078970ce015e2c99ab7a6d9a14512c8b3",
       "source": "../../core/agents/forge-implementer"
     },
     {
@@ -173,8 +173,8 @@
   "harness_dir": "harnesses/hybrid",
   "source": {
     "kind": "commit",
-    "ref": "09dab77",
-    "sha": "09dab773007a37431cb2c67c8e0d8ff720b6da16"
+    "ref": "8c737bb",
+    "sha": "8c737bbcc2b82f4a0a782bc8c0b7216405109ace"
   },
   "targets": [
     "claude-code",
