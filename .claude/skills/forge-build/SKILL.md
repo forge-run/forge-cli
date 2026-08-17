@@ -62,12 +62,14 @@ graph**, which is how a stray build pulls in `openssl-sys` and spends minutes co
 the canonical set never needed. Use the string as written.
 
 ```bash
-FEATS="http-adapter websocket-adapter mcp-adapter grpc-adapter"
+# S-2 (2026-08-17): the four adapter features collapsed into one `adapters`
+# feature (the old names survive as aliases; any adapter => all). One tree
+# for check, clippy, build, tests and CI.
 cargo fmt --all -- --check
-cargo clippy --workspace --tests --locked --features "$FEATS" -- -D warnings
-cargo build   --workspace --tests --locked --features "$FEATS"
+cargo clippy --workspace --tests --locked --features adapters -- -D warnings
+cargo build   --workspace --tests --locked --features adapters
 FORGE_AUTH_CACHE_TTL_SECS=0 \
-  cargo test  --workspace --tests --no-fail-fast --locked --features "$FEATS"
+  cargo test  --workspace --tests --no-fail-fast --locked --features adapters
 ```
 
 `FORGE_AUTH_CACHE_TTL_SECS=0` is required, not optional: the auth cache makes token
@@ -77,7 +79,7 @@ validation eventually-consistent, and the revocation/logout tests assert an *ins
 Two extra gates CI runs:
 ```bash
 cargo check --bin forge-runtime --locked --no-default-features \
-  --features "allocator-mimalloc $FEATS"        # feature-gated allocator can rot silently
+  --features adapters   # the ONLY tree compiling the 10 not(jemalloc-stats) arms (S-2 1A; mimalloc removed)
 bash -c 'cd examples/api-smoke && cargo check --locked'  # public-API surface witness
 ```
 The api-smoke crate is the *only* thing that catches `pub` → `pub(crate)` demotions and

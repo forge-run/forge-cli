@@ -201,6 +201,55 @@
       },
       "source": "harnesses/hybrid/local/vendor-integrity",
       "timeout_seconds": 60
+    },
+    {
+      "blocking": true,
+      "check": "check.py",
+      "ci_skip": false,
+      "description": "The delta ledger for design-replica work (D-055): while a lane's CURRENT intent has kind design-replica, design/deltas.json must exist, parse, and hold no `open` entries at the done boundary. One entry per reference state x visible attribute (structure, color, weight, spacing, scale, motion, behavior); terminal states are `closed` and `accepted` (with a reason — acceptance without one is how a gap stops being a gap). `open` is the mechanization of \"noticed\": noticing a delta obligates closing it, and prose cannot fail a gate. Lanes with no replica intent pass with that fact recorded. Pure file parse — deterministic, so it runs unchanged in the CI sweep (no D-012 twin owed).\n",
+      "events": [
+        "pre-done",
+        "pre-commit"
+      ],
+      "exclude": [
+        ".harness/**",
+        ".claude/**"
+      ],
+      "id": "design-deltas",
+      "include": [
+        "**/*"
+      ],
+      "memoize": false,
+      "params": {
+        "ledger": "design/deltas.json"
+      },
+      "source": "harnesses/hybrid/local/design-deltas",
+      "timeout_seconds": 30
+    },
+    {
+      "blocking": true,
+      "check": "check.py",
+      "ci_skip": true,
+      "description": "The paired-state check for design-replica work (D-055): while a lane's CURRENT intent has kind design-replica, every committed reference state (a <state>.png + sidecar in the intent's reference_dir) must have a same-state/viewport/theme capture of OUR converged build, listed in the captures manifest and stamped with the deployed tree's identity — live_hash == desired_hash and git_sha == HEAD. That stamp is the point: a screenshot of an undeployed tree is not evidence (the incident behind this gate produced exactly that false negative), and requiring HEAD forces the honest ordering commit -> push -> converge -> capture -> done. The gate never captures anything itself; the capture script produces the evidence, the gate verifies it. Session-only (ci_skip): captures need a converged local platform. The D-012 CI twin is forge-portal-e2e's capture-parity step (`capture-reference.ts --mode ours --verify-pairs`), which runs the same pairing where the platform exists.\n",
+      "events": [
+        "pre-done"
+      ],
+      "exclude": [
+        ".harness/**",
+        ".claude/**"
+      ],
+      "id": "reference-parity",
+      "include": [
+        "**/*"
+      ],
+      "memoize": false,
+      "params": {
+        "captures_dir": "design/captures",
+        "e2e_repo": "../forge-portal-e2e",
+        "reference_dir": "design/reference"
+      },
+      "source": "harnesses/hybrid/local/reference-parity",
+      "timeout_seconds": 60
     }
   ],
   "harness": "hybrid",

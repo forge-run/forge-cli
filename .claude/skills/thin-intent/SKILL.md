@@ -60,6 +60,47 @@ building — the loop applies downstream of those.
 `intent show` prints what the lane currently has, and `intent show --json`
 is what the machinery sees.
 
+## Design-replica intents (D-055)
+
+Work that replicates a visible reference — a site, a page, a design — records
+a **kind**, and the intake gets stricter:
+
+```
+python3 <working-root>/.harness/dispatch.py intent record \
+  --statement "the forge.run landing replicates <exemplar>'s homepage anatomy" \
+  --kind design-replica --reference design/reference \
+  --acceptance "..." --out-of-scope "palette (ember) and fonts stay ours" ...
+```
+
+- **The corpus is the intake.** `--reference` names a committed directory of
+  reference states — `<state>.png` each with a sidecar `<state>.json` naming
+  `source_url, captured_at, viewport, state, theme`. Recording a replica
+  intent without one is **refused**, and the refusal prints the capture
+  command (`capture-reference.ts --mode reference`). Capture the corpus
+  first; do not screenshot by hand — three of four false conclusions in the
+  incident behind this rule were hand-tooling artifacts.
+- **Carve-outs are committed, not conversational.** What is deliberately NOT
+  replicated — palette, fonts, honesty-gated content (their logos, their
+  star counts, their customer claims) — goes in `--out-of-scope`. The
+  verifier and the gap review only see committed artifacts; a deviation
+  accepted in conversation does not exist at the done boundary.
+- **The scope rule.** A standing "replicate X" directive scopes **every
+  visible attribute** of X — structure, color, weight, spacing, scale,
+  motion, behavior — until the intent is retired. Sub-requests ("fix the
+  nav") never narrow it, and a re-record that omits `--kind` inherits the
+  replica scope rather than dropping it.
+- **Noticing obligates a ledger entry.** Every visible delta you see goes in
+  `design/deltas.json` as `open`, and is closed or accepted-with-reason
+  before done — prose can't fail a gate; the ledger can. The `design-deltas`
+  gate blocks `pre-done`/`pre-commit` while any entry is `open`, and the
+  `reference-parity` gate blocks `pre-done` until every reference state has
+  a same-viewport/theme capture of the converged build (`--mode ours`)
+  stamped with the deployed tree's `git_sha`/`live_hash` — a screenshot of
+  an undeployed tree is not evidence.
+- **References age.** The capture tool warns when the corpus is older than
+  its freshness window — the target site moves; recapture rather than
+  arguing with old pixels.
+
 ## The gap review (before claiming done)
 
 At the done-boundary, diff the result against the recorded intent:

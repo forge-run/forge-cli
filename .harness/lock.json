@@ -19,7 +19,7 @@
     },
     {
       "path": ".claude/skills/forge-build/SKILL.md",
-      "sha256": "188c6c79085d766e35cc4f467895f04f8e2ebc1e05f8280a55646f18a352c3ef"
+      "sha256": "ccfc694feb20dec78a3fa89f57422e5962435664d0462f5c65f5b79c048843db"
     },
     {
       "path": ".claude/skills/forge-model-tiers/SKILL.md",
@@ -35,15 +35,15 @@
     },
     {
       "path": ".claude/skills/thin-intent/SKILL.md",
-      "sha256": "21d092ef5f4c6a7f771397be73f73aae5e79e34d03cf957fba6c6d772a14cd8a"
+      "sha256": "2d2bf0453450820f01af9f03c14381c5ecf952256e5d5e4222c587b9484f00f1"
     },
     {
       "path": ".github/workflows/harness-gates.yml",
-      "sha256": "6e2ec5aa594378f95af2eaff248d4f54e0c90d00c7976b6d38c3def6ab1cba41"
+      "sha256": "0e62556a05f3ec3b1ca1e0c263fe9c2a2c17f9aff526e36be5d8a5e49199c8cf"
     },
     {
       "path": ".harness/plan.json",
-      "sha256": "0de0beee7ebe2dc4efae776dff254bbc16ac5eaad71e8b22cc1922daf20cca7c"
+      "sha256": "89d145367986f9225bef10cb5e2b0630553b823983709b59221f38a089eda79c"
     },
     {
       "path": ".harness/runner.py",
@@ -67,7 +67,7 @@
         "cargo": "cargo",
         "cargo_wrap": "bash -c"
       },
-      "sha256": "f53047fbbe55c4084c29d055e82ed9b040f740ea98d1487b69299e2b02e3eee3",
+      "sha256": "d9002ff13d2e412fa9175f94140e7cfc9048e09cab97d2846091b68c16eb6b08",
       "source": "../../core/skills/forge-build"
     },
     {
@@ -140,7 +140,7 @@
     },
     {
       "kind": "skill",
-      "sha256": "fbc73cd77c8d6aee6d8d649a9e00ce18114ae32ae27f5c54d28898ed79598d22",
+      "sha256": "1c1856bb086e51ff4b8064ff182edc84631e0a8007a5f6691e51b3f6fe14a693",
       "source": "local/thin-intent"
     },
     {
@@ -167,14 +167,32 @@
       },
       "sha256": "5b03679bcb2b74d038a7bec3a14021683377096b34e3ed1363d818e9d732d98f",
       "source": "local/vendor-integrity"
+    },
+    {
+      "kind": "gate",
+      "params": {
+        "ledger": "design/deltas.json"
+      },
+      "sha256": "0b85692a2f0728ebb55e41995d7e22ead28e27ad9e9d80228a57a1bdf2e80625",
+      "source": "local/design-deltas"
+    },
+    {
+      "kind": "gate",
+      "params": {
+        "captures_dir": "design/captures",
+        "e2e_repo": "../forge-portal-e2e",
+        "reference_dir": "design/reference"
+      },
+      "sha256": "9e1ef723a7b9a148f536817a5e80082c9990adb120188ee624a6cdf51806071e",
+      "source": "local/reference-parity"
     }
   ],
   "harness": "hybrid",
   "harness_dir": "harnesses/hybrid",
   "source": {
     "kind": "commit",
-    "ref": "8aa5e2a",
-    "sha": "8aa5e2a3edfa5a1ca2785f5fb42adf5e3eb441a1"
+    "ref": "114968b",
+    "sha": "114968b31ff7fb4200b8c182c5ca1ff45d0688f7"
   },
   "targets": [
     "claude-code",
