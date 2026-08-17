@@ -47,11 +47,11 @@
     },
     {
       "path": ".github/workflows/harness-gates.yml",
-      "sha256": "8e51ed496fd47292f2bfe646447bd973740b935eee86caa1825debba43dee157"
+      "sha256": "3e39f1fd49966d1cd0f3f1b741ff4b1cafe35478b9149e3dfb84cd5007389d3d"
     },
     {
       "path": ".harness/plan.json",
-      "sha256": "1e5fa1cb761753f67079ed56732be46742c9bbed37a14209fa7e59dd9cb1cab7"
+      "sha256": "861cb87c006af8f0b7ad6c426c44c99004a96aaf15e6cae72ea49e6c643b0e84"
     },
     {
       "path": ".harness/runner.py",
@@ -211,14 +211,24 @@
       "kind": "verifier",
       "sha256": "3307baf88b56cd6ef29e24ebfd457e353c3369a8be28fef56712112c5168b127",
       "source": "local/prose-review"
+    },
+    {
+      "kind": "gate",
+      "params": {
+        "check_cmd": "cargo run -q -p forge-cms --bin gen_corpus -- --check",
+        "regen_cmd": "cargo run -q -p forge-cms --bin gen_corpus",
+        "seeds_file": "domains/content/seeds/cms_documents.json"
+      },
+      "sha256": "5564c469afb90271a631a319d8841a041c99075a3354d6b2af3e9f5facb707c6",
+      "source": "local/cms-corpus-current"
     }
   ],
   "harness": "hybrid",
   "harness_dir": "harnesses/hybrid",
   "source": {
     "kind": "commit",
-    "ref": "2fb9c2d",
-    "sha": "2fb9c2db1a809ae18f1cb591006e5a9e6121644e"
+    "ref": "e79018e",
+    "sha": "e79018e406f0b58d0aebfae7815e091dbd554296"
   },
   "targets": [
     "claude-code",

@@ -281,6 +281,35 @@
       },
       "source": "harnesses/hybrid/local/prose-tells",
       "timeout_seconds": 60
+    },
+    {
+      "blocking": true,
+      "check": "check.sh",
+      "ci_skip": false,
+      "description": "The generated CMS corpus must match content/** in the same commit. The content pipeline is content/** -> gen_corpus -> the committed domains/content seed -> converge projects it into cms_documents -> the anon render cache invalidates on that table's changelog. Edit content/** without regenerating and every downstream stage reports success while the site serves the old words: in_sync true, live_hash moved, x-forge-cache hit, nothing red anywhere (observed live, 2026-08-18 — the D-056 prose pass deployed cleanly and changed nothing on screen until the corpus was regenerated). ship.sh runs this same preflight, but content-only edits ride a plain git push and never pass through ship.sh — so the guard that \"already existed and was wired into NOTHING\" (ship.sh's own words) is wired here, at the commit boundary. Consumers without a generated corpus pass with that fact recorded.\n",
+      "events": [
+        "pre-done",
+        "pre-commit"
+      ],
+      "exclude": [
+        ".harness/**",
+        ".claude/**",
+        "content/internal/**"
+      ],
+      "id": "cms-corpus-current",
+      "include": [
+        "content/**",
+        "domains/content/seeds/**",
+        "crates/forge-cms/**"
+      ],
+      "memoize": true,
+      "params": {
+        "check_cmd": "cargo run -q -p forge-cms --bin gen_corpus -- --check",
+        "regen_cmd": "cargo run -q -p forge-cms --bin gen_corpus",
+        "seeds_file": "domains/content/seeds/cms_documents.json"
+      },
+      "source": "harnesses/hybrid/local/cms-corpus-current",
+      "timeout_seconds": 600
     }
   ],
   "harness": "hybrid",
