@@ -250,6 +250,37 @@
       },
       "source": "harnesses/hybrid/local/reference-parity",
       "timeout_seconds": 60
+    },
+    {
+      "blocking": true,
+      "check": "check.py",
+      "ci_skip": false,
+      "description": "The lintable half of the anti-tell prose doctrine (D-056): prose a human reads must sound like one engineer telling another, and the tells that break that voice — hype vocabulary, \"isn't just X\" constructions, exclamation marks, emoji, stacked em-dashes — are mechanical enough to grep. This gate scans changed files under the prose roots (marketing content by default): JSON files are parsed and their string values judged (that is where a content model keeps its copy), other text files are scanned as paragraphs. Every hit is reported with its location and the tell it matched; the repair is a rewrite, and the prose-style skill carries the doctrine with worked before/after pairs. The judgment half (rhythm, aphorisms, adjective piles) is prose-review, an LLM judge at pre-review — a grep cannot hear a keynote voice, and pretending it can would make this gate the whole bar.\n",
+      "events": [
+        "post-edit",
+        "pre-done",
+        "pre-commit"
+      ],
+      "exclude": [
+        ".harness/**",
+        ".claude/**",
+        "content/internal/**",
+        "**/*.png",
+        "**/*.jpg",
+        "**/*.svg",
+        "**/*.woff2",
+        "**/*.lock"
+      ],
+      "id": "prose-tells",
+      "include": [
+        "content/**"
+      ],
+      "memoize": false,
+      "params": {
+        "roots": "content"
+      },
+      "source": "harnesses/hybrid/local/prose-tells",
+      "timeout_seconds": 60
     }
   ],
   "harness": "hybrid",
@@ -263,7 +294,35 @@
   ],
   "post_edit_budget_seconds": 8,
   "scratch_env": [],
-  "verifiers": [],
+  "verifiers": [
+    {
+      "blocking": true,
+      "description": "The judgment half of the anti-tell prose doctrine (D-056): a fresh-context judge that reads the diff's prose sentence by sentence against the read-aloud bar — would a senior engineer say this aloud, verbatim, to a peer. Catches what the prose-tells grep cannot: stacked triads, aphoristic closers, adjective piles, uniform rhythm, keynote voice. Blocking at pre-review only — the same dormant-by-default posture D-052 left every judge in; it spends a model call only when a review is explicitly assembled (/harness-review).\n",
+      "eval_min_agreement": 0.9,
+      "evals": "evals",
+      "events": [
+        "pre-review"
+      ],
+      "exclude": [
+        ".harness/**",
+        ".claude/**"
+      ],
+      "id": "prose-review",
+      "include": [
+        "content/**",
+        "**/*.md"
+      ],
+      "inputs": [
+        "diff"
+      ],
+      "model": "claude-fable-5",
+      "params": {},
+      "prompt": "prompt.md",
+      "rubric": "rubric.md",
+      "source": "harnesses/hybrid/local/prose-review",
+      "verdict_schema": "verdict.schema.json"
+    }
+  ],
   "watch_gates": [
     "cargo-fmt",
     "cargo-check",

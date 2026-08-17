@@ -100,6 +100,11 @@ python3 <working-root>/.harness/dispatch.py intent record \
 - **References age.** The capture tool warns when the corpus is older than
   its freshness window — the target site moves; recapture rather than
   arguing with old pixels.
+- **The commit hook judges the pre-command tree.** It fires before any part
+  of your command runs, so a ledger edit, WIP file, or `git stash pop`
+  chained in the same command as `git commit` does not exist yet when the
+  gates look. State-restoring commands run as their own command (or via a
+  file tool) first.
 
 ## The gap review (before claiming done)
 

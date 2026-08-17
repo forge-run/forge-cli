@@ -9,6 +9,10 @@
       "sha256": "dd52e2d05dbe2e376f34eddb01062f294d44c36abb93239486b9bec6b22c0018"
     },
     {
+      "path": ".claude/commands/harness-review.md",
+      "sha256": "cba6fd6ee3d91d2a374406a27c7a5bda949a6b3359a17e1978ec0ae24b49e157"
+    },
+    {
       "keys": [
         "PostToolUse",
         "PreToolUse",
@@ -34,16 +38,20 @@
       "sha256": "5de9eefd3d873efcf2005ccd20eee59c423a6db2facdcf4b1daf901c5aa0d077"
     },
     {
+      "path": ".claude/skills/prose-style/SKILL.md",
+      "sha256": "8bff9b26be359a36ddc9d4f0c79ac8573f0cab56c45ccae578b9a2e4e13db6de"
+    },
+    {
       "path": ".claude/skills/thin-intent/SKILL.md",
-      "sha256": "2d2bf0453450820f01af9f03c14381c5ecf952256e5d5e4222c587b9484f00f1"
+      "sha256": "8ee11ec8aea41e339b59ae692c6221710c97e8b8cc92a95edeab8d4aabf0dc7a"
     },
     {
       "path": ".github/workflows/harness-gates.yml",
-      "sha256": "539857624475d8afb386d4ba710f24efc716eaa457907136013a9f9180b0ef19"
+      "sha256": "8e51ed496fd47292f2bfe646447bd973740b935eee86caa1825debba43dee157"
     },
     {
       "path": ".harness/plan.json",
-      "sha256": "89d145367986f9225bef10cb5e2b0630553b823983709b59221f38a089eda79c"
+      "sha256": "1e5fa1cb761753f67079ed56732be46742c9bbed37a14209fa7e59dd9cb1cab7"
     },
     {
       "path": ".harness/runner.py",
@@ -140,7 +148,7 @@
     },
     {
       "kind": "skill",
-      "sha256": "1c1856bb086e51ff4b8064ff182edc84631e0a8007a5f6691e51b3f6fe14a693",
+      "sha256": "36af743f154aa2672095887707e582beb962ba3ed23b99c70c44d91f83261f1a",
       "source": "local/thin-intent"
     },
     {
@@ -185,14 +193,32 @@
       },
       "sha256": "9e1ef723a7b9a148f536817a5e80082c9990adb120188ee624a6cdf51806071e",
       "source": "local/reference-parity"
+    },
+    {
+      "kind": "gate",
+      "params": {
+        "roots": "content"
+      },
+      "sha256": "5fa5c377c6a81619f1ed1fb7ab29b05194bc25e12da5d6ed0b3b551c66c7bae6",
+      "source": "local/prose-tells"
+    },
+    {
+      "kind": "skill",
+      "sha256": "bc2a502e5aa3a17701fa80f20d490a78958a225d6eae12712af920e1f68aff7b",
+      "source": "local/prose-style"
+    },
+    {
+      "kind": "verifier",
+      "sha256": "3307baf88b56cd6ef29e24ebfd457e353c3369a8be28fef56712112c5168b127",
+      "source": "local/prose-review"
     }
   ],
   "harness": "hybrid",
   "harness_dir": "harnesses/hybrid",
   "source": {
     "kind": "commit",
-    "ref": "bb7bdf1",
-    "sha": "bb7bdf1a1810dec1c627f2faf62d19ad4bb97fda"
+    "ref": "2fb9c2d",
+    "sha": "2fb9c2db1a809ae18f1cb591006e5a9e6121644e"
   },
   "targets": [
     "claude-code",

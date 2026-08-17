@@ -21,12 +21,12 @@ jobs:
         with:
           fetch-depth: 0
           path: forge-cli
-      - name: Checkout harness machinery (bb7bdf1)
+      - name: Checkout harness machinery (2fb9c2d)
         uses: actions/checkout@v4
         with:
           repository: forge-run/forge-sdlc-harness
           path: forge-sdlc-harness
-          ref: bb7bdf1a1810dec1c627f2faf62d19ad4bb97fda
+          ref: 2fb9c2db1a809ae18f1cb591006e5a9e6121644e
           clean: true
           token: ${{ secrets.FORGE_CROSS_REPO_TOKEN }}
       - name: Checkout forge-sdk-v2
@@ -86,6 +86,26 @@ jobs:
             BASE="$(git rev-parse HEAD~1 2>/dev/null || git hash-object -t tree /dev/null)"
           fi
           python3 "$GITHUB_WORKSPACE/forge-sdlc-harness/core/runner/runner.py" all --diff-base "$BASE"
+      # LLM verifiers: dormant until the ANTHROPIC_API_KEY org secret
+      # exists — adding it is the only activation step (D-013/D-017).
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Pre-review verifiers (secret-gated)
+        working-directory: forge-cli
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "$ANTHROPIC_API_KEY" ]; then
+            echo "ANTHROPIC_API_KEY not configured — verifiers skipped (add the org secret to activate)"
+            exit 0
+          fi
+          command -v claude >/dev/null 2>&1 || npm install -g @anthropic-ai/claude-code
+          BASE="${{ github.event.pull_request.base.sha }}"
+          if [ -z "$BASE" ]; then BASE="${{ github.event.inputs.base }}"; fi
+          if [ -z "$BASE" ]; then BASE="$(git rev-parse HEAD~1 2>/dev/null || git hash-object -t tree /dev/null)"; fi
+          python3 "$GITHUB_WORKSPACE/forge-sdlc-harness/core/runner/runner.py" pre-review --diff-base "$BASE"
       - name: Upload evidence bundle
         if: always()
         uses: actions/upload-artifact@v4
