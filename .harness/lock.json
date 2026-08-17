@@ -39,7 +39,7 @@
     },
     {
       "path": ".github/workflows/harness-gates.yml",
-      "sha256": "e24d35f4985708cb9a5fc12cd897c7faae13f5753fc15fb854d642f20e1aa2d2"
+      "sha256": "5bd4c942af1e3a266893a5886001b3bf160312e8df1431fe24cab6df22ee75f9"
     },
     {
       "path": ".harness/plan.json",
@@ -111,7 +111,7 @@
         "full_args": "--workspace --locked",
         "package_memo": true
       },
-      "sha256": "383f858e41c40f0a085debac5124eb07659a974d8d80da559fdb555d1d2e3f63",
+      "sha256": "c1322330bb7b702e900c6abdf26221062b7fbd78ad7e7be20ae50c33d17fe935",
       "source": "../../core/gates/cargo-check"
     },
     {
@@ -173,8 +173,8 @@
   "harness_dir": "harnesses/hybrid",
   "source": {
     "kind": "commit",
-    "ref": "2b434d2",
-    "sha": "2b434d2aa9e663879aa5091e4dc2e06a716efbb7"
+    "ref": "01c29c7",
+    "sha": "01c29c7c27a9afd188f9599039e604d94ec0b47f"
   },
   "targets": [
     "claude-code",
