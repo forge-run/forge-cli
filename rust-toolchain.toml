@@ -1,0 +1,5 @@
+# Pinned fleet-wide so a stable release is not a silent fleet recompile
+# (and so every repo shares one sccache namespace); see forge-sdlc-harness S-3.
+[toolchain]
+channel = "1.95.0"
+components = ["rustfmt", "clippy"]
