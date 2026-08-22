@@ -47,11 +47,11 @@
     },
     {
       "path": ".github/workflows/harness-gates.yml",
-      "sha256": "c0662f432da0399095d7e068c43d52f8e24cc30574cd4ac8b6e01ccad64deb6b"
+      "sha256": "705e8a5f30f2bcc3da12c5af050be3b2a762cdac9efd7206aea239e454475442"
     },
     {
       "path": ".harness/plan.json",
-      "sha256": "d296a20a0ee3216df67c118a7c078f2ef7174d70a485b4ab34418ee40c0b7bab"
+      "sha256": "b5ee52d30397e844fc6edc7db494ace44361ca283b70e96b1a81b00f29bd2970"
     },
     {
       "path": ".harness/runner.py",
@@ -158,6 +158,14 @@
     {
       "kind": "gate",
       "params": {
+        "tests_dir": "core/runner/tests"
+      },
+      "sha256": "34415d81c87d33d89deeb3a4252583befcb2d5de88939ec655242ece25a1aea2",
+      "source": "local/python-suite"
+    },
+    {
+      "kind": "gate",
+      "params": {
         "e2e_repo": "../forge-portal-e2e",
         "map": "e2e-map.json"
       },
@@ -231,8 +239,8 @@
   "harness_dir": "harnesses/hybrid",
   "source": {
     "kind": "commit",
-    "ref": "acc89f96812dee01ff2a7ef76ed8d961b937c694",
-    "sha": "acc89f96812dee01ff2a7ef76ed8d961b937c694"
+    "ref": "9dcbd85",
+    "sha": "9dcbd85c0741ac5d36b043cd53ee612443464385"
   },
   "targets": [
     "claude-code",

@@ -133,6 +133,30 @@
       "blocking": true,
       "check": "check.sh",
       "ci_skip": true,
+      "description": "The stdlib-unittest suite that covers the emitted runner and dispatcher must be green before a change to them is accepted or committed.\nThis closes a hole the cargo gates cannot see. The harness repo's own `cargo-tests` is scoped to `tool/` — correctly, since that is where its crate lives — so the ~1100-test python suite that covers `core/runner/**` ran only in CI and by hand. HM2.1 found NINE reds sitting in it, unnoticed, and fixed them; nothing local would have objected while they landed (GAP-REVIEWS #hm2-1). The dispatcher those tests cover is the file every enforcement path in the fleet runs through, and its parsing code fails OPEN when wrong: a mis-parse waves the command through silently.\n`ci_skip` because ci.yml already runs exactly this discovery, in the `runner` job, on every push — this is the session-tier twin of a check that keeps its CI half (D-012), not a second copy of it.\nPath-filtered to the runner tree, so a docs or gate-asset commit does not pay for it, and memoized on that same fileset: an unchanged `core/runner/**` is a suite whose answer cannot have moved.\nNOT APPLICABLE where there is no such suite. hybrid is a shared harness and forge-portal-web has no `core/runner/`, so \"there is nothing here to run\" has to be a real answer — established by looking, the way vendor-integrity establishes its own: if a runner tests directory survives elsewhere in the tree, the pathspec MOVED and this gate is checking nothing, which is exit 2 and not a green tick. Both grep fences that died in this fleet died by matching nothing after a file move.\n",
+      "events": [
+        "pre-done",
+        "pre-commit"
+      ],
+      "exclude": [
+        ".harness/**",
+        ".claude/**"
+      ],
+      "id": "python-suite",
+      "include": [
+        "core/runner/**"
+      ],
+      "memoize": true,
+      "params": {
+        "tests_dir": "core/runner/tests"
+      },
+      "source": "harnesses/hybrid/local/python-suite",
+      "timeout_seconds": 600
+    },
+    {
+      "blocking": true,
+      "check": "check.sh",
+      "ci_skip": true,
       "description": "Targeted local e2e tier (D-019): when a session's changed paths touch surfaces the consumer's e2e-map.json declares coverage for, the matching Playwright specs run against the LOCAL dev platform at pre-done. The full suite stays at the merge boundary (CI dispatch, D-010) — this tier exists so e2e-visible regressions surface at the session boundary, not a merge later. Paths with no mapping pass with that fact recorded; a matched path with the platform down is an infrastructure error (never a silent pass) — boot dev/up.sh or use WIP mode.\n",
       "events": [
         "pre-done"
