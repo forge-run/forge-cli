@@ -47,7 +47,7 @@
     },
     {
       "path": ".github/workflows/harness-gates.yml",
-      "sha256": "705e8a5f30f2bcc3da12c5af050be3b2a762cdac9efd7206aea239e454475442"
+      "sha256": "a7d197613317b84a1beb959ea9da46308154e03f71d9ada78bbcc81fc8bbf05e"
     },
     {
       "path": ".harness/plan.json",
@@ -123,7 +123,7 @@
         "full_args": "--workspace --locked",
         "package_memo": true
       },
-      "sha256": "c1322330bb7b702e900c6abdf26221062b7fbd78ad7e7be20ae50c33d17fe935",
+      "sha256": "7970f89e3987f3d01b5d2e41627ce6b82587d33871cf744cdd78145adbf745b3",
       "source": "../../core/gates/cargo-check"
     },
     {
@@ -137,7 +137,7 @@
         "scope": "full",
         "test_args": "--workspace --locked"
       },
-      "sha256": "067b80e2246f2986694c783e0a1bd049e4c31f83eb632fd55928c42998101c1e",
+      "sha256": "4cc935cb31ad492c9c4253d55ea0ddae2715d2c5e02a5260015a15b34aadac95",
       "source": "../../core/gates/cargo-tests"
     },
     {
@@ -239,8 +239,8 @@
   "harness_dir": "harnesses/hybrid",
   "source": {
     "kind": "commit",
-    "ref": "9dcbd85",
-    "sha": "9dcbd85c0741ac5d36b043cd53ee612443464385"
+    "ref": "5dc42d6",
+    "sha": "5dc42d6d092af081f95dc67e272e10c392baac3c"
   },
   "targets": [
     "claude-code",
