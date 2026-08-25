@@ -28,8 +28,25 @@ Consequences:
 - **Read once.** Re-reading a file you just wrote, or re-running a suite an implementer
   already ran and pasted, is a turn spent to feel sure. Prefer the evidence you were
   given; re-run only what you actually doubt.
-- **Don't poll.** Wait on a condition with one backgrounded `until` loop, not repeated
-  checks. A finished background task notifies you.
+- **Don't poll — waiting is free, a wake-up that only checks is a Monitor's job.**
+  Each babysitting tick costs a full cache-read of the session context: the gm12/gm2
+  lanes burned **644M cache-read tokens** (~7–8% of a weekly window) on ticks a
+  backgrounded `until` loop or Monitor does for zero turns. Wake the model only when
+  the next action needs judgment. The Stop hook now says this once if a session
+  starts ticking (five near-zero-growth stops); the ledger's `poll-shaped` report
+  section names offenders after the fact.
+- **Don't leave a delegate idling across a >5-minute wall.** A delegated agent's
+  prompt cache lives 5 minutes; cargo-tests at pre-commit runs p95 ≈ 17min and the
+  build lock is held p95 ≈ 7min, so a delegate that sits through either re-buys its
+  whole prefix on the next turn — measured: **47.4M cache-write tokens re-bought in
+  one week (~29% of all delegate cache writes)**, the `expiry rewrites` section in
+  `usage report`. Warm the focused build shape before spawning, or hold the long wait
+  in the orchestrator and spawn after it clears.
+- **Over context budget? Hand off, don't push on.** `python3 .harness/dispatch.py
+  handoff --note "<what you were about to do>"` writes a ~few-KB capsule (plan
+  records, delegations, live intents, lanes); a fresh session reads that instead of
+  inheriting a 1.5M-token transcript. The orchestrator's context is the single most
+  expensive thing in the fleet — Fable re-reads it at 2× Opus rates every turn.
 
 ## Delegating
 
