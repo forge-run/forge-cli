@@ -3,6 +3,7 @@
     "RUSTC_WRAPPER": "sccache",
     "SCCACHE_CACHE_SIZE": "25G"
   },
+  "consequence_class": "substrate",
   "fences": [
     {
       "description": "Hybrid code dogfoods the customer surface: portal, CLI, and observability-UI code may not path-dep substrate crates. Reach the platform through the public surface (forge-sdk-v2, the HTTP APIs) instead. Escapes are legal with a named reason — every escape is a discovered gap in the customer surface, and the escape log is the customer-harness backlog.\n",
