@@ -70,6 +70,18 @@ thrown away. Look for a branch or worktree with the obvious name, and say what y
 taking before you take it. When you find a peer on it, the cheap move is to hand over
 what you have rather than race — the diagnosis is worth more than the patch.
 
+**Factory-shaped work runs headless by default (D-060).** A roadmap with steps
+and acceptance goes through `sdk-driver run` in a lane, not through an
+interactive session driving delegations by hand: the driven session pays
+141–153k read/turn where an interactive orchestrator pays 464k, and it does
+its own ceremony and close-out (OPERATING.md §7 has the three commands). Keep
+the interactive session for what actually needs its judgment — specification,
+review, wire decisions, blocking verdicts — and for supervising the drivers,
+which a Monitor does for zero turns. Any headless-attributed miss reaching
+main/CI reverts this default; until then, reaching for an interactive
+orchestrator to execute a written roadmap is the expensive habit this skill
+exists to name.
+
 ## What this is not
 
 This is not a reason to skip verification, shorten evidence, or accept a claim you have
