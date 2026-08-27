@@ -136,7 +136,7 @@ forge branch promote br-… --yes                  # merge branch substrate → 
 forge branch discard br-… --yes                  # destroy the branch snapshot
 ```
 
-Branches are the agent CI/CD primitive: fork, run experimental changes, promote-or-discard. CP handlers return `501 not_implemented` until the substrate-snapshot work lands; the CLI surfaces the response verbatim so the substrate-pending state is visible.
+Branches are the agent CI/CD primitive: fork, run experimental changes, promote-or-discard. The CP handlers are implemented (create with DNS-safe slugging + collision rejection and envelope snapshotting; promote routed through the agent reconcile path — `forge-control-plane/src/admin_branches.rs`), though the CP module still marks its store/worker integration as follow-up work, so treat branches as implemented-but-unhardened rather than battle-tested. (The earlier "501 until the substrate-snapshot work lands" state is gone; corrected 2026-08-27.)
 
 ### `forge domain` — tenant domain claims
 

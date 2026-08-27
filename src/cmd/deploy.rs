@@ -1363,8 +1363,9 @@ async fn cross_validate_tenant_claims(manifest: &forge_schema::AppManifest) -> R
         eprintln!(
             "warning: app.json declares {} tenant_claims.domains entries but \
              FORGE_CP_URL / FORGE_ADMIN_TOKEN / FORGE_TENANT_ID are unset — \
-             skipping deploy-time validation. The runtime will reject \
-             unregistered claims when the routing-table swap lands.",
+             skipping deploy-time validation. The CP's routing-table swap \
+             surface is live (/admin/routing-table); whether the edge \
+             rejects unregistered claims is enforced there, not here.",
             domains.len(),
         );
         return Ok(());

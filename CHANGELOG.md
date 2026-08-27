@@ -102,10 +102,11 @@ deploy commands from the public surface.
   Flags: `--css-only`, `--json`.
 - **`forge branch {new,list,test,promote,discard}`** — ephemeral
   workspace branches CLI. Mirrors `forge domain`'s direct-to-CP
-  auth pattern (`FORGE_CP_URL` + `FORGE_ADMIN_TOKEN`). CP-side
-  endpoints return 501 today; CLI surfaces the substrate-pending
-  state verbatim. Destructive verbs (promote, discard) require
-  `--yes` to confirm.
+  auth pattern (`FORGE_CP_URL` + `FORGE_ADMIN_TOKEN`). (CP-side
+  endpoints returned 501 when this entry was written; they have
+  since been implemented — see README's `forge branch` section,
+  corrected 2026-08-27.) Destructive verbs (promote, discard)
+  require `--yes` to confirm.
 - **8 new tests** for the inspection commands (pages walker
   recursion + sibling detection, components props counting,
   branding default emission, PascalCase → kebab-case
