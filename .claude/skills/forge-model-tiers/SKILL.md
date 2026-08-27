@@ -18,6 +18,17 @@ The rule behind the table: **spend model quality where a wrong answer is expensi
 detect.** A mechanical error surfaces as a red build in seconds. A wrong judgment
 surfaces weeks later as an escape, or never.
 
+**The cheap tier is the DEFAULT for its row, not the exception.** In the week
+to 2026-08-27 every one of 982 delegated turns ran opus-tier — the mechanic
+(`forge-mechanic`, tuned to `effort: medium` since D-058) ran zero times,
+while renames, fixture moves and decided-change sweeps went to the
+implementer at ~3x the rate. Before delegating, ask the table's question —
+*who can tell whether the answer is right?* — and when the answer is "the
+compiler and the gates", the mechanic takes it. The standing check is the
+ledger's model split (`usage report`, by agent/model): a week where the
+cheap-tier row's work all ran on opus-tier again is this rule not being
+followed, and it is the number to fix, not the wording here.
+
 ## Escalation
 
 Escalation runs one way — cheap tier reports, frontier decides — and it is **a report,
