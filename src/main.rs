@@ -27,6 +27,7 @@ mod client;
 mod cmd;
 mod config;
 mod contract_lint;
+mod dialect;
 
 #[derive(Debug, Parser)]
 #[command(name = "forge", version, about, long_about = None)]
@@ -95,6 +96,13 @@ enum Cmd {
     /// package (content-addressed to the registry version) to `--out`.
     #[command(subcommand)]
     Sdk(cmd::sdk::SdkCmd),
+
+    /// Check the workspace's authored sources without building anything.
+    /// Today that is the annotated-Python dialect: every
+    /// `domains/<d>/services/*.py` goes through the front end with the
+    /// workspace's table schemas loaded, and any refusal exits non-zero.
+    /// `--format json` prints the versioned diagnostics envelope.
+    Check(cmd::check::CheckArgs),
 
     /// Compile the workspace graph to WebAssembly Components, stamp their
     /// blake3 hashes into `forge.lock`, and persist the Components to
@@ -244,6 +252,7 @@ async fn main() -> Result<()> {
             let client = client::ForgeClient::new(cfg)?;
             cmd::sdk::run(s, &client).await
         }
+        Cmd::Check(args) => cmd::check::run(args),
         Cmd::WasmBuild(b) => {
             // `wasm-build` doesn't talk to the network — it shells out
             // to cargo. Skip the config + client construction.

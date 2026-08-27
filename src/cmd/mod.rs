@@ -3,6 +3,7 @@
 pub mod branch;
 pub mod brand;
 pub mod build;
+pub mod check;
 pub mod components;
 pub mod deploy;
 pub mod dev;

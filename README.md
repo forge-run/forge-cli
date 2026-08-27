@@ -63,6 +63,7 @@ Under the hood that's three steps, which you can also run individually:
 | `forge ws list` | List workspaces visible to the active portal session, scoped to the active tenant. |
 | `forge ws use <workspace-id>` | Set the active workspace. Subsequent commands mint a per-workspace bearer on demand. |
 | `forge new --template <name>` | Scaffold a new workload from a built-in template (`echo`, `mcp-tool`, `subscription-publisher`). |
+| `forge check` | Check the workspace's authored sources without building. Today that is the annotated-Python dialect: every `domains/<d>/services/*.py` through the front end, with the workspace's table schemas loaded. Exit `0` accepted, `1` refused, `2` this machine could not do its job. `--format json` prints the versioned `forge-check/1` envelope. |
 | `forge wasm-build` | Compile the workspace graph to WASM Components, stamp `forge.lock`, and persist the Components to `.forge/artifacts/`. Run before commit. (Aliased as `forge build`.) |
 | `forge wasm-upload` | Stage the built Components (`.forge/artifacts/`) to the workspace's content store so a `git push` converge resolves each module by hash. Run after `wasm-build`, before pushing. |
 | `forge ship` | The whole deploy in one: `wasm-build` → `wasm-upload` → `git push` → wait for the converge. `--no-build`, `--no-wait`, `--timeout <secs>`. |

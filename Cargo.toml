@@ -54,6 +54,23 @@ forge-manifest = { path = "../forge-types/crates/forge-manifest" }
 # capability config (D7), and emits the generated `.forge/` graph. The CLI
 # is the build orchestrator, so it depends on the compiler directly.
 forge-web-build = { path = "../forge-web/build" }
+# The annotated-Python dialect: front end and emitter, linked as a library
+# rather than spawned as a binary (PHASE5-PROPOSAL §4.4 — the server linked
+# first, the CLI second, once the emitted-crate shape had stopped moving).
+# `forge check` runs the front end alone; `forge wasm-build` emits a
+# `forge-domain-<d>` crate per dialect domain before the one cargo line.
+#
+# Two costs, both known and both paid on purpose. It adds ruff's parser
+# closure to a release binary already at 24.7 MB, and the front end validates
+# with CPython (`python3 -m py_compile`, overridable via `FORGE_LANG_PYTHON`) —
+# so a workspace with a `.py` service needs a python3 on PATH. A Rust-only
+# workspace never reaches either.
+#
+# What linkage does NOT buy is protection from release skew: forge-cli
+# self-updates and the control plane converges on the fleet's schedule, so the
+# two can link this crate at two revisions. `EMITTER_VERSION` and a named
+# refusal are what close that (§4.2).
+forge-lang-rustgen = { path = "../forge-lang/crates/forge-lang-rustgen" }
 # Wrap the wasm32-wasip1 cdylib as a Component-Model artifact
 # before deploy. forge-runtime W3 cutover (2026-05-15) made the
 # runtime reject core modules — only Components instantiate. The
