@@ -280,6 +280,28 @@
       "blocking": true,
       "check": "check.py",
       "ci_skip": false,
+      "description": "A step's diff wandering outside what the plan scoped it to (L2-1). The incident class is the shared-checkout/peer-collision family: two sessions working the same root, one step's edits landing in files another step — or another session — owns, discovered at review or by a stranger's `git commit -a`. A roadmap step may declare `steps[].scope`: root-relative path prefixes (relative to the WORKING ROOT, so they start with a repo name and may span repos). This gate confines the current step's changed paths to that envelope and names every path that escaped it.\nOpt-in by construction: a roadmap with no `scope` anywhere declares no envelope and the gate passes saying so, so no consumer goes red on arrival. Pure function of the changed paths x the roadmap files — deterministic, so it runs unchanged in the CI sweep (no D-012 twin owed).\n",
+      "events": [
+        "pre-done",
+        "pre-commit"
+      ],
+      "exclude": [
+        ".harness/**",
+        ".claude/**"
+      ],
+      "id": "step-scope",
+      "include": [
+        "**/*"
+      ],
+      "memoize": false,
+      "params": {},
+      "source": "harnesses/hybrid/local/step-scope",
+      "timeout_seconds": 30
+    },
+    {
+      "blocking": true,
+      "check": "check.py",
+      "ci_skip": false,
       "description": "The lintable half of the anti-tell prose doctrine (D-056): prose a human reads must sound like one engineer telling another, and the tells that break that voice — hype vocabulary, \"isn't just X\" constructions, exclamation marks, emoji, stacked em-dashes — are mechanical enough to grep. This gate scans changed files under the prose roots (marketing content by default): JSON files are parsed and their string values judged (that is where a content model keeps its copy), other text files are scanned as paragraphs. Every hit is reported with its location and the tell it matched; the repair is a rewrite, and the prose-style skill carries the doctrine with worked before/after pairs. The judgment half (rhythm, aphorisms, adjective piles) is prose-review, an LLM judge at pre-review — a grep cannot hear a keynote voice, and pretending it can would make this gate the whole bar.\n",
       "events": [
         "post-edit",
