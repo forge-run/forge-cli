@@ -92,6 +92,33 @@ jobs:
           token: ${{ secrets.FORGE_CROSS_REPO_TOKEN }}
           path: forge-ui
 
+      # forge-cli path-deps ../forge-lang/crates/forge-lang-rustgen, NOT
+      # optional and not feature-gated, and forge-lang in turn path-deps
+      # forge-sdk-v2 (whose own path dep, forge-schema, is checked out above).
+      # Cargo parses every path dep's manifest before it looks at features or
+      # targets, so both must be here or the release build dies before it
+      # compiles a line.
+      #
+      # This is why forge-sdk-v2 is now present despite the note on ci.yml's
+      # copy saying the narrower release build does not pull forge-web/core:
+      # that reasoning was about core, and forge-lang reaches forge-sdk-v2 by a
+      # different edge. The release workflow has not run since the forge-lang
+      # dep landed (last tag v0.5.3, 2026-07-17), so the next tag would have
+      # been the first to find out.
+      - name: Checkout forge-lang
+        uses: actions/checkout@v4
+        with:
+          repository: forge-run/forge-lang
+          token: ${{ secrets.FORGE_CROSS_REPO_TOKEN }}
+          path: forge-lang
+
+      - name: Checkout forge-sdk-v2
+        uses: actions/checkout@v4
+        with:
+          repository: forge-run/forge-sdk-v2
+          token: ${{ secrets.FORGE_CROSS_REPO_TOKEN }}
+          path: forge-sdk-v2
+
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:

@@ -70,6 +70,27 @@ jobs:
           token: ${{ secrets.FORGE_CROSS_REPO_TOKEN }}
           path: forge-sdk-v2
 
+      # forge-cli path-deps ../forge-lang/crates/forge-lang-rustgen (Cargo.toml
+      # :73, added with `forge check` / `forge wasm-build`). Cargo loads every
+      # path dep's manifest before it looks at features or targets, so WITHOUT
+      # this checkout the FIRST cargo command in the job dies on a missing
+      # manifest — clippy — and Build and Test are skipped, which is how a red
+      # main looks green-adjacent. That happened on every forge-cli push from
+      # 2026-08-28 09:57 until this step landed.
+      #
+      # forge-lang in turn path-deps forge-sdk-v2 (whose own path dep is
+      # forge-schema); both are already checked out above, which is why this
+      # one step is enough. The set is measured, not guessed — see
+      # forge-lang/.harness/consumer.yaml's `ci.sibling_checkouts`, which also
+      # names forge-runtime, needed only for forge-lang's own wasm e2e bindgen
+      # and not for anything forge-cli compiles.
+      - name: Checkout forge-lang
+        uses: actions/checkout@v4
+        with:
+          repository: forge-run/forge-lang
+          token: ${{ secrets.FORGE_CROSS_REPO_TOKEN }}
+          path: forge-lang
+
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
