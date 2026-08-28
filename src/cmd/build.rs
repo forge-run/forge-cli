@@ -213,6 +213,26 @@ pub(crate) fn compile_workspace_graph(root: &std::path::Path) -> Result<()> {
             },
         );
     }
+    // ── the dialect: source that is not Rust yet, made Rust ────────────────
+    // After the graph is known (a graph error is the author's first problem)
+    // and BEFORE the one cargo build below, because the crate has to exist
+    // when cargo reads the workspace. Emitting a crate for a domain the
+    // compiler thinks is data-only would build nothing and deploy nothing, so
+    // `.py` had to become a known source kind first (D4, closed in
+    // forge-web 3e15157).
+    let dialect = crate::dialect::emit(root)?;
+    if !dialect.is_empty() {
+        eprintln!(
+            "  transpiled {} dialect domain(s): {}",
+            dialect.len(),
+            dialect
+                .iter()
+                .map(|d| d.name.as_str())
+                .collect::<Vec<_>>()
+                .join(", ")
+        );
+    }
+
     // ── finding #5: stamp BUILT-BYTE wasm hashes into forge.lock ───────────
     // compile_workspace writes the lock with SOURCE-artifact hashes (its own
     // content-addressing). But the deploy resolves each wasm by its R2 key,
@@ -223,7 +243,7 @@ pub(crate) fn compile_workspace_graph(root: &std::path::Path) -> Result<()> {
     // `wasm_modules` with their blake3, so committed-lock hash == R2 key ==
     // converge-verified hash. The matching Component bytes are uploaded to the
     // artifact store by the deploy/stage step (idempotent, content-addressed).
-    stamp_built_wasm_hashes(root, &graph)
+    stamp_built_wasm_hashes(root, &graph, !dialect.is_empty())
         .context("stamping built-byte wasm hashes into forge.lock")?;
 
     println!("{}", root.join(".forge").display());
@@ -241,6 +261,7 @@ pub(crate) fn compile_workspace_graph(root: &std::path::Path) -> Result<()> {
 fn stamp_built_wasm_hashes(
     root: &std::path::Path,
     graph: &forge_web_build::WorkspaceGraph,
+    dialect: bool,
 ) -> Result<()> {
     use forge_web_build::ModuleKind;
 
@@ -326,6 +347,27 @@ fn stamp_built_wasm_hashes(
         .context("forge.lock has no wasm_modules object")?;
     for (k, h) in &built {
         wm.insert(k.clone(), serde_json::Value::String(h.clone()));
+    }
+    // THE RELEASE-SKEW STAMP (PHASE5-PROPOSAL §4.2).
+    //
+    // forge-cli ships as a self-updating tarball and the control plane
+    // converges on the fleet's own schedule, so the two can link the same
+    // emitter crate at two revisions and no crate boundary closes that. In the
+    // ordinary deploy the client's built bytes are what ship and skew cannot
+    // bite; in a SERVER-side build the server re-emits from the pushed source,
+    // and bytes the customer never tested are the ones that go live. The
+    // server compares this against its own before it builds, and a mismatch
+    // becomes an upgrade prompt rather than a compile error about generated
+    // code (`forge-control-plane/src/git/reconcile/dialect.rs`).
+    //
+    // Only stamped for a workspace that HAS dialect sources: writing an
+    // emitter version into the lock of a Rust-only workspace would claim a
+    // relationship that does not exist, and would move a hash for nobody.
+    if dialect && let Some(obj) = doc.as_object_mut() {
+        obj.insert(
+            "emitter_version".to_string(),
+            serde_json::Value::String(forge_lang_rustgen::EMITTER_VERSION.to_string()),
+        );
     }
     let out = serde_json::to_string_pretty(&doc).context("serialize forge.lock")?;
     std::fs::write(&lock_path, out + "\n")
