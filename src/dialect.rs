@@ -10,6 +10,7 @@
 //! (`forge-control-plane/src/git/reconcile/dialect.rs`); the shapes are
 //! deliberately identical.
 
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 use anyhow::{Result, bail};
@@ -99,6 +100,118 @@ pub fn schema_roots(root: &Path) -> Vec<PathBuf> {
         roots.push(platform);
     }
     roots
+}
+
+/// The op names a domain's `service.json` DECLARES.
+///
+/// `None` when there is no `service.json` — a domain may legitimately have
+/// none yet, and "no declaration file" is not "declares nothing". The two
+/// authored shapes are both accepted, exactly as `contract_lint` accepts
+/// them: the flat per-domain `{name, domain, operations:[…]}` and the full
+/// `{services:[…]}` deploy manifest.
+pub fn declared_ops(domain: &Path) -> Option<Vec<String>> {
+    let text = std::fs::read_to_string(domain.join("service.json")).ok()?;
+    let doc: serde_json::Value = serde_json::from_str(&text).ok()?;
+    let mut names = Vec::new();
+    let mut take = |ops: &serde_json::Value| {
+        if let Some(list) = ops.as_array() {
+            names.extend(
+                list.iter()
+                    .filter_map(|o| o.get("name")?.as_str().map(str::to_string)),
+            );
+        }
+    };
+    match doc.get("services").and_then(|v| v.as_array()) {
+        Some(services) => {
+            for svc in services {
+                if let Some(ops) = svc.get("operations") {
+                    take(ops);
+                }
+            }
+        }
+        None => {
+            if let Some(ops) = doc.get("operations") {
+                take(ops);
+            }
+        }
+    }
+    Some(names)
+}
+
+/// One disagreement between what a domain declares and what it defines.
+#[derive(Debug)]
+pub struct OpMismatch {
+    pub domain: String,
+    pub op: String,
+    pub kind: MismatchKind,
+}
+
+#[derive(Debug)]
+pub enum MismatchKind {
+    /// In `service.json`, defined by no source. The route exists in the
+    /// contract and 404s at runtime.
+    DeclaredNotDefined,
+    /// Defined by a source, in no `service.json`. The op has no contract, so
+    /// it is unreachable through the API and invisible to the SDK generator —
+    /// code that compiles, deploys, and can never be called.
+    DefinedNotDeclared,
+}
+
+impl OpMismatch {
+    /// The line an author reads.
+    pub fn render(&self) -> String {
+        match self.kind {
+            MismatchKind::DeclaredNotDefined => format!(
+                "{}: service.json declares `{}` and no source defines it — \
+                 the route is in the contract and 404s at runtime",
+                self.domain, self.op
+            ),
+            MismatchKind::DefinedNotDeclared => format!(
+                "{}: `{}` is defined and service.json does not declare it — \
+                 no contract, so it is unreachable through the API and absent \
+                 from the generated SDK",
+                self.domain, self.op
+            ),
+        }
+    }
+}
+
+/// Compare what each dialect domain declares against what it defines.
+///
+/// Dialect domains only. A Rust domain's ops are not extractable without
+/// parsing Rust, which the workspace compiler explicitly does not do — so
+/// silence about them is honest, and claiming otherwise would make this check
+/// wrong for the portal.
+pub fn op_mismatches(root: &Path, defined: &BTreeMap<String, Vec<String>>) -> Vec<OpMismatch> {
+    let mut out = Vec::new();
+    for dir in domains(root) {
+        let name = domain_name(&dir);
+        let Some(defined_here) = defined.get(&name) else {
+            continue; // not a dialect domain
+        };
+        let Some(declared) = declared_ops(&dir) else {
+            continue; // no service.json authored yet
+        };
+        for op in &declared {
+            if !defined_here.contains(op) {
+                out.push(OpMismatch {
+                    domain: name.clone(),
+                    op: op.clone(),
+                    kind: MismatchKind::DeclaredNotDefined,
+                });
+            }
+        }
+        for op in defined_here {
+            if !declared.contains(op) {
+                out.push(OpMismatch {
+                    domain: name.clone(),
+                    op: op.clone(),
+                    kind: MismatchKind::DefinedNotDeclared,
+                });
+            }
+        }
+    }
+    out
 }
 
 /// The cargo package an emitted domain crate is named, and the workspace

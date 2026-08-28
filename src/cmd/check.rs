@@ -33,6 +33,7 @@
 //! version stamp and its refusal are what close that, and they live with the
 //! build (§4.2).
 
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 use anyhow::Result;
@@ -81,17 +82,17 @@ pub fn run(args: CheckArgs) -> Result<()> {
     // rather than `/Users/…` — is the rustc convention and the one an editor
     // can click.
     let root = args.manifest_dir.unwrap_or_else(|| PathBuf::from("."));
-    let registers = match check(&root) {
-        Ok(r) => r,
+    let found = match check(&root) {
+        Ok(v) => v,
         Err(message) => toolchain(message),
     };
 
-    if registers.is_empty() {
+    if found.is_empty() {
         // Not a failure and not silence: a workspace with no dialect source
         // is a correct answer to the question that was asked, and an author
         // who expected one checked wants to know it found none.
         match json {
-            true => println!("{}", envelope(&root, &registers)),
+            true => println!("{}", envelope(&root, &found)),
             false => eprintln!(
                 "no dialect sources under {}/domains/*/services/*.py — nothing to check",
                 root.display()
@@ -100,19 +101,21 @@ pub fn run(args: CheckArgs) -> Result<()> {
         return Ok(());
     }
 
-    let refused = registers.iter().filter(|r| !r.is_empty()).count();
     if json {
-        println!("{}", envelope(&root, &registers));
+        println!("{}", envelope(&root, &found));
     } else {
-        for register in &registers {
+        for register in &found.registers {
             match register.is_empty() {
                 true => eprintln!("{}: accepted", register.path),
                 false => eprint!("{}", register.render()),
             }
         }
-        eprintln!("{}", summary(&registers));
+        for m in &found.mismatches {
+            eprintln!("error: {}", m.render());
+        }
+        eprintln!("{}", summary(&found));
     }
-    if refused == 0 {
+    if found.ok() {
         return Ok(());
     }
     // Exit 1, the refusal code, without a second error line: the register IS
@@ -127,7 +130,7 @@ pub fn run(args: CheckArgs) -> Result<()> {
 /// the customer's source, which is always a [`Register`], empty when accepted.
 /// Split from [`run`] so the verdicts are testable: `run` ends in
 /// `process::exit`, which a test cannot survive.
-fn check(root: &Path) -> Result<Vec<Register>, String> {
+fn check(root: &Path) -> Result<Verdicts, String> {
     if !root.join("workspace.json").exists() {
         return Err(format!(
             "no workspace.json at {} — `forge check` reads a workspace; pass \
@@ -137,7 +140,7 @@ fn check(root: &Path) -> Result<Vec<Register>, String> {
     }
     let sources = dialect::sources(root);
     if sources.is_empty() {
-        return Ok(Vec::new());
+        return Ok(Verdicts::default());
     }
 
     let schema_dirs = dialect::schema_roots(root);
@@ -156,9 +159,18 @@ fn check(root: &Path) -> Result<Vec<Register>, String> {
     // second run necessary to see the second problem, which is the round trip
     // this command exists to remove.
     let mut registers: Vec<Register> = Vec::with_capacity(sources.len());
+    // Op names per domain, collected from the SAME front-end pass that
+    // produces the verdicts — a second pass would be a second chance to
+    // disagree about the same file.
+    let mut defined: BTreeMap<String, Vec<String>> = BTreeMap::new();
     for source in &sources {
         match check_only(source, tables.as_ref()) {
-            Ok(label) => registers.push(Register::new(label)),
+            Ok(accepted) => {
+                if let Some(domain) = domain_of(root, source) {
+                    defined.entry(domain).or_default().extend(accepted.ops);
+                }
+                registers.push(Register::new(accepted.source));
+            }
             Err(CompileError::Rejected(register)) => registers.push(register),
             Err(CompileError::Toolchain(m)) => {
                 return Err(format!(
@@ -175,33 +187,102 @@ fn check(root: &Path) -> Result<Vec<Register>, String> {
             }
         }
     }
-    Ok(registers)
+    // Only meaningful when every source was accepted: a refused source
+    // defines no ops as far as the front end is concerned, so every op it
+    // would have defined would be reported as "declared and not defined" —
+    // a second, wrong diagnosis stacked on the real one.
+    let mismatches = match registers.iter().all(|r| r.is_empty()) {
+        true => dialect::op_mismatches(root, &defined),
+        false => Vec::new(),
+    };
+    Ok(Verdicts {
+        registers,
+        mismatches,
+    })
+}
+
+/// Which domain a source belongs to — `domains/<d>/services/x.py` -> `<d>`.
+fn domain_of(root: &Path, source: &Path) -> Option<String> {
+    source
+        .strip_prefix(root)
+        .ok()?
+        .components()
+        .nth(1)
+        .map(|c| c.as_os_str().to_string_lossy().into_owned())
+}
+
+/// What one run of `forge check` found.
+#[derive(Debug, Default)]
+struct Verdicts {
+    /// One per dialect source, empty when the source was accepted.
+    registers: Vec<Register>,
+    /// Declared-vs-defined disagreements, across domains.
+    mismatches: Vec<dialect::OpMismatch>,
+}
+
+impl Verdicts {
+    fn is_empty(&self) -> bool {
+        self.registers.is_empty() && self.mismatches.is_empty()
+    }
+
+    fn refused(&self) -> usize {
+        self.registers.iter().filter(|r| !r.is_empty()).count()
+    }
+
+    /// Anything at all that should stop a build.
+    fn ok(&self) -> bool {
+        self.refused() == 0 && self.mismatches.is_empty()
+    }
 }
 
 /// The closing line a person reads.
-fn summary(registers: &[Register]) -> String {
-    let refused: Vec<&Register> = registers.iter().filter(|r| !r.is_empty()).collect();
-    let findings: usize = refused.iter().map(|r| r.rejections.len()).sum();
-    format!(
+fn summary(found: &Verdicts) -> String {
+    let refused = found.refused();
+    let findings: usize = found
+        .registers
+        .iter()
+        .filter(|r| !r.is_empty())
+        .map(|r| r.rejections.len())
+        .sum();
+    let mut line = format!(
         "{} source(s) checked, {} accepted, {} refused{}",
-        registers.len(),
-        registers.len() - refused.len(),
-        refused.len(),
+        found.registers.len(),
+        found.registers.len() - refused,
+        refused,
         match findings {
             0 => String::new(),
             n => format!(" ({n} finding(s))"),
         }
-    )
+    );
+    if !found.mismatches.is_empty() {
+        line.push_str(&format!(
+            "; {} declared/defined mismatch(es)",
+            found.mismatches.len()
+        ));
+    }
+    line
 }
 
 /// The whole run as one JSON document.
-fn envelope(root: &Path, registers: &[Register]) -> String {
+fn envelope(root: &Path, found: &Verdicts) -> String {
     let doc = serde_json::json!({
         "schema_version": CHECK_SCHEMA,
         "root": root.display().to_string(),
-        "accepted": registers.iter().filter(|r| r.is_empty()).count(),
-        "refused": registers.iter().filter(|r| !r.is_empty()).count(),
-        "sources": registers.iter().map(|r| r.to_json()).collect::<Vec<_>>(),
+        "accepted": found.registers.iter().filter(|r| r.is_empty()).count(),
+        "refused": found.refused(),
+        "sources": found.registers.iter().map(|r| r.to_json()).collect::<Vec<_>>(),
+        // Additive: a parser pinned to forge-check/1 ignores a key it does not
+        // know, and this one is empty on every workspace that has no
+        // disagreement.
+        "op_mismatches": found.mismatches.iter().map(|m| serde_json::json!({
+            "domain": m.domain,
+            "op": m.op,
+            "kind": match m.kind {
+                dialect::MismatchKind::DeclaredNotDefined => "declared_not_defined",
+                dialect::MismatchKind::DefinedNotDeclared => "defined_not_declared",
+            },
+            "message": m.render(),
+        })).collect::<Vec<_>>(),
     });
     serde_json::to_string_pretty(&doc).expect("the envelope is plain data")
 }
@@ -304,11 +385,12 @@ def hello(ctx: OpContext, input: Value) -> Greeting:
             ("domains/a/services/hello.py", ACCEPTED),
             ("domains/b/services/hello.py", REFUSED),
         ]);
-        let registers = match check(ws.path()) {
-            Ok(r) => r,
+        let found = match check(ws.path()) {
+            Ok(v) => v,
             Err(e) if skip_without_cpython(&e) => return,
             Err(e) => panic!("{e}"),
         };
+        let registers = &found.registers;
         // BOTH, not the first: a checker that stops at the first refusal makes
         // the author run it again to see the second one.
         assert_eq!(registers.len(), 2);
@@ -320,7 +402,7 @@ def hello(ctx: OpContext, input: Value) -> Greeting:
             registers[1].render()
         );
         assert_eq!(
-            summary(&registers),
+            summary(&found),
             "2 source(s) checked, 1 accepted, 1 refused (1 finding(s))"
         );
     }
@@ -333,13 +415,12 @@ def hello(ctx: OpContext, input: Value) -> Greeting:
             ("workspace.json", "{}"),
             ("domains/b/services/hello.py", REFUSED),
         ]);
-        let registers = match check(ws.path()) {
-            Ok(r) => r,
+        let found = match check(ws.path()) {
+            Ok(v) => v,
             Err(e) if skip_without_cpython(&e) => return,
             Err(e) => panic!("{e}"),
         };
-        let doc: serde_json::Value =
-            serde_json::from_str(&envelope(ws.path(), &registers)).unwrap();
+        let doc: serde_json::Value = serde_json::from_str(&envelope(ws.path(), &found)).unwrap();
         assert_eq!(doc["schema_version"], CHECK_SCHEMA);
         assert_eq!(doc["accepted"], 0);
         assert_eq!(doc["refused"], 1);
@@ -378,16 +459,138 @@ def count_tenants(ctx: OpContext, input: Value) -> Count:
             ("domains/a/schemas/tenants.table.json", TENANTS_TABLE),
             ("domains/b/services/count.py", READS_ANOTHER_DOMAINS_TABLE),
         ]);
-        let registers = match check(ws.path()) {
-            Ok(r) => r,
+        let found = match check(ws.path()) {
+            Ok(v) => v,
             Err(e) if skip_without_cpython(&e) => return,
             Err(e) => panic!("{e}"),
         };
+        let registers = &found.registers;
         assert_eq!(registers.len(), 1);
         assert!(
             registers[0].is_empty(),
             "a domain reading another domain's declared table must be accepted:\n{}",
             registers[0].render()
+        );
+    }
+    /// A domain can declare an op it never defines, or define one it never
+    /// declares, and until this nothing said so.
+    ///
+    /// Both directions are real and they fail differently. Declared-not-
+    /// defined puts a route in the contract that 404s when anyone calls it.
+    /// Defined-not-declared is worse in a quieter way: the op compiles,
+    /// deploys, and has no contract — so it is unreachable through the API and
+    /// absent from the generated SDK. Code that runs and cannot be called.
+    #[test]
+    fn a_domain_that_declares_and_defines_different_ops_is_refused() {
+        const HELLO: &str = r#"from dataclasses import dataclass
+
+from forge import OpContext, Value, op
+
+
+@dataclass
+class Greeting:
+    text: str
+
+
+@op("hello")
+def hello(ctx: OpContext, input: Value) -> Greeting:
+    return Greeting(text="hi")
+"#;
+        let ws = workspace(&[
+            ("workspace.json", "{}"),
+            ("domains/a/services/hello.py", HELLO),
+            // declares one op that exists nowhere, and omits the one that does
+            (
+                "domains/a/service.json",
+                r#"{"name":"a","domain":"a","operations":[{"name":"ghost"}]}"#,
+            ),
+        ]);
+        let found = match check(ws.path()) {
+            Ok(v) => v,
+            Err(e) if skip_without_cpython(&e) => return,
+            Err(e) => panic!("{e}"),
+        };
+        assert!(
+            found.registers.iter().all(|r| r.is_empty()),
+            "sources are fine"
+        );
+        assert!(!found.ok(), "a mismatch must stop the build");
+        let rendered: Vec<String> = found.mismatches.iter().map(|m| m.render()).collect();
+        assert_eq!(rendered.len(), 2, "{rendered:?}");
+        assert!(
+            rendered.iter().any(|r| r.contains("declares `ghost`")),
+            "{rendered:?}"
+        );
+        assert!(
+            rendered.iter().any(|r| r.contains("`hello` is defined")),
+            "{rendered:?}"
+        );
+    }
+
+    /// A domain whose declarations match is silent, and a domain with no
+    /// service.json at all is silent — "no declaration file" is not "declares
+    /// nothing", and treating it as the latter would refuse every workspace
+    /// mid-authoring.
+    #[test]
+    fn a_matching_domain_and_an_undeclared_one_are_both_quiet() {
+        const HELLO: &str = r#"from dataclasses import dataclass
+
+from forge import OpContext, Value, op
+
+
+@dataclass
+class Greeting:
+    text: str
+
+
+@op("hello")
+def hello(ctx: OpContext, input: Value) -> Greeting:
+    return Greeting(text="hi")
+"#;
+        let ws = workspace(&[
+            ("workspace.json", "{}"),
+            ("domains/a/services/hello.py", HELLO),
+            (
+                "domains/a/service.json",
+                r#"{"name":"a","domain":"a","operations":[{"name":"hello"}]}"#,
+            ),
+            // b has sources and no service.json — mid-authoring, not an error
+            ("domains/b/services/hello.py", HELLO),
+        ]);
+        let found = match check(ws.path()) {
+            Ok(v) => v,
+            Err(e) if skip_without_cpython(&e) => return,
+            Err(e) => panic!("{e}"),
+        };
+        assert!(found.mismatches.is_empty(), "{:?}", found.mismatches);
+        assert!(found.ok());
+    }
+
+    /// A refused source must not also be accused of not defining its ops.
+    ///
+    /// The front end returns no ops for a source it rejected, so every op that
+    /// source would have defined looks "declared and not defined" — a second,
+    /// wrong diagnosis stacked on the real one, pointing at the wrong file.
+    #[test]
+    fn a_refused_source_suppresses_the_mismatch_report() {
+        let ws = workspace(&[
+            ("workspace.json", "{}"),
+            ("domains/b/services/hello.py", REFUSED),
+            (
+                "domains/b/service.json",
+                r#"{"name":"b","domain":"b","operations":[{"name":"hello"}]}"#,
+            ),
+        ]);
+        let found = match check(ws.path()) {
+            Ok(v) => v,
+            Err(e) if skip_without_cpython(&e) => return,
+            Err(e) => panic!("{e}"),
+        };
+        assert_eq!(found.refused(), 1);
+        assert!(
+            found.mismatches.is_empty(),
+            "the refusal is the diagnosis; do not stack a wrong one on it: {:?}",
+            found.mismatches
         );
     }
 }
