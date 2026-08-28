@@ -15,7 +15,8 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{Result, bail};
 use forge_lang_rustgen::{
-    CompileError, CompileSpec, EMITTER_VERSION, Layout, Plants, Tables, compile_all,
+    CompileError, CompileSpec, Compiled, Defect, EMITTER_VERSION, Layout, Plants, Tables,
+    compile_all,
 };
 
 /// A dialect source's extension.
@@ -240,6 +241,10 @@ pub struct EmittedDomain {
     /// The crate's path relative to the workspace root, which is also its
     /// workspace-member path.
     pub member: String,
+    /// The crate as emitted, kept so a compile failure can be bundled without
+    /// re-rendering. Re-rendering would be a second emit, and a bundle whose
+    /// crate is not the one cargo choked on is evidence about nothing.
+    pub compiled: Compiled,
 }
 
 /// Transpile every dialect domain in the workspace to a crate beside its
@@ -279,7 +284,7 @@ pub fn emit(root: &Path) -> Result<Vec<EmittedDomain>> {
     let mut emitted = Vec::with_capacity(domains.len());
     for (dir, sources) in &domains {
         let name = domain_name(dir);
-        compile_all(
+        let compiled = compile_all(
             sources,
             tables.as_ref(),
             &CompileSpec {
@@ -307,6 +312,7 @@ pub fn emit(root: &Path) -> Result<Vec<EmittedDomain>> {
         emitted.push(EmittedDomain {
             name,
             member: format!("domains/{}", domain_name(dir)),
+            compiled,
         });
     }
 
@@ -394,6 +400,77 @@ fn refusal(domain: &str, e: CompileError) -> anyhow::Error {
              (the front end validates with CPython — is python3 on PATH?)"
         ),
     }
+}
+
+/// After a failed workspace build: is a dialect crate implicated, and if so,
+/// bundle it.
+///
+/// Returns `None` when nothing points at emitted code — a Rust workspace's
+/// build failure is the customer's Rust, and rustc's output is exactly what
+/// they need. Handing them a "this is our bug" message for their own type
+/// error would be worse than saying nothing.
+///
+/// The build that just failed streamed its output to the terminal, which is
+/// right for a long build and useless for a bundle. So the diagnostics are
+/// re-collected with `--message-format=json` — a second cargo run that costs
+/// nothing, because everything is already compiled or already failed and
+/// cargo replays the same errors from cache.
+pub fn report_defect(root: &Path, emitted: &[EmittedDomain]) -> Result<Option<String>> {
+    if emitted.is_empty() {
+        return Ok(None);
+    }
+    let out = std::process::Command::new("cargo")
+        .args([
+            "build",
+            "--release",
+            "--target",
+            "wasm32-wasip1",
+            "--message-format=json",
+        ])
+        .current_dir(root)
+        .output()?;
+    let diagnostics = String::from_utf8_lossy(&out.stdout);
+    if !forge_lang_rustgen::is_compile_defect(&diagnostics) {
+        // Cargo failed before compiling anything — an unresolvable dependency,
+        // a missing target. That is the build environment, not the emitter,
+        // and blaming ourselves for it teaches people to ignore the blame.
+        return Ok(None);
+    }
+
+    // Which emitted crates does cargo actually name? A workspace can hold Rust
+    // domains too, and their errors are theirs.
+    let mut reports = Vec::new();
+    for domain in emitted {
+        if !diagnostics.contains(&format!("{}/src/", domain.member)) {
+            continue;
+        }
+        let sources = sources_of(&root.join(&domain.member));
+        let path = Defect {
+            sources: &sources,
+            emitted: &domain.compiled.emitted,
+            crate_name: &domain.compiled.crate_name,
+            diagnostics: &diagnostics,
+        }
+        .write_report(&root.join(&domain.member))?;
+        reports.push((domain.name.clone(), path));
+    }
+    if reports.is_empty() {
+        return Ok(None);
+    }
+
+    let mut msg = String::from(
+        "the emitted crate(s) below do not compile.\n\n\
+         That is a forge-lang defect, not an error in your source — emitted Rust\n\
+         is compile-clean by construction for anything `forge check` accepts.\n\
+         There is nothing to change in your `.py`, and editing the generated\n\
+         crate will not help: the next build overwrites it.\n\n\
+         Report bundle(s) — each holds the source, the emitted crate, cargo's\n\
+         diagnostics verbatim, and the toolchain versions:\n",
+    );
+    for (domain, path) in &reports {
+        msg.push_str(&format!("  {domain}: {}\n", path.display()));
+    }
+    Ok(Some(msg))
 }
 
 #[cfg(test)]
@@ -577,6 +654,19 @@ def hello(ctx: OpContext, input: Value) -> Greeting:
         // And it was not rewritten.
         let root = std::fs::read_to_string(ws.path().join("Cargo.toml")).unwrap();
         assert_eq!(root, "[workspace]\nmembers = [\"crates/shared\"]\n");
+    }
+
+    /// A Rust-only workspace must never see the dialect's "this is our bug"
+    /// message.
+    ///
+    /// Its build failure is the customer's Rust, and rustc's output is exactly
+    /// what they need. Telling them a forge-lang defect caused their own type
+    /// error would be worse than saying nothing — and this returns before
+    /// spawning cargo at all, so it costs a Rust workspace nothing.
+    #[test]
+    fn a_workspace_with_no_emitted_crate_is_never_blamed_on_the_emitter() {
+        let ws = tree(&[("workspace.json", "{}")]);
+        assert!(report_defect(ws.path(), &[]).unwrap().is_none());
     }
 
     #[test]

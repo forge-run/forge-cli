@@ -243,7 +243,7 @@ pub(crate) fn compile_workspace_graph(root: &std::path::Path) -> Result<()> {
     // `wasm_modules` with their blake3, so committed-lock hash == R2 key ==
     // converge-verified hash. The matching Component bytes are uploaded to the
     // artifact store by the deploy/stage step (idempotent, content-addressed).
-    stamp_built_wasm_hashes(root, &graph, !dialect.is_empty())
+    stamp_built_wasm_hashes(root, &graph, &dialect)
         .context("stamping built-byte wasm hashes into forge.lock")?;
 
     println!("{}", root.join(".forge").display());
@@ -261,7 +261,7 @@ pub(crate) fn compile_workspace_graph(root: &std::path::Path) -> Result<()> {
 fn stamp_built_wasm_hashes(
     root: &std::path::Path,
     graph: &forge_web_build::WorkspaceGraph,
-    dialect: bool,
+    dialect: &[crate::dialect::EmittedDomain],
 ) -> Result<()> {
     use forge_web_build::ModuleKind;
 
@@ -301,6 +301,16 @@ fn stamp_built_wasm_hashes(
         .status()
         .with_context(|| "failed to spawn `cargo build` — is cargo on PATH?")?;
     if !status.success() {
+        // A dialect crate that does not compile is OUR defect, never the
+        // customer's source (forge-lang decision 3), and rustc's spans point
+        // into generated Rust — the more carefully they read it the further
+        // they get from anything they wrote. P4.5 built the answer as a report
+        // bundle and put the writer in forge-lang's LIBRARY precisely so this
+        // call site could use it; until now only `forge-lang build --verify`
+        // did, which is not the command a customer runs.
+        if let Some(report) = crate::dialect::report_defect(root, dialect)? {
+            anyhow::bail!("{report}");
+        }
         anyhow::bail!("cargo build (wasm32-wasip1) failed (exit {status})");
     }
 
@@ -363,7 +373,9 @@ fn stamp_built_wasm_hashes(
     // Only stamped for a workspace that HAS dialect sources: writing an
     // emitter version into the lock of a Rust-only workspace would claim a
     // relationship that does not exist, and would move a hash for nobody.
-    if dialect && let Some(obj) = doc.as_object_mut() {
+    if !dialect.is_empty()
+        && let Some(obj) = doc.as_object_mut()
+    {
         obj.insert(
             "emitter_version".to_string(),
             serde_json::Value::String(forge_lang_rustgen::EMITTER_VERSION.to_string()),
