@@ -848,6 +848,7 @@ dependencies = [
 name = "forge-lang-py"
 version = "0.1.0"
 dependencies = [
+ "forge-lang-tree",
  "ruff_python_ast",
  "ruff_python_parser",
  "ruff_text_size",
@@ -859,6 +860,13 @@ name = "forge-lang-rustgen"
 version = "0.1.0"
 dependencies = [
  "forge-lang-py",
+]
+
+[[package]]
+name = "forge-lang-tree"
+version = "0.1.0"
+dependencies = [
+ "serde_json",
 ]
 
 [[package]]
