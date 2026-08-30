@@ -343,6 +343,33 @@ def hello(ctx: OpContext, input: Value) -> Greeting:
         return Greeting(text="no")
 "#;
 
+    /// The same accepted op in the OTHER dialect spelling.
+    const ACCEPTED_TS: &str = r#"import { op, OpContext, Value } from "forge";
+
+interface Greeting {
+  text: string;
+}
+
+export const hello = op("hello", (ctx: OpContext, input: Value) => {
+  const g: Greeting = { text: "hi" };
+  return g;
+});
+"#;
+
+    /// `var` is FL1010 — outside the subset, and in the FL1000 band, which is
+    /// the half of this fixture that matters. See the test below.
+    const REFUSED_TS: &str = r#"import { op, OpContext, Value } from "forge";
+
+interface Greeting {
+  text: string;
+}
+
+export const hello = op("hello", (ctx: OpContext, input: Value) => {
+  var g: Greeting = { text: "hi" };
+  return g;
+});
+"#;
+
     fn workspace(files: &[(&str, &str)]) -> tempfile::TempDir {
         let dir = tempfile::tempdir().unwrap();
         for (path, body) in files {
@@ -405,6 +432,68 @@ def hello(ctx: OpContext, input: Value) -> Greeting:
         assert_eq!(
             summary(&found),
             "2 source(s) checked, 1 accepted, 1 refused (1 finding(s))"
+        );
+    }
+
+    /// A `.ts` source is read by the TS front half, and the register says so.
+    ///
+    /// Until P7.5-builders the pipeline ran the Python front end
+    /// unconditionally, so every `.ts` source in a workspace came back FL0001
+    /// SyntaxError — CPython reporting a grammar the file was never written
+    /// in. The CODE BAND is what lets this test assert which half ran rather
+    /// than merely that something passed: TS refusals are FL1xxx and the
+    /// Python half cannot emit one, so pinning the code pins the dispatch.
+    ///
+    /// No `skip_without_cpython` guard, and its absence is deliberate: the TS
+    /// front half runs no reference toolchain, so this holds on a machine
+    /// with no python3 at all.
+    #[test]
+    fn a_ts_source_is_checked_by_the_ts_front_half() {
+        let ws = workspace(&[
+            ("workspace.json", "{}"),
+            ("domains/a/services/hello.ts", ACCEPTED_TS),
+            ("domains/b/services/hello.ts", REFUSED_TS),
+        ]);
+        let found = check(ws.path()).unwrap_or_else(|e| panic!("{e}"));
+        let registers = &found.registers;
+        assert_eq!(registers.len(), 2);
+        assert!(
+            registers[0].is_empty(),
+            "domains/a should be accepted:\n{}",
+            registers[0].render()
+        );
+        let rendered = registers[1].render();
+        assert!(rendered.contains("FL1010"), "{rendered}");
+        assert!(
+            !rendered.contains("FL0001"),
+            "FL0001 is CPython's parse error, so the PYTHON front half read a \
+             .ts file:\n{rendered}"
+        );
+        assert_eq!(
+            summary(&found),
+            "2 source(s) checked, 1 accepted, 1 refused (1 finding(s))"
+        );
+    }
+
+    /// Both spellings in one workspace, checked in one pass.
+    #[test]
+    fn a_workspace_can_hold_both_spellings_at_once() {
+        let ws = workspace(&[
+            ("workspace.json", "{}"),
+            ("domains/a/services/hello.py", ACCEPTED),
+            ("domains/b/services/hello.ts", ACCEPTED_TS),
+        ]);
+        let found = match check(ws.path()) {
+            Ok(v) => v,
+            Err(e) if skip_without_cpython(&e) => return,
+            Err(e) => panic!("{e}"),
+        };
+        assert_eq!(found.registers.len(), 2);
+        assert!(found.ok(), "{}", summary(&found));
+        assert_eq!(
+            summary(&found),
+            // No findings clause: `summary` omits it when there are none.
+            "2 source(s) checked, 2 accepted, 0 refused"
         );
     }
 
