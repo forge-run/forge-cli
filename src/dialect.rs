@@ -16,11 +16,8 @@ use std::path::{Path, PathBuf};
 use anyhow::{Result, bail};
 use forge_lang_rustgen::{
     CompileError, CompileSpec, Compiled, Defect, EMITTER_VERSION, Layout, Plants, Tables,
-    compile_all,
+    compile_all, lang_of,
 };
-
-/// A dialect source's extension.
-pub const DIALECT_SUFFIX: &str = "py";
 
 /// The reference directory a workspace keeps runtime-owned table schemas in.
 ///
@@ -41,7 +38,7 @@ pub const DEPS_DIR: &str = ".forge-deps";
 
 /// Every dialect source in the workspace, sorted.
 ///
-/// `domains/<d>/services/*.py` and nothing deeper: a `.py` under a
+/// `domains/<d>/services/*` and nothing deeper: a source under a
 /// subdirectory of `services/` is not an op module, and treating it as one
 /// would check — and later emit — a crate the author did not ask for.
 pub fn sources(root: &Path) -> Vec<PathBuf> {
@@ -55,6 +52,13 @@ pub fn sources(root: &Path) -> Vec<PathBuf> {
 
 /// One domain's dialect sources, sorted — so the emitted crate is a function
 /// of the tree and not of a directory read order.
+///
+/// WHICH extensions count is [`forge_lang_rustgen::lang_of`]'s answer and not
+/// this file's. It used to be a `DIALECT_SUFFIX` constant here, which was a
+/// second copy of a map the toolchain already owned: the day forge-lang grew
+/// a second front half, a checker that had not been told would walk past
+/// every source of the new language and report a workspace with nothing in
+/// it. Discovery and dispatch have to agree, so they read one function.
 pub fn sources_of(domain: &Path) -> Vec<PathBuf> {
     let Ok(entries) = std::fs::read_dir(domain.join("services")) else {
         return Vec::new();
@@ -62,7 +66,7 @@ pub fn sources_of(domain: &Path) -> Vec<PathBuf> {
     let mut found: Vec<PathBuf> = entries
         .flatten()
         .map(|e| e.path())
-        .filter(|p| p.is_file() && p.extension().is_some_and(|e| e == DIALECT_SUFFIX))
+        .filter(|p| p.is_file() && lang_of(p).is_some())
         .collect();
     found.sort();
     found
@@ -551,6 +555,24 @@ def hello(ctx: OpContext, input: Value) -> Greeting:
     return Greeting(text="hi")
 "#;
 
+    /// The same op in the OTHER dialect spelling.
+    ///
+    /// Deliberately the TS twin of `ACCEPTED` rather than a wider fixture:
+    /// what these tests hold is that discovery and emission read a `.ts`
+    /// source at all, and a fixture that also exercised the checker would
+    /// fail for two reasons and be diagnosed for one.
+    const ACCEPTED_TS: &str = r#"import { op, OpContext, Value } from "forge";
+
+interface Greeting {
+  text: string;
+}
+
+export const hello = op("hello", (ctx: OpContext, input: Value) => {
+  const g: Greeting = { text: "hi" };
+  return g;
+});
+"#;
+
     fn tree(files: &[(&str, &str)]) -> tempfile::TempDir {
         let dir = tempfile::tempdir().unwrap();
         for (path, body) in files {
@@ -612,6 +634,86 @@ def hello(ctx: OpContext, input: Value) -> Greeting:
         assert!(
             root.contains(&format!("exclude = [\"{DEPS_DIR}\"]")),
             "{root}"
+        );
+    }
+
+    /// The TS twin of the test above, asserting the same things.
+    ///
+    /// One builder, two spellings: a `.ts` source has to be discovered,
+    /// checked and emitted through exactly the path a `.py` source takes,
+    /// because the crate that comes out the other end is the same crate.
+    /// Before P7.5-builders discovery was gated on `.py` alone, so this tree
+    /// emitted nothing — and `forge wasm-build` then went looking for
+    /// `forge-domain-greetings`'s wasm (forge-web already counts a `.ts`
+    /// service as a wasm module) and died reading an artifact that was never
+    /// produced, naming a path under `target/` rather than the customer's
+    /// file.
+    ///
+    /// No `skip_without_cpython` here, and that is not an omission: the TS
+    /// front half runs no reference toolchain, so this arm holds on a machine
+    /// with no python3 at all.
+    #[test]
+    fn emitting_a_ts_domain_writes_a_member_crate_and_a_root_manifest() {
+        let ws = tree(&[
+            ("workspace.json", "{}"),
+            ("domains/greetings/services/hello.ts", ACCEPTED_TS),
+        ]);
+        let emitted = emit(ws.path()).unwrap_or_else(|e| panic!("{e:#}"));
+        assert_eq!(emitted.len(), 1);
+        assert_eq!(emitted[0].name, "greetings");
+        assert_eq!(emitted[0].member, "domains/greetings");
+
+        let member =
+            std::fs::read_to_string(ws.path().join("domains/greetings/Cargo.toml")).unwrap();
+        assert!(
+            member.contains("name = \"forge-domain-greetings\""),
+            "{member}"
+        );
+        assert!(
+            !member.contains("[workspace]"),
+            "an emitted domain must be a workspace MEMBER:\n{member}"
+        );
+        assert!(ws.path().join("domains/greetings/src/lib.rs").is_file());
+        // The dialect source is still the source of truth, beside its output.
+        assert!(
+            ws.path()
+                .join("domains/greetings/services/hello.ts")
+                .is_file()
+        );
+
+        let root = std::fs::read_to_string(ws.path().join("Cargo.toml")).unwrap();
+        assert!(root.contains("members = [\"domains/greetings\"]"), "{root}");
+        assert!(
+            root.contains(&format!("exclude = [\"{DEPS_DIR}\"]")),
+            "{root}"
+        );
+    }
+
+    /// Discovery finds both spellings under one domain, and sorts them.
+    ///
+    /// The two-source case is where a domain's crate is emitted from several
+    /// modules, so a discovery that found only one of the two would emit a
+    /// crate missing half its ops rather than failing.
+    #[test]
+    fn discovery_finds_both_spellings_and_nothing_else() {
+        let ws = tree(&[
+            ("workspace.json", "{}"),
+            ("domains/greetings/services/hello.ts", ACCEPTED_TS),
+            ("domains/greetings/services/aloha.py", ACCEPTED),
+            ("domains/greetings/services/README.md", "notes"),
+            ("domains/greetings/services/ops.rs", "// rust"),
+            ("domains/greetings/services/nested/deep.py", ACCEPTED),
+        ]);
+        let found: Vec<String> = sources(ws.path())
+            .iter()
+            .map(|p| p.strip_prefix(ws.path()).unwrap().display().to_string())
+            .collect();
+        assert_eq!(
+            found,
+            vec![
+                "domains/greetings/services/aloha.py",
+                "domains/greetings/services/hello.ts",
+            ]
         );
     }
 

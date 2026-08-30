@@ -860,6 +860,8 @@ name = "forge-lang-rustgen"
 version = "0.1.0"
 dependencies = [
  "forge-lang-py",
+ "forge-lang-tree",
+ "forge-lang-ts",
 ]
 
 [[package]]
@@ -867,6 +869,17 @@ name = "forge-lang-tree"
 version = "0.1.0"
 dependencies = [
  "serde_json",
+]
+
+[[package]]
+name = "forge-lang-ts"
+version = "0.1.0"
+dependencies = [
+ "forge-lang-tree",
+ "oxc_allocator",
+ "oxc_ast",
+ "oxc_parser",
+ "oxc_span",
 ]
 
 [[package]]

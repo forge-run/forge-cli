@@ -94,7 +94,8 @@ pub fn run(args: CheckArgs) -> Result<()> {
         match json {
             true => println!("{}", envelope(&root, &found)),
             false => eprintln!(
-                "no dialect sources under {}/domains/*/services/*.py — nothing to check",
+                "no dialect sources under {}/domains/*/services/ — nothing to check \
+                 (a dialect source is a .py or a .ts file)",
                 root.display()
             ),
         }

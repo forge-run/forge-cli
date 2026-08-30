@@ -98,10 +98,10 @@ enum Cmd {
     Sdk(cmd::sdk::SdkCmd),
 
     /// Check the workspace's authored sources without building anything.
-    /// Today that is the annotated-Python dialect: every
-    /// `domains/<d>/services/*.py` goes through the front end with the
-    /// workspace's table schemas loaded, and any refusal exits non-zero.
-    /// `--format json` prints the versioned diagnostics envelope.
+    /// Today that is the dialect, in either of its two spellings: every
+    /// `domains/<d>/services/*.py` and `*.ts` goes through its own front end
+    /// with the workspace's table schemas loaded, and any refusal exits
+    /// non-zero. `--format json` prints the versioned diagnostics envelope.
     Check(cmd::check::CheckArgs),
 
     /// Compile the workspace graph to WebAssembly Components, stamp their
