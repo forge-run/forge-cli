@@ -21,12 +21,12 @@ jobs:
         with:
           fetch-depth: 0
           path: forge-cli
-      - name: Checkout harness machinery (fa7c6d2)
+      - name: Checkout harness machinery (c955aec)
         uses: actions/checkout@v4
         with:
           repository: forge-run/forge-sdlc-harness
           path: forge-sdlc-harness
-          ref: fa7c6d238bd82b5fce3665311bdd23fd3dc64ca9
+          ref: c955aec2d87b111f7982c12d3f70b0786340dfd5
           clean: true
           token: ${{ secrets.FORGE_CROSS_REPO_TOKEN }}
       - name: Checkout forge-sdk-v2
@@ -76,6 +76,11 @@ jobs:
       - name: Emitted artifacts match the lockfile (drift gate)
         working-directory: forge-cli
         run: python3 "$GITHUB_WORKSPACE/forge-sdlc-harness/core/runner/runner.py" self-check
+      # node/npx for any gate whose reference toolchain needs it (D1),
+      # and for the secret-gated verifiers below. Must precede the gate step.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
       - name: Run harness gates (structural twin of session gates)
         working-directory: forge-cli
         run: |
@@ -88,9 +93,6 @@ jobs:
           python3 "$GITHUB_WORKSPACE/forge-sdlc-harness/core/runner/runner.py" all --diff-base "$BASE"
       # LLM verifiers: dormant until the ANTHROPIC_API_KEY org secret
       # exists — adding it is the only activation step (D-013/D-017).
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
       - name: Pre-review verifiers (secret-gated)
         working-directory: forge-cli
         env:
