@@ -44,10 +44,25 @@ pub const DEPS_DIR: &str = ".forge-deps";
 pub fn sources(root: &Path) -> Vec<PathBuf> {
     let mut found: Vec<PathBuf> = Vec::new();
     for domain in domains(root) {
-        found.extend(sources_of(&domain));
+        found.extend(sources_of_in(&domain, rust_is_dialect(root)));
     }
     found.sort();
     found
+}
+
+/// Whether `.rs` counts as a dialect source in THIS workspace.
+///
+/// P10.7 gave `lang_of` a Rust arm, and that collides head-on with the
+/// raw-Rust layout: the portal's hand-written ops live at exactly
+/// `domains/<d>/services/ops.rs`. The tie-break is the WORKSPACE'S ROUTE,
+/// not the file: a tree that opted into the interpreted tier
+/// (`.forge-interpret` at its root) reads `.rs` as the Rust DIALECT; an
+/// unmarked workspace keeps the raw meaning and must not notice the
+/// dialect exists (`a_rust_only_workspace_is_left_exactly_as_it_was`).
+/// The server half applies the same rule over a pushed tree
+/// (`forge-control-plane`'s `dialect::rust_is_dialect`).
+pub fn rust_is_dialect(root: &Path) -> bool {
+    root.join(".forge-interpret").is_file()
 }
 
 /// One domain's dialect sources, sorted — so the emitted crate is a function
@@ -60,13 +75,31 @@ pub fn sources(root: &Path) -> Vec<PathBuf> {
 /// every source of the new language and report a workspace with nothing in
 /// it. Discovery and dispatch have to agree, so they read one function.
 pub fn sources_of(domain: &Path) -> Vec<PathBuf> {
+    // The domain's parent's parent is the workspace root
+    // (`<root>/domains/<d>`), which is where the Rust ruling lives.
+    let rust_dialect = domain
+        .parent()
+        .and_then(|p| p.parent())
+        .map(rust_is_dialect)
+        .unwrap_or(false);
+    sources_of_in(domain, rust_dialect)
+}
+
+fn sources_of_in(domain: &Path, rust_dialect: bool) -> Vec<PathBuf> {
     let Ok(entries) = std::fs::read_dir(domain.join("services")) else {
         return Vec::new();
     };
     let mut found: Vec<PathBuf> = entries
         .flatten()
         .map(|e| e.path())
-        .filter(|p| p.is_file() && lang_of(p).is_some())
+        .filter(|p| {
+            p.is_file()
+                && match lang_of(p) {
+                    Some(forge_lang_rustgen::Lang::Rust) => rust_dialect,
+                    Some(_) => true,
+                    None => false,
+                }
+        })
         .collect();
     found.sort();
     found
@@ -799,6 +832,30 @@ public final class Hello {
     /// dialect exists. No crate, no generated manifest, no lock field — the
     /// same bar P5.4's control test set for the workspace compiler, which
     /// proved a Rust-only tree gets no phantom redeploy.
+    /// The positive twin of the two pins around it: a workspace that opted
+    /// into the interpreted tier reads `.rs` as the Rust DIALECT (P10.7's
+    /// tie-break — the route decides, not the extension).
+    #[test]
+    fn a_marked_workspace_reads_rs_as_the_rust_dialect() {
+        let ws = tree(&[
+            ("workspace.json", "{}"),
+            (".forge-interpret", "1"),
+            ("domains/greetings/services/aloha.py", ACCEPTED),
+            ("domains/greetings/services/ops.rs", "// dialect rust"),
+        ]);
+        let found: Vec<String> = sources(ws.path())
+            .iter()
+            .map(|p| p.strip_prefix(ws.path()).unwrap().display().to_string())
+            .collect();
+        assert_eq!(
+            found,
+            vec![
+                "domains/greetings/services/aloha.py",
+                "domains/greetings/services/ops.rs",
+            ]
+        );
+    }
+
     #[test]
     fn a_rust_only_workspace_is_left_exactly_as_it_was() {
         let ws = tree(&[
