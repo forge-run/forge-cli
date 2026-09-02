@@ -845,6 +845,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "forge-lang-java"
+version = "0.1.0"
+dependencies = [
+ "forge-lang-tree",
+ "serde_json",
+]
+
+[[package]]
 name = "forge-lang-py"
 version = "0.1.0"
 dependencies = [
@@ -859,6 +867,7 @@ dependencies = [
 name = "forge-lang-rustgen"
 version = "0.1.0"
 dependencies = [
+ "forge-lang-java",
  "forge-lang-py",
  "forge-lang-tree",
  "forge-lang-ts",
