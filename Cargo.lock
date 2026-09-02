@@ -864,11 +864,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "forge-lang-rust"
+version = "0.1.0"
+dependencies = [
+ "forge-lang-tree",
+ "proc-macro2",
+ "serde_json",
+ "syn 2.0.117",
+ "tempfile",
+]
+
+[[package]]
 name = "forge-lang-rustgen"
 version = "0.1.0"
 dependencies = [
  "forge-lang-java",
  "forge-lang-py",
+ "forge-lang-rust",
  "forge-lang-tree",
  "forge-lang-ts",
 ]
