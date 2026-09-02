@@ -573,6 +573,27 @@ export const hello = op("hello", (ctx: OpContext, input: Value) => {
 });
 "#;
 
+    /// And the THIRD spelling (P6.6).
+    ///
+    /// Same narrowness as the TS twin above and for the same reason. The
+    /// Java shape differs from both neighbours where the language forces it:
+    /// the public type's name is the file's, the op keeps its snake_case
+    /// name rather than taking the class's casing, and the output shape is a
+    /// `record` because the dialect has no dataclass and no interface here.
+    const ACCEPTED_JAVA: &str = r#"import forge.Op;
+import forge.OpContext;
+import forge.Value;
+
+public final class Hello {
+    public record Greeting(String text) {}
+
+    @Op("hello")
+    public static Greeting hello(OpContext ctx, Value input) {
+        return new Greeting("hi");
+    }
+}
+"#;
+
     fn tree(files: &[(&str, &str)]) -> tempfile::TempDir {
         let dir = tempfile::tempdir().unwrap();
         for (path, body) in files {
@@ -689,17 +710,73 @@ export const hello = op("hello", (ctx: OpContext, input: Value) => {
         );
     }
 
-    /// Discovery finds both spellings under one domain, and sorts them.
+    /// The Java twin, asserting the same things (P6.6).
     ///
-    /// The two-source case is where a domain's crate is emitted from several
-    /// modules, so a discovery that found only one of the two would emit a
-    /// crate missing half its ops rather than failing.
+    /// One builder, three spellings now. The crate that comes out is the same
+    /// crate whichever front half read the source, and this is where that is
+    /// either true or visibly false — the emitted member is
+    /// `forge-domain-greetings` from a `.java` source exactly as from a `.py`
+    /// one, and the Java file stays beside its output as the source of truth.
+    ///
+    /// Unlike the TS twin this one DOES need a toolchain: javac is the Java
+    /// front half's parser, so a machine with no JDK cannot read the source.
+    /// That answers a named toolchain fault rather than a rejection, and this
+    /// test fails loudly on such a machine rather than skipping — "could not
+    /// run" is not "ran and was fine".
     #[test]
-    fn discovery_finds_both_spellings_and_nothing_else() {
+    fn emitting_a_java_domain_writes_a_member_crate_and_a_root_manifest() {
+        let ws = tree(&[
+            ("workspace.json", "{}"),
+            ("domains/greetings/services/Hello.java", ACCEPTED_JAVA),
+        ]);
+        let emitted = emit(ws.path()).unwrap_or_else(|e| panic!("{e:#}"));
+        assert_eq!(emitted.len(), 1);
+        assert_eq!(emitted[0].name, "greetings");
+        assert_eq!(emitted[0].member, "domains/greetings");
+
+        let member =
+            std::fs::read_to_string(ws.path().join("domains/greetings/Cargo.toml")).unwrap();
+        assert!(
+            member.contains("name = \"forge-domain-greetings\""),
+            "{member}"
+        );
+        assert!(
+            !member.contains("[workspace]"),
+            "an emitted domain must be a workspace MEMBER:\n{member}"
+        );
+        assert!(ws.path().join("domains/greetings/src/lib.rs").is_file());
+        assert!(
+            ws.path()
+                .join("domains/greetings/services/Hello.java")
+                .is_file()
+        );
+
+        let root = std::fs::read_to_string(ws.path().join("Cargo.toml")).unwrap();
+        assert!(root.contains("members = [\"domains/greetings\"]"), "{root}");
+        assert!(
+            root.contains(&format!("exclude = [\"{DEPS_DIR}\"]")),
+            "{root}"
+        );
+    }
+
+    /// Discovery finds all THREE spellings under one domain, and sorts them.
+    ///
+    /// The multi-source case is where a domain's crate is emitted from
+    /// several modules, so a discovery that found only some of them would
+    /// emit a crate missing part of its ops rather than failing. The three
+    /// non-sources beside them are the control: discovery is `lang_of`, not
+    /// "every file under services/".
+    #[test]
+    fn discovery_finds_all_three_spellings_and_nothing_else() {
         let ws = tree(&[
             ("workspace.json", "{}"),
             ("domains/greetings/services/hello.ts", ACCEPTED_TS),
             ("domains/greetings/services/aloha.py", ACCEPTED),
+            // A stub rather than ACCEPTED_JAVA on purpose: discovery is
+            // `lang_of` over an extension and parses nothing, and a public
+            // Java class whose name did not match this file would be a javac
+            // error the moment anything DID parse it.
+            ("domains/greetings/services/Namaste.java", "// java"),
             ("domains/greetings/services/README.md", "notes"),
             ("domains/greetings/services/ops.rs", "// rust"),
             ("domains/greetings/services/nested/deep.py", ACCEPTED),
@@ -711,6 +788,7 @@ export const hello = op("hello", (ctx: OpContext, input: Value) => {
         assert_eq!(
             found,
             vec![
+                "domains/greetings/services/Namaste.java",
                 "domains/greetings/services/aloha.py",
                 "domains/greetings/services/hello.ts",
             ]
