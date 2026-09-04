@@ -119,6 +119,142 @@ pub fn domains(root: &Path) -> Vec<PathBuf> {
     dirs
 }
 
+// PLATFORM_BUNDLE + PLATFORM_BUNDLE_SOURCE — the runtime-owned table
+// schemas, embedded at build time from the canonical path in forge-runtime
+// (`build.rs`). The checker needs them because 26 of the 27 tables the
+// dogfood ops read — and 9 of the portal's — belong to the runtime, and the
+// compiled snapshot pins them by ref instead of by tree copies.
+include!(concat!(env!("OUT_DIR"), "/platform_bundle.gen.rs"));
+
+/// Every authored schema input, tree-relative path (forward slashes) → file
+/// path. ONE enumeration for `forge schema compile`, its `--check`, and the
+/// stale-snapshot verifier — the three cannot disagree about what counts.
+pub fn authored_schema_files(root: &Path) -> Vec<(String, PathBuf)> {
+    let mut found = Vec::new();
+    for domain in domains(root) {
+        let dir = domain.join("schemas");
+        let Ok(entries) = std::fs::read_dir(&dir) else {
+            continue;
+        };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if !path
+                .file_name()
+                .map(|n| n.to_string_lossy().ends_with(".table.json"))
+                .unwrap_or(false)
+            {
+                continue;
+            }
+            let rel = path
+                .strip_prefix(root)
+                .unwrap_or(&path)
+                .components()
+                .map(|c| c.as_os_str().to_string_lossy())
+                .collect::<Vec<_>>()
+                .join("/");
+            found.push((rel, path));
+        }
+    }
+    found.sort();
+    found
+}
+
+pub fn sha256(bytes: &[u8]) -> String {
+    use sha2::Digest;
+    let mut h = sha2::Sha256::new();
+    h.update(bytes);
+    format!("sha256:{:x}", h.finalize())
+}
+
+/// The embedded bundle's pin: sha256 over `name:sha256(file)\n` lines in
+/// file order (already sorted by `build.rs`).
+pub fn bundle_hash() -> String {
+    let mut lines = String::new();
+    for (name, text) in PLATFORM_BUNDLE {
+        lines.push_str(name);
+        lines.push(':');
+        lines.push_str(&sha256(text.as_bytes()));
+        lines.push('\n');
+    }
+    sha256(lines.as_bytes())
+}
+
+/// Verify a loaded snapshot against the tree it sits in: every authored
+/// input still present with the recorded hash, no authored schema the
+/// snapshot has never seen, and the bundle pin matching what THIS build
+/// embeds. `Err` is the drift diagnosis, ready to print.
+pub fn verify_snapshot(root: &Path, snap: &forge_lang_rustgen::Snapshot) -> Result<(), String> {
+    let mut stale: Vec<String> = Vec::new();
+    let mut seen: std::collections::BTreeMap<String, String> = Default::default();
+    for (rel, path) in authored_schema_files(root) {
+        match std::fs::read(&path) {
+            Ok(bytes) => {
+                seen.insert(rel, sha256(&bytes));
+            }
+            Err(_) => stale.push(format!("{rel}: unreadable")),
+        }
+    }
+    for (rel, hash) in &seen {
+        match snap.authored.get(rel) {
+            None => stale.push(format!("{rel}: not in the snapshot")),
+            Some(recorded) if recorded != hash => {
+                stale.push(format!("{rel}: changed since the snapshot"))
+            }
+            Some(_) => {}
+        }
+    }
+    for rel in snap.authored.keys() {
+        if !seen.contains_key(rel) {
+            stale.push(format!("{rel}: in the snapshot, not in the tree"));
+        }
+    }
+    if snap.bundle_hash.as_deref() != Some(bundle_hash().as_str()) {
+        stale.push(format!(
+            "platform bundle: snapshot pins {}, this build embeds {} (from {})",
+            snap.bundle_hash.as_deref().unwrap_or("nothing"),
+            bundle_hash(),
+            PLATFORM_BUNDLE_SOURCE,
+        ));
+    }
+    if stale.is_empty() {
+        return Ok(());
+    }
+    Err(format!(
+        "{} is stale — run `forge schema compile` and commit the result:\n  {}",
+        forge_lang_rustgen::SNAPSHOT_FILE,
+        stale.join("\n  ")
+    ))
+}
+
+/// The table schemas rule zero judges against, snapshot-first.
+///
+/// A workspace with a committed `schema.lock` is judged against THAT — the
+/// compiled schema the converge applies, system fields and the runtime-owned
+/// set included — after verifying it is not stale (a stale snapshot is a
+/// toolchain error naming the fix, never a silently wrong verdict). A
+/// workspace without one keeps the directory walk ([`schema_roots`])
+/// unchanged. Returns the tables and, for a snapshot, its content hash — so
+/// `forge check` can name the schema it judged against.
+pub fn workspace_tables(root: &Path) -> Result<(Option<Tables>, Option<String>), String> {
+    let lock_path = root.join(forge_lang_rustgen::SNAPSHOT_FILE);
+    if lock_path.is_file() {
+        let text = std::fs::read_to_string(&lock_path)
+            .map_err(|e| format!("cannot read {}: {e}", lock_path.display()))?;
+        let snap = forge_lang_rustgen::Snapshot::parse(&text, forge_lang_rustgen::SNAPSHOT_FILE)?;
+        verify_snapshot(root, &snap)?;
+        return Ok((Some(snap.tables), Some(snap.content_hash)));
+    }
+    let schema_dirs = schema_roots(root);
+    let tables = match schema_dirs.is_empty() {
+        true => None,
+        false => Some(
+            Tables::load(&schema_dirs)
+                .map_err(|e| format!("cannot load the workspace's table schemas: {e}"))?,
+        ),
+    };
+    Ok((tables, None))
+}
+
 /// The directories rule zero loads table schemas from.
 ///
 /// MEASURED, not chosen. With only its own domain's schemas plus the platform
@@ -230,13 +366,20 @@ pub fn op_mismatches(root: &Path, defined: &BTreeMap<String, Vec<String>>) -> Ve
         let Some(declared) = declared_ops(&dir) else {
             continue; // no service.json authored yet
         };
-        for op in &declared {
-            if !defined_here.contains(op) {
-                out.push(OpMismatch {
-                    domain: name.clone(),
-                    op: op.clone(),
-                    kind: MismatchKind::DeclaredNotDefined,
-                });
+        // In a MIXED domain (J-5 rung 2) the hand-written host crate defines
+        // every op the dialect does not — declared-but-undefined is its
+        // normal state and not a 404. The reverse direction still holds:
+        // a dialect op the manifest does not declare is unreachable.
+        let mixed = dir.join("services/lib.rs").is_file();
+        if !mixed {
+            for op in &declared {
+                if !defined_here.contains(op) {
+                    out.push(OpMismatch {
+                        domain: name.clone(),
+                        op: op.clone(),
+                        kind: MismatchKind::DeclaredNotDefined,
+                    });
+                }
             }
         }
         for op in defined_here {
@@ -287,6 +430,11 @@ pub struct EmittedDomain {
     /// still names loudly.
     pub compiled: Option<Compiled>,
     /// The emitted module's op roster (module mode). `None` in crate mode.
+    /// The mixed-domain emit result. Nothing consumes it yet — the emit's
+    /// side effect (the `services/jgen` module on disk) is what the build
+    /// picks up — but the defect report should learn mixed domains
+    /// (J-5 follow-up), and this is the value it will read.
+    #[allow(dead_code)]
     pub module: Option<forge_lang_rustgen::CompiledModule>,
 }
 
@@ -315,14 +463,9 @@ pub fn emit(root: &Path) -> Result<Vec<EmittedDomain>> {
         return Ok(Vec::new());
     }
 
-    let schema_dirs = schema_roots(root);
-    let tables = match schema_dirs.is_empty() {
-        true => None,
-        false => Some(
-            Tables::load(&schema_dirs)
-                .map_err(|e| anyhow::anyhow!("cannot load the workspace's table schemas: {e}"))?,
-        ),
-    };
+    // Snapshot-first, same as `forge check` — the two must give the same
+    // answers, and the snapshot is now one of the answers.
+    let (tables, _snapshot_hash) = workspace_tables(root).map_err(|e| anyhow::anyhow!("{e}"))?;
 
     let mut emitted = Vec::with_capacity(domains.len());
     for (dir, sources) in &domains {

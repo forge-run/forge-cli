@@ -105,6 +105,13 @@ enum Cmd {
     /// envelope.
     Check(cmd::check::CheckArgs),
 
+    /// The workspace's compiled schema: `forge schema compile` writes
+    /// `schema.lock` (authored tables + the runtime-owned bundle + archetype
+    /// system columns, resolved and content-addressed); `--check` is the
+    /// drift gate.
+    #[command(subcommand)]
+    Schema(cmd::schema::SchemaCmd),
+
     /// Compile the workspace graph to WebAssembly Components, stamp their
     /// blake3 hashes into `forge.lock`, and persist the Components to
     /// `.forge/artifacts/` for `forge wasm-upload` to stage. (Was `forge build`.)
@@ -254,6 +261,13 @@ async fn main() -> Result<()> {
             cmd::sdk::run(s, &client).await
         }
         Cmd::Check(args) => cmd::check::run(args),
+        Cmd::Schema(cmd) => {
+            cmd::schema::run(cmd, || {
+                let cfg = config::resolve(cli.base_url, cli.token, cli.profile)?;
+                client::ForgeClient::new(cfg)
+            })
+            .await
+        }
         Cmd::WasmBuild(b) => {
             // `wasm-build` doesn't talk to the network — it shells out
             // to cargo. Skip the config + client construction.

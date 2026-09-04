@@ -38,7 +38,7 @@ use std::path::{Path, PathBuf};
 
 use anyhow::Result;
 use clap::Args;
-use forge_lang_rustgen::{CompileError, Register, Tables, check_only};
+use forge_lang_rustgen::{CompileError, Register, check_only};
 
 use crate::dialect;
 
@@ -50,7 +50,7 @@ use crate::dialect;
 /// exists only because a workspace has many sources and that envelope has one
 /// `path`. Additive-only, and the `N` bumps when a field is added
 /// (`forge-lang/REJECTIONS.md`, the machine-envelope section).
-const CHECK_SCHEMA: &str = "forge-check/1";
+const CHECK_SCHEMA: &str = "forge-check/2";
 
 /// This machine could not do its job — the toolchain exit code, distinct from
 /// a refusal so a CI step can tell "your source is wrong" from "my runner is".
@@ -144,17 +144,12 @@ fn check(root: &Path) -> Result<Verdicts, String> {
         return Ok(Verdicts::default());
     }
 
-    let schema_dirs = dialect::schema_roots(root);
-    let tables = match schema_dirs.is_empty() {
-        // Rule zero is off when a workspace declares nothing, exactly as
-        // `forge-lang build` without `--schemas`: the schemas ADD checking,
-        // their absence never changes what is accepted.
-        true => None,
-        false => Some(
-            Tables::load(&schema_dirs)
-                .map_err(|e| format!("cannot load the workspace's table schemas: {e}"))?,
-        ),
-    };
+    // Snapshot-first: a workspace with a committed `schema.lock` is judged
+    // against the compiled schema the converge applies — system fields and
+    // the runtime-owned set included — after a staleness check. A workspace
+    // without one keeps the directory walk; rule zero stays off when a
+    // workspace declares nothing at all.
+    let (tables, schema) = dialect::workspace_tables(root)?;
 
     // Every source is checked. Stopping at the first refusal would make a
     // second run necessary to see the second problem, which is the round trip
@@ -199,6 +194,7 @@ fn check(root: &Path) -> Result<Verdicts, String> {
     Ok(Verdicts {
         registers,
         mismatches,
+        schema,
     })
 }
 
@@ -219,6 +215,11 @@ struct Verdicts {
     registers: Vec<Register>,
     /// Declared-vs-defined disagreements, across domains.
     mismatches: Vec<dialect::OpMismatch>,
+    /// The compiled snapshot's content hash when the workspace was judged
+    /// against a `schema.lock` — named in the output so a verdict can be
+    /// tied to the exact schema it was made under. `None` on the
+    /// directory-walk path.
+    schema: Option<String>,
 }
 
 impl Verdicts {
@@ -261,6 +262,9 @@ fn summary(found: &Verdicts) -> String {
             found.mismatches.len()
         ));
     }
+    if let Some(hash) = &found.schema {
+        line.push_str(&format!(" — judged against schema.lock {hash}"));
+    }
     line
 }
 
@@ -275,6 +279,9 @@ fn envelope(root: &Path, found: &Verdicts) -> String {
         // Additive: a parser pinned to forge-check/1 ignores a key it does not
         // know, and this one is empty on every workspace that has no
         // disagreement.
+        // forge-check/2: which schema the verdicts were made under — the
+        // compiled snapshot's content hash, or null on the directory walk.
+        "schema_lock": found.schema,
         "op_mismatches": found.mismatches.iter().map(|m| serde_json::json!({
             "domain": m.domain,
             "op": m.op,

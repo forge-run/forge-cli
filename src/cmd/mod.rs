@@ -17,6 +17,7 @@ pub mod new;
 pub mod pages;
 pub mod pull;
 pub mod push;
+pub mod schema;
 pub mod sdk;
 pub mod secrets;
 pub mod ship;

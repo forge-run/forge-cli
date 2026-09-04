@@ -48,6 +48,14 @@ forge-schema = { path = "../forge-schema" }
 # forge-types workspace so forge-git (control-plane) derives a byte-identical
 # manifest from the same code — parity by construction, not by re-test.
 forge-manifest = { path = "../forge-types/crates/forge-manifest" }
+# TS-0 — `forge schema compile`. The snapshot is a PROJECTION of what the
+# converge applies, so it parses every input through the same
+# `SchemaDefinition::from_json` the storage apply step runs, and
+# materializes system columns from the same `Archetype` catalog
+# (generated from types.yaml) — never a transcribed list.
+forge-types = { path = "../forge-types/crates/forge-types" }
+# schema.lock input/content hashing (the artifact is content-addressed).
+sha2 = "0.10"
 # Domain/app/capability workspace compiler. `forge build`, when run in a
 # workspace root (a `workspace.json` is present), runs the compiler as a
 # pre-build gate: it walks domains/ + apps/, enforces consumes (D2) +
