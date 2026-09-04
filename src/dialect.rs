@@ -343,6 +343,11 @@ pub fn emit(root: &Path) -> Result<Vec<EmittedDomain>> {
                 plants: Plants::none(),
                 layout: Layout::WorkspaceMember,
                 build_root: None,
+                // Emit workspace-relative source labels so the committed
+                // crate is reproducible across checkouts — a portal domain's
+                // emitted crate is committed and CI checks it out at a
+                // different path (J-5: the S2 cutover requires this).
+                source_root: Some(root.to_path_buf()),
             },
         )
         .map_err(|e| refusal(&name, e))?;
