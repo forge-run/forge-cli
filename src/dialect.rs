@@ -271,17 +271,23 @@ pub fn domain_name(domain: &Path) -> String {
         .unwrap_or_default()
 }
 
-/// One domain, transpiled to a crate on disk.
+/// One domain, transpiled to a crate on disk — or, in MIXED domains
+/// (a hand-written crate hosting dialect sources; portal-java-cutover J-5
+/// rung 2), to a `services/jgen` module inside that crate.
 pub struct EmittedDomain {
     /// The domain's name — also the `<d>::<d>` lock key's halves.
     pub name: String,
     /// The crate's path relative to the workspace root, which is also its
     /// workspace-member path.
     pub member: String,
-    /// The crate as emitted, kept so a compile failure can be bundled without
-    /// re-rendering. Re-rendering would be a second emit, and a bundle whose
-    /// crate is not the one cargo choked on is evidence about nothing.
-    pub compiled: Compiled,
+    /// The crate as emitted (crate mode), kept so a compile failure can be
+    /// bundled without re-rendering. `None` in module mode — the member
+    /// crate is the customer's own, and its compile errors are its own too
+    /// except inside `services/jgen/`, which the generic build failure
+    /// still names loudly.
+    pub compiled: Option<Compiled>,
+    /// The emitted module's op roster (module mode). `None` in crate mode.
+    pub module: Option<forge_lang_rustgen::CompiledModule>,
 }
 
 /// Transpile every dialect domain in the workspace to a crate beside its
@@ -321,6 +327,28 @@ pub fn emit(root: &Path) -> Result<Vec<EmittedDomain>> {
     let mut emitted = Vec::with_capacity(domains.len());
     for (dir, sources) in &domains {
         let name = domain_name(dir);
+        // MIXED domain (J-5 rung 2): a hand-written crate (its own
+        // `services/lib.rs`) hosting dialect sources. Emit a `services/jgen`
+        // module for the host's fallback arm instead of replacing the crate;
+        // the member list and the domain manifest stay the author's.
+        if dir.join("services/lib.rs").is_file() {
+            let module = forge_lang_rustgen::compile_module(
+                sources,
+                tables.as_ref(),
+                &forge_lang_rustgen::ModuleSpec {
+                    out_dir: dir.join("services/jgen"),
+                    source_root: Some(root.to_path_buf()),
+                },
+            )
+            .map_err(|e| refusal(&name, e))?;
+            emitted.push(EmittedDomain {
+                name,
+                member: format!("domains/{}", domain_name(dir)),
+                compiled: None,
+                module: Some(module),
+            });
+            continue;
+        }
         let compiled = compile_all(
             sources,
             tables.as_ref(),
@@ -354,7 +382,8 @@ pub fn emit(root: &Path) -> Result<Vec<EmittedDomain>> {
         emitted.push(EmittedDomain {
             name,
             member: format!("domains/{}", domain_name(dir)),
-            compiled,
+            compiled: Some(compiled),
+            module: None,
         });
     }
 
@@ -376,6 +405,7 @@ fn workspace_manifest(root: &Path, emitted: &[EmittedDomain]) -> Result<()> {
         let text = std::fs::read_to_string(&path)?;
         let missing: Vec<&str> = emitted
             .iter()
+            .filter(|e| e.compiled.is_some())
             .map(|e| e.member.as_str())
             .filter(|m| !text.contains(m))
             .collect();
@@ -483,14 +513,19 @@ pub fn report_defect(root: &Path, emitted: &[EmittedDomain]) -> Result<Option<St
     // domains too, and their errors are theirs.
     let mut reports = Vec::new();
     for domain in emitted {
+        let Some(compiled) = &domain.compiled else {
+            // Module mode: the member crate is hand-written; only its
+            // `services/jgen` is ours, and the generic failure names it.
+            continue;
+        };
         if !diagnostics.contains(&format!("{}/src/", domain.member)) {
             continue;
         }
         let sources = sources_of(&root.join(&domain.member));
         let path = Defect {
             sources: &sources,
-            emitted: &domain.compiled.emitted,
-            crate_name: &domain.compiled.crate_name,
+            emitted: &compiled.emitted,
+            crate_name: &compiled.crate_name,
             diagnostics: &diagnostics,
         }
         .write_report(&root.join(&domain.member))?;
