@@ -34,11 +34,36 @@
       "blocking": true,
       "check": "check.sh",
       "ci_skip": false,
-      "description": "rustfmt must be clean whenever Rust sources change. Enable only on a tree that is already fmt-clean — a gate that lands red hides everything behind it (forge-cli lesson). Promoted from hybrid local on second consumer (substrate).\n",
+      "description": "A roadmap is validated where it is WRITTEN, not at launch (LE-5, 2026-09-05). Four of the five roadmaps filed in one week carried `execution: inline` — a value the driver refuses — and none carried step titles; `plan start` refused each one correctly, but only after lanes had been made, plans copied and commits made. This gate runs the same validator (factory.problems) over every changed `*roadmap*.json` at post-edit, so the refusal arrives at the Write, and it prints EVERY problem rather than the first plus a count. The accepted shape is the template in the forge-roadmap skill.\n",
       "events": [
         "post-edit",
         "pre-done",
         "pre-commit"
+      ],
+      "exclude": [
+        "**/schemas/**",
+        "**/node_modules/**",
+        "**/target/**"
+      ],
+      "id": "roadmap-valid",
+      "include": [
+        "*roadmap*.json"
+      ],
+      "memoize": false,
+      "params": {},
+      "source": "core/gates/roadmap-valid",
+      "timeout_seconds": 30
+    },
+    {
+      "blocking": true,
+      "check": "check.sh",
+      "ci_skip": false,
+      "description": "rustfmt must be clean whenever Rust sources change. Enable only on a tree that is already fmt-clean — a gate that lands red hides everything behind it (forge-cli lesson). Promoted from hybrid local on second consumer (substrate).\n",
+      "events": [
+        "post-edit",
+        "pre-done",
+        "pre-commit",
+        "checkpoint"
       ],
       "exclude": [],
       "id": "cargo-fmt",
@@ -361,6 +386,7 @@
   ],
   "harness": "hybrid",
   "known_events": [
+    "checkpoint",
     "post-edit",
     "pre-commit",
     "pre-done",
