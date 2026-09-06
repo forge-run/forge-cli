@@ -243,6 +243,23 @@ If a suite of yours anchors fixtures outside the target dir and the variable is 
 `scratch_env`, that declaration is the fix — not a line in your shell profile, which no
 other session and no gate will ever see.
 
+An entry has two shapes. Bare `VAR` is the run root itself. `VAR=rel/subdir` is a
+subdirectory OF that root, created for the run and exported as `VAR`:
+
+```yaml
+scratch_env: [FORGE_STORAGE_TEST_ROOT, TMPDIR=forge-storage-tests]
+```
+
+The second form exists for the storage test template. `forge-storage` clones a prebuilt
+workspace instead of bootstrapping one (~1 ms instead of ~1.5 s), and the clone fires only
+when a workspace's `data_directory` starts with `$FORGE_STORAGE_TEST_ROOT/forge-storage-tests`
+— the root itself does not qualify. A `TempDir` under `TMPDIR` reaches that check only if
+`TMPDIR` IS that subdirectory, and the declaration above is how both seams make it so, with
+the same per-run isolation and the same reaping as the bare form. An absolute path or a
+`..` segment is refused at `harness build`, naming the entry: either would point the
+variable outside the private root, which is the shared-fixture bug this block exists to
+prevent.
+
 **Serializing builds does not substitute for this.** They solve different problems: a lock
 makes runs sequential, isolation makes them independent. Gate-internal cargo does not take
 the build lock at all, so two suites can still overlap there — and for a suite anchored
