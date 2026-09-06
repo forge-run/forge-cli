@@ -21,7 +21,7 @@
             "type": "command"
           }
         ],
-        "matcher": "Bash"
+        "matcher": "Bash|Monitor"
       },
       {
         "hooks": [

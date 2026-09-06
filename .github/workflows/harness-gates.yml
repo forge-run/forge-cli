@@ -21,12 +21,12 @@ jobs:
         with:
           fetch-depth: 0
           path: forge-cli
-      - name: Checkout harness machinery (d76da71)
+      - name: Checkout harness machinery (aa2bd6b)
         uses: actions/checkout@v4
         with:
           repository: forge-run/forge-sdlc-harness
           path: forge-sdlc-harness
-          ref: d76da716e389ae0a7613c603c6f0ab20cdf53d07
+          ref: aa2bd6be863ee032982edf9c9647542e124d758b
           clean: true
           token: ${{ secrets.FORGE_CROSS_REPO_TOKEN }}
       - name: Checkout forge-sdk-v2
@@ -64,15 +64,58 @@ jobs:
           if ! [ -x "$HOME/.cargo/bin/rustup" ]; then
             flock /tmp/rustup-repair.lock -c 'test -x "$HOME/.cargo/bin/rustup" || curl --proto "=https" --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain none --no-modify-path'
           fi
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt, clippy
-          targets: wasm32-wasip1
+      # NOT the toolchain action. It runs `rustup toolchain install stable`
+      # unlocked in every job, and eight runners share one ~/.rustup: three
+      # jobs starting together on 2026-09-05 saw "detected conflict:
+      # bin/cargo-clippy", "could not read downloaded file" and "could not
+      # rename .partial" — each the others' half-finished install. That race
+      # is what strips a toolchain's cargo ("not applicable to the stable
+      # toolchain", 55 unit-test reds) and it fires at every roll (D-041
+      # starts CI everywhere at once). One lock, one installer at a time,
+      # and a failed install is retried from a clean uninstall rather than
+      # left as the next job's conflict.
+      - name: Install Rust toolchain (serialised on the shared box)
+        run: |
+          flock /tmp/rustup-repair.lock -c '
+            set -e
+            R="$HOME/.cargo/bin/rustup"
+            install() { "$R" toolchain install stable --profile minimal --component rustfmt --component clippy --target wasm32-wasip1 --no-self-update; }
+            if ! install; then
+              echo "rustup: stable install failed; reinstalling from a clean uninstall"
+              "$R" toolchain uninstall stable || true
+              rm -f "$HOME/.rustup/downloads/"*.partial
+              install
+            fi
+            "$R" default stable
+            "$HOME/.cargo/bin/cargo" +stable --version
+          '
       # No rust-cache: the self-hosted runners persist target/ between
       # runs already, and rust-cache's post-job pruning corrupted a
       # sibling workflow's persistent target dir (missing dep-info, cargo
       # 101) when it ran against the shared workspace root.
+      #
+      # HC-1b (2026-09-06) read the whole outage back to that same post-job
+      # step, from the runner's own log (harness CI run 33978757910, runner-1,
+      # 16:43:56Z): rust-cache's save deletes $CARGO_HOME/registry/src, prunes
+      # registry/cache and the index cache to the SAVING job's lockfile, and
+      # removes every file that was in $CARGO_HOME/bin when its job started —
+      # rustup and cargo included. On a box whose eight runners share one
+      # CARGO_HOME that is every other job's `cargo: command not found`
+      # (127), `failed to download anyhow v1.0.104 … --offline`, and
+      # `no matching package named chrono` in the same second. This workflow
+      # carries no rust-cache; any OTHER workflow on the box that still does
+      # re-breaks it on every exit (the HC-1d sweep removes them). The two
+      # steps above and the warm below are the defence until it lands.
+      #
+      # The runner builds the pinned tool --offline (a build that reaches
+      # the network mid-gate is a build whose inputs nobody pinned), so the
+      # registry must already hold the pin's lockfile. Nothing on the shared
+      # box warmed it when the pin's Cargo.lock moved (anyhow 1.0.104,
+      # 2026-09-02): 45 consecutive reds in ~30s each, every push ungated.
+      # Fetching here is online, --locked, idempotent, and warms the ONE
+      # CARGO_HOME all eight runners share.
+      - name: Warm the pinned tool's registry (online, --locked)
+        run: cargo fetch --locked --manifest-path "$GITHUB_WORKSPACE/forge-sdlc-harness/tool/Cargo.toml"
       - name: Emitted artifacts match the lockfile (drift gate)
         working-directory: forge-cli
         run: python3 "$GITHUB_WORKSPACE/forge-sdlc-harness/core/runner/runner.py" self-check
@@ -86,9 +129,25 @@ jobs:
         run: |
           set -euo pipefail
           BASE="${{ github.event.pull_request.base.sha }}"
+          # A push's own range (HC-4): `before` is the sha the branch held
+          # before this push, so a multi-commit push is swept whole rather
+          # than HEAD~1 only. Empty on a new branch (all zeros) or when the
+          # runner's checkout cannot see it, in which case the fallbacks
+          # below stand.
+          if [ -z "$BASE" ]; then
+            BEFORE="${{ github.event.before }}"
+            case "$BEFORE" in
+              ""|0000000000000000000000000000000000000000) ;;
+              *) git cat-file -e "$BEFORE^{commit}" 2>/dev/null && BASE="$BEFORE" ;;
+            esac
+          fi
           if [ -z "$BASE" ]; then BASE="${{ github.event.inputs.base }}"; fi
           if [ -z "$BASE" ]; then
-            BASE="$(git rev-parse HEAD~1 2>/dev/null || git hash-object -t tree /dev/null)"
+            # --verify -q prints NOTHING on an unknown revision; a bare
+            # rev-parse echoes the argument back, so on a depth-1 checkout
+            # the fallback used to append the empty tree to "HEAD~1" and
+            # the sweep died on a two-word base (2026-09-05, 45 reds).
+            BASE="$(git rev-parse --verify -q 'HEAD~1^{commit}' || git hash-object -t tree /dev/null)"
           fi
           python3 "$GITHUB_WORKSPACE/forge-sdlc-harness/core/runner/runner.py" all --diff-base "$BASE"
       # LLM verifiers: dormant until the ANTHROPIC_API_KEY org secret
@@ -106,7 +165,7 @@ jobs:
           command -v claude >/dev/null 2>&1 || npm install -g @anthropic-ai/claude-code
           BASE="${{ github.event.pull_request.base.sha }}"
           if [ -z "$BASE" ]; then BASE="${{ github.event.inputs.base }}"; fi
-          if [ -z "$BASE" ]; then BASE="$(git rev-parse HEAD~1 2>/dev/null || git hash-object -t tree /dev/null)"; fi
+          if [ -z "$BASE" ]; then BASE="$(git rev-parse --verify -q 'HEAD~1^{commit}' || git hash-object -t tree /dev/null)"; fi
           python3 "$GITHUB_WORKSPACE/forge-sdlc-harness/core/runner/runner.py" pre-review --diff-base "$BASE"
       - name: Upload evidence bundle
         if: always()

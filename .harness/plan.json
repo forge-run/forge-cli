@@ -52,7 +52,8 @@
       "memoize": false,
       "params": {},
       "source": "core/gates/roadmap-valid",
-      "timeout_seconds": 30
+      "timeout_seconds": 30,
+      "toolchains": []
     },
     {
       "blocking": true,
@@ -75,7 +76,11 @@
         "manifest_path": ""
       },
       "source": "core/gates/cargo-fmt",
-      "timeout_seconds": 120
+      "timeout_seconds": 120,
+      "toolchains": [
+        "rustc",
+        "cargo"
+      ]
     },
     {
       "blocking": true,
@@ -102,13 +107,17 @@
         "package_memo": true
       },
       "source": "core/gates/cargo-check",
-      "timeout_seconds": 120
+      "timeout_seconds": 120,
+      "toolchains": [
+        "rustc",
+        "cargo"
+      ]
     },
     {
       "blocking": true,
       "check": "check.sh",
       "ci_skip": false,
-      "description": "The repo's own cargo test suite must be green before completion is accepted or a commit lands. Session-local tier of \"tests green\" — heavier suites (e2e, cross-repo) bind at the merge boundary instead (D-010). Promoted from hybrid local/portal-tests on second consumer (substrate).\nConsumers may quarantine a flaky test in `.harness/quarantine.json`, a list of `{test, since, reason, issue?}`. Quarantined tests are skipped at pre-done/pre-commit and RUN in the CI sweep, so the loop stops paying for a known-flaky test without the escape rate going blind; entries older than 14 days are named on stderr. Every skip, retry and flaky pass is in `details`.\nOn a red, `details.failures` names the tests that failed and carries a bounded tail of each one's output, plus an excerpt of the run for the reds that have no failing test at all (a compile error). Counts alone sent two adjudications of the same failure back to re-run the suite just to learn its name.\n",
+      "description": "The repo's own cargo test suite must be green before completion is accepted or a commit lands. Session-local tier of \"tests green\" — heavier suites (e2e, cross-repo) bind at the merge boundary instead (D-010). Promoted from hybrid local/portal-tests on second consumer (substrate).\nConsumers may quarantine a flaky test in `.harness/quarantine.json`, a list of `{test, since, reason, issue?}`. Quarantined tests are skipped at pre-done/pre-commit and RUN in the CI sweep, so the loop stops paying for a known-flaky test without the escape rate going blind; entries older than 14 days are named on stderr. Every skip, retry and flaky pass is in `details`.\nOn a red, `details.failures` names the tests that failed and carries a bounded tail of each one's output, plus an excerpt of the run for the reds that have no failing test at all (a compile error). Counts alone sent two adjudications of the same failure back to re-run the suite just to learn its name.\n`retries` applies to the FOCUSED (pre-done) tier only, under nextest. Full runs (pre-commit, CI sweep) never retry, whatever the plan declares: a retry at the commit boundary could launder a real failure into a pass, and the full tier's number is the escape rate. A full run's evidence says so beside the count it did not apply (`retries: null`, `retries_declared`, `retries_policy`). A red whose output is exec-shaped (`could not execute process …`) is named in `details.exec_shaped` and on stderr with a re-run recipe — named, not laundered into a third outcome (D-081).\n",
       "events": [
         "pre-done",
         "pre-commit"
@@ -137,7 +146,11 @@
         "test_args": "--workspace --locked"
       },
       "source": "core/gates/cargo-tests",
-      "timeout_seconds": 900
+      "timeout_seconds": 900,
+      "toolchains": [
+        "rustc",
+        "cargo"
+      ]
     },
     {
       "blocking": true,
@@ -153,7 +166,8 @@
       "memoize": false,
       "params": {},
       "source": "core/gates/emitted-committed",
-      "timeout_seconds": 30
+      "timeout_seconds": 30,
+      "toolchains": []
     },
     {
       "blocking": true,
@@ -177,7 +191,10 @@
         "tests_dir": "core/runner/tests"
       },
       "source": "harnesses/hybrid/local/python-suite",
-      "timeout_seconds": 600
+      "timeout_seconds": 600,
+      "toolchains": [
+        "python3"
+      ]
     },
     {
       "blocking": true,
@@ -202,7 +219,8 @@
         "map": "e2e-map.json"
       },
       "source": "harnesses/hybrid/local/e2e-matching",
-      "timeout_seconds": 600
+      "timeout_seconds": 600,
+      "toolchains": []
     },
     {
       "blocking": true,
@@ -226,7 +244,8 @@
         "roots": ""
       },
       "source": "harnesses/hybrid/local/no-silent-catch",
-      "timeout_seconds": 60
+      "timeout_seconds": 60,
+      "toolchains": []
     },
     {
       "blocking": true,
@@ -250,7 +269,8 @@
         "vendor_dir": "static/vendor"
       },
       "source": "harnesses/hybrid/local/vendor-integrity",
-      "timeout_seconds": 60
+      "timeout_seconds": 60,
+      "toolchains": []
     },
     {
       "blocking": true,
@@ -274,7 +294,8 @@
         "ledger": "design/deltas.json"
       },
       "source": "harnesses/hybrid/local/design-deltas",
-      "timeout_seconds": 30
+      "timeout_seconds": 30,
+      "toolchains": []
     },
     {
       "blocking": true,
@@ -299,7 +320,8 @@
         "reference_dir": "design/reference"
       },
       "source": "harnesses/hybrid/local/reference-parity",
-      "timeout_seconds": 60
+      "timeout_seconds": 60,
+      "toolchains": []
     },
     {
       "blocking": true,
@@ -321,7 +343,8 @@
       "memoize": false,
       "params": {},
       "source": "harnesses/hybrid/local/step-scope",
-      "timeout_seconds": 30
+      "timeout_seconds": 30,
+      "toolchains": []
     },
     {
       "blocking": true,
@@ -352,7 +375,8 @@
         "roots": "content"
       },
       "source": "harnesses/hybrid/local/prose-tells",
-      "timeout_seconds": 60
+      "timeout_seconds": 60,
+      "toolchains": []
     },
     {
       "blocking": true,
@@ -381,7 +405,8 @@
         "seeds_file": "domains/content/seeds/cms_documents.json"
       },
       "source": "harnesses/hybrid/local/cms-corpus-current",
-      "timeout_seconds": 600
+      "timeout_seconds": 600,
+      "toolchains": []
     }
   ],
   "harness": "hybrid",
@@ -394,6 +419,7 @@
     "pre-tool",
     "session-start"
   ],
+  "ladders": {},
   "post_edit_budget_seconds": 8,
   "scratch_env": [],
   "verifiers": [
