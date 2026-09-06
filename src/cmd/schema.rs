@@ -22,7 +22,10 @@
 //!
 //! Relationships are resolved against the whole set at once, so the
 //! apply-order `relationship_unresolved_target` noise cannot exist here: a
-//! target either resolves or the compile refuses.
+//! target either resolves or the compile refuses. Each carries its KIND —
+//! `has_many` or `belongs_to` — because the two arrive in different runtime
+//! shapes and a consumer typing a followed read has to know which
+//! (typed-schema TS-7).
 //!
 //! # What the snapshot is NOT
 //!
@@ -399,10 +402,40 @@ pub fn compile_snapshot(root: &Path) -> Result<CompiledSnapshot> {
             let Some(target) = rel.target_table.as_deref() else {
                 continue;
             };
-            rels.push(serde_json::json!({
-                "name": rel.name,
-                "target_table": target,
-            }));
+            // The KIND, resolved here rather than re-derived downstream
+            // (typed-schema TS-7). The two kinds arrive in different runtime
+            // shapes — a has-many is a nested array under the relationship's
+            // own key, a belongs-to is FLATTENED onto the parent row with
+            // dotted keys — so a consumer that types a followed read has to
+            // know which it is. `is_has_many` is the same answer the storage
+            // side gives; reading it here keeps the snapshot the one place
+            // anyone asks, and keeps the authored `.table.json` out of every
+            // downstream's hands.
+            let mut doc = serde_json::Map::new();
+            doc.insert("name".into(), rel.name.clone().into());
+            doc.insert("target_table".into(), target.into());
+            doc.insert(
+                "kind".into(),
+                if rel.is_has_many() {
+                    "has_many"
+                } else {
+                    "belongs_to"
+                }
+                .into(),
+            );
+            // The keys the kind was read off, for the record: a snapshot that
+            // says `has_many` without saying what it joins on is a claim the
+            // reader cannot check.
+            if let Some(local) = rel.local_key.as_deref() {
+                doc.insert("local_key".into(), local.into());
+            }
+            if let Some(fk) = rel.foreign_key.as_deref() {
+                doc.insert("foreign_key".into(), fk.into());
+            }
+            if let Some(parent) = rel.parent_key.as_deref() {
+                doc.insert("parent_key".into(), parent.into());
+            }
+            rels.push(serde_json::Value::Object(doc));
         }
         let mut doc = serde_json::Map::new();
         doc.insert("origin".into(), entry.origin.clone().into());
@@ -494,8 +527,17 @@ mod tests {
                 "columns":[{"name":"title","type":"string"},
                            {"name":"count","type":"integer","required":false}],
                 "relationships":[{"name":"actor","target_table":"audit_events",
-                                  "local_key":"created_by"}],
+                                  "local_key":"created_by"},
+                                 {"name":"parts","target_table":"widget_parts",
+                                  "foreign_key":"widget_id","parent_key":"id"}],
                 "accept_destructive": true}"#,
+        )
+        .unwrap();
+        std::fs::write(
+            schemas.join("widget_parts.table.json"),
+            r#"{"name":"widget_parts","archetype":"Base",
+                "label":"Part","plural_label":"Parts","header_fields":["widget_id"],
+                "columns":[{"name":"widget_id","type":"string"}]}"#,
         )
         .unwrap();
         ws
@@ -510,7 +552,7 @@ mod tests {
             a.text, b.text,
             "two compiles of one tree must be byte-equal"
         );
-        assert_eq!(a.authored, 1);
+        assert_eq!(a.authored, 2);
         assert_eq!(a.bundle, PLATFORM_BUNDLE.len());
 
         let doc: serde_json::Value = serde_json::from_str(&a.text).unwrap();
@@ -545,6 +587,16 @@ mod tests {
         // The relationship resolved against the BUNDLE table — the by-ref
         // pin doing its job — and the runtime-owned set is present.
         assert_eq!(widgets["relationships"][0]["target_table"], "audit_events");
+        // Both kinds, each with the key it was read off (typed-schema TS-7).
+        // A consumer typing a followed read needs the kind, because a
+        // has-many arrives as a nested array under its own key and a
+        // belongs-to arrives flattened onto the parent with dotted keys.
+        assert_eq!(widgets["relationships"][0]["kind"], "belongs_to");
+        assert_eq!(widgets["relationships"][0]["local_key"], "created_by");
+        assert_eq!(widgets["relationships"][1]["name"], "parts");
+        assert_eq!(widgets["relationships"][1]["kind"], "has_many");
+        assert_eq!(widgets["relationships"][1]["foreign_key"], "widget_id");
+        assert_eq!(widgets["relationships"][1]["parent_key"], "id");
         assert!(
             doc["tables"]["audit_events"]["origin"]
                 .as_str()
