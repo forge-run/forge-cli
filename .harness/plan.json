@@ -154,6 +154,34 @@
     },
     {
       "blocking": true,
+      "check": "check.sh",
+      "ci_skip": false,
+      "description": "clippy must be clean whenever Rust sources change. Filed twice before it was built (GAP-REVIEWS #p21, then again on 2026-08-30): two lint regressions survived to main without it, and by 2026-08-30 three more had accumulated in forge-lang's test files — `empty line after doc comment` and two `very complex type` among them. Every one of them was caught by hand, late, by someone running clippy for another reason.\nNOT bound to post-edit, unlike cargo-fmt. clippy is a real build: it is minutes warm on forge-runtime and forge-storage, and post-edit holds an 8s wall budget. A gate that cannot fit its tier is a gate that defers or dies, so this one lives where the wall clock is.\nEnable only on a tree that is ALREADY clippy-clean. The forge-cli lesson is the whole reason this description says so twice: its fmt check failed for a month, so clippy, build and test never ran behind it, and fixing it surfaced two real clippy errors that had been landing unchecked. A gate that lands red hides everything after it.\n",
+      "events": [],
+      "exclude": [
+        ".harness/**",
+        ".claude/**"
+      ],
+      "id": "cargo-clippy",
+      "include": [
+        "**/*.rs",
+        "**/Cargo.toml"
+      ],
+      "memoize": true,
+      "params": {
+        "clippy_args": "--workspace --all-targets --locked",
+        "deny": "-D warnings",
+        "manifest_path": ""
+      },
+      "source": "core/gates/cargo-clippy",
+      "timeout_seconds": 1800,
+      "toolchains": [
+        "rustc",
+        "cargo"
+      ]
+    },
+    {
+      "blocking": true,
       "check": "check.py",
       "ci_skip": false,
       "description": "Fails when a generated artifact is uncommitted. CI checks out the COMMITTED tree and runs the drift gate against it, so an emitted file left dirty is a red build that no local check can see — `self-check` compares the lockfile against DISK, which is clean in exactly this case.\nWritten after a fleet roll staged `.harness`, `.github` and `.gitignore` by hand and missed `.claude/settings.json#hooks`, across thirteen repos. The verification used the same hand-typed list, so it confirmed the blind spot instead of catching it. The lockfile already records what was emitted; this gate reads it rather than remembering.\n",

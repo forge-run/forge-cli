@@ -51,7 +51,7 @@
     },
     {
       "path": ".github/workflows/harness-gates.yml",
-      "sha256": "e706c7a65510d1717c3303adc48e580d2c554592a24a1341b54291f5595b93e4"
+      "sha256": "19e64fe3e2c2a67a8b88a95364f26e3d91d461f89f1a79025d14c8ecbcca09e0"
     },
     {
       "path": ".gitignore#rules",
@@ -66,7 +66,7 @@
     },
     {
       "path": ".harness/plan.json",
-      "sha256": "f6852d40b0b52b6126175806f7581d1047f39fa3ef1c51c604ddcaed499d4999"
+      "sha256": "34aa759e5824fd3cfa7222d9ab839cd8f6f425fe0f3cd5cc40e677aefacf7469"
     },
     {
       "path": ".harness/runner.py",
@@ -162,8 +162,18 @@
         "scope": "full",
         "test_args": "--workspace --locked"
       },
-      "sha256": "efb18f99598f04e6fb5654c71b1df6f1d5c9d2394adda3a5568b816e9f9971b9",
+      "sha256": "e47bbb2d9bec2e5b159bc65ce76c84035a669c4593af62a6731dcbde52f09c71",
       "source": "../../core/gates/cargo-tests"
+    },
+    {
+      "kind": "gate",
+      "params": {
+        "clippy_args": "--workspace --all-targets --locked",
+        "deny": "-D warnings",
+        "manifest_path": ""
+      },
+      "sha256": "25cc1b07cbae30ab7714d782d56086e5eeb734ffd48cc9d839d490dc297ac36d",
+      "source": "../../core/gates/cargo-clippy"
     },
     {
       "kind": "gate",
@@ -269,8 +279,8 @@
   "harness_dir": "harnesses/hybrid",
   "source": {
     "kind": "commit",
-    "ref": "9378940ff0662a2f3b90e8adfd5b543f1fa7cf08",
-    "sha": "9378940ff0662a2f3b90e8adfd5b543f1fa7cf08"
+    "ref": "18a9bc6307ddad09035250d4be4c692da7f2438a",
+    "sha": "18a9bc6307ddad09035250d4be4c692da7f2438a"
   },
   "targets": [
     "claude-code",
