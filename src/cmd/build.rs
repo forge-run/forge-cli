@@ -200,11 +200,31 @@ pub(crate) fn compile_workspace_graph(root: &std::path::Path) -> Result<()> {
         );
     }
     for a in &graph.apps {
+        // The stylesheet, reported in the bytes that SHIP. A declarative app's
+        // CSS travels as the `css_body` of each page/component manifest row and
+        // the substrate composes it per request, so the meaningful number is the
+        // authored total across those records — not a bundle file, which this
+        // layout never writes. It is here because the flat layout reported it
+        // (a root `build.rs` printed `CSS: N -> M bytes`) and a migration onto
+        // the workspace compiler that stopped reporting it would let the whole
+        // stylesheet go missing with the build still green (HS-10).
+        let css_records = a
+            .components
+            .iter()
+            .filter(|c| !c.css_body.trim().is_empty())
+            .count()
+            + a.pages
+                .iter()
+                .filter(|p| !p.css_body.trim().is_empty())
+                .count();
+        let css_bytes = forge_web_build::substrate_css_string(&a.components, &a.pages).len();
         eprintln!(
-            "  app    {:<14} pages:{:<3} components:{:<3} consumes:{} {}",
+            "  app    {:<14} pages:{:<3} components:{:<3} css:{}B/{} consumes:{} {}",
             a.name,
             a.pages.len(),
             a.components.len(),
+            css_bytes,
+            css_records,
             a.manifest.consumes.join(","),
             if a.has_wasm {
                 "[wasm]"
