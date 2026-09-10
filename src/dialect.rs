@@ -1204,4 +1204,49 @@ public final class Hello {
              is asserting against a path that could never have arrived:\n{manifest}"
         );
     }
+
+    /// The composed thing, with nothing injected: whatever tree THIS binary
+    /// was built in, no lane path reaches a generated manifest.
+    ///
+    /// The two tests above inject the lane, which proves `resolve` and the
+    /// emitter but not the link between them — `emit()` feeding `resolve` the
+    /// compile-time defaults, which is the link FU-11 actually travelled.
+    /// That link cannot be faked from inside a test, because the defaults are
+    /// baked by `env!` in a crate this one only links.
+    ///
+    /// So this test changes meaning with where it is built, on purpose. In a
+    /// canonical checkout it is a control that cannot fail. Built with the
+    /// emitter swapped for a lane copy — which is what
+    /// `forge-sdlc-harness/scripts/hh10-lane-probe.sh` does — it is the
+    /// acceptance itself, and the probe's second run proves it can fail by
+    /// making it fail.
+    #[test]
+    fn the_binarys_own_build_tree_never_reaches_a_manifest() {
+        let _guard = crate::lane::tests::ENV_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        let ws = tempfile::tempdir().unwrap();
+        let services = ws.path().join("domains/billing/services");
+        std::fs::create_dir_all(&services).unwrap();
+        std::fs::write(ws.path().join("workspace.json"), "{}").unwrap();
+        std::fs::write(services.join("hello.ts"), ACCEPTED_TS).unwrap();
+
+        emit(ws.path()).expect("emit");
+        let manifest =
+            std::fs::read_to_string(ws.path().join("domains/billing/Cargo.toml")).unwrap();
+        eprintln!(
+            "emitted by a forge built in {}:\n{}",
+            env!("CARGO_MANIFEST_DIR"),
+            manifest,
+        );
+        let lane: Vec<&str> = manifest
+            .lines()
+            .filter(|l| l.contains("path = ") && l.contains("--"))
+            .collect();
+        assert!(
+            lane.is_empty(),
+            "a lane path reached a committed, generated manifest:\n{}",
+            lane.join("\n"),
+        );
+    }
 }
