@@ -43,7 +43,9 @@
       "exclude": [
         "**/schemas/**",
         "**/node_modules/**",
-        "**/target/**"
+        "**/target/**",
+        "**/.harness/reports/**",
+        "**/.harness/intent/**"
       ],
       "id": "roadmap-valid",
       "include": [
