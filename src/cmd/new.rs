@@ -370,7 +370,10 @@ fn scaffold_workspace(crate_name: &str, template: &str, files: &[(&str, &str)]) 
 ///  2. A sibling `forge-sdk-v2` next to this `forge-cli` checkout (the
 ///     canonical dev layout `.../{forge-cli,forge-sdk-v2}/`), resolved from
 ///     `CARGO_MANIFEST_DIR` at COMPILE time — so it is the maintainer's build
-///     path, correct only on the box the CLI was built on.
+///     path, correct only on the box the CLI was built on, and pointing into
+///     a worktree lane when the CLI was built in one. `crate::lane` folds
+///     that case back onto the canonical sibling before it reaches the
+///     scaffold's committed `Cargo.toml` (FU-11).
 ///
 /// If neither resolves to an existing directory we still emit a clearly-marked
 /// placeholder path (never a silent, wrong absolute path) and the caller warns
@@ -387,12 +390,18 @@ fn resolve_sdk_dep() -> (String, bool) {
     }
 
     let sibling = env!("CARGO_MANIFEST_DIR")
-        .strip_suffix("forge-cli")
-        .map(|prefix| format!("{prefix}forge-sdk-v2"));
+        .rsplit_once("forge-cli")
+        .map(|(prefix, _)| format!("{prefix}forge-sdk-v2"));
     if let Some(path) = sibling {
-        let exists = std::path::Path::new(&path).is_dir();
-        if exists {
-            return (dep(&path), true);
+        // A binary built in a lane bakes the lane into this path, and the
+        // scaffold's `Cargo.toml` is committed by `git_init_scaffold` two
+        // steps later — the FU-11 shape, in the customer's brand-new repo
+        // rather than in the portal. No refusal here: `forge new` already
+        // degrades to a marked placeholder plus a warning when the path does
+        // not resolve, and that is the same conversation one line louder.
+        let path = crate::lane::de_lane(std::path::Path::new(&path));
+        if path.is_dir() {
+            return (dep(&path.to_string_lossy()), true);
         }
     }
 

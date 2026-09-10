@@ -451,6 +451,23 @@ pub struct EmittedDomain {
 /// crates already live: same member path, same `forge-domain-<d>` package
 /// name, so the rest of the build does not learn a second convention.
 pub fn emit(root: &Path) -> Result<Vec<EmittedDomain>> {
+    emit_with(root, &crate::lane::rt_source(), &crate::lane::sdk_source())
+}
+
+/// [`emit`], with the two path dependencies named rather than taken from this
+/// binary's own build.
+///
+/// Split out so a test can hand it a lane-wired pair and read what reaches the
+/// manifest: the compile-time default cannot be faked from inside a test, and
+/// the property under test — no lane path in a committed, generated file — is
+/// a property of the bytes written, not of the resolver alone.
+///
+/// Both are passed through `lane::resolve` HERE rather than by the caller,
+/// because this is the last place before the path becomes a committed file and
+/// there is no route to that file that skips it.
+pub fn emit_with(root: &Path, rt: &Path, sdk: &Path) -> Result<Vec<EmittedDomain>> {
+    let rt_path = crate::lane::resolve("forge-lang-rt", rt)?;
+    let sdk_path = crate::lane::resolve("forge-sdk-v2", sdk)?;
     let domains: Vec<(PathBuf, Vec<PathBuf>)> = domains(root)
         .into_iter()
         .map(|d| {
@@ -503,13 +520,21 @@ pub fn emit(root: &Path) -> Result<Vec<EmittedDomain>> {
                 // guarantees. Nothing is copied into the workspace, so the
                 // root manifest needs `members` and nothing else.
                 //
+                // Named rather than left to the emitter's compile-time
+                // default, because this manifest is COMMITTED and that
+                // default is whichever tree the binary was built in — a lane
+                // worktree for anyone who borrowed a binary, which is how
+                // FU-11 put `forge-lang--host-surface` into
+                // `domains/billing/Cargo.toml`. `crate::lane` above answers
+                // with the canonical sibling, and says when it had to.
+                //
                 // Where a RELEASED forge-cli finds them is not answered here
                 // and not answerable by copying either: the sources have to
                 // come from somewhere on that machine. It is the open question
                 // `forge-lang/.../build_root.rs` names, and its answer is git
                 // dependencies pinned by revision (PHASE5-PROPOSAL §3.3).
-                rt_path: None,
-                sdk_path: None,
+                rt_path: Some(rt_path.clone()),
+                sdk_path: Some(sdk_path.clone()),
                 trace: false,
                 plants: Plants::none(),
                 layout: Layout::WorkspaceMember,
@@ -1094,6 +1119,89 @@ public final class Hello {
         assert_eq!(
             crate_name(Path::new("/w/domains/billing")),
             "forge-domain-billing"
+        );
+    }
+
+    /// The FU-11 shape, end to end: a `forge` whose `forge-lang-rt` and
+    /// `forge-sdk-v2` both point into worktree lanes regenerates a portal
+    /// domain's COMMITTED `Cargo.toml`, and no lane path reaches it.
+    ///
+    /// The workspace sits inside the scratch working root at
+    /// `forge-portal-web/`, so the emitted relative paths are the ones the
+    /// real `domains/billing/Cargo.toml` carries — `../../../forge-lang/...`
+    /// — rather than a tempdir-to-tempdir path that would assert nothing
+    /// about the string a reviewer sees in the diff.
+    ///
+    /// `.ts` rather than `.py` on purpose: the TS front half runs no
+    /// reference toolchain, so this holds on a machine with no python3 and
+    /// never degrades to a skip. A contamination test that can quietly not
+    /// run is the FU-11 failure mode again one level up.
+    #[test]
+    fn a_lane_wired_binary_writes_the_canonical_path_into_a_portal_manifest() {
+        let _guard = crate::lane::tests::ENV_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        let root = crate::lane::tests::working_root();
+        let lane_rt = root
+            .path()
+            .join("forge-lang--host-surface/crates/forge-lang-rt");
+        let lane_sdk = root.path().join("forge-sdk-v2--lane");
+        assert!(lane_rt.is_dir() && lane_sdk.is_dir());
+
+        let ws = root.path().join("forge-portal-web");
+        let services = ws.join("domains/billing/services");
+        std::fs::create_dir_all(&services).unwrap();
+        std::fs::write(ws.join("workspace.json"), "{}").unwrap();
+        std::fs::write(services.join("hello.ts"), ACCEPTED_TS).unwrap();
+
+        let emitted = emit_with(&ws, &lane_rt, &lane_sdk).expect("emit");
+        assert_eq!(emitted.len(), 1);
+        assert_eq!(emitted[0].member, "domains/billing");
+
+        let manifest = std::fs::read_to_string(ws.join("domains/billing/Cargo.toml")).unwrap();
+        assert!(
+            !manifest.contains("--"),
+            "a lane path reached a committed, generated manifest:\n{manifest}"
+        );
+        assert!(
+            manifest.contains("path = \"../../../forge-lang/crates/forge-lang-rt\""),
+            "{manifest}"
+        );
+        assert!(
+            manifest.contains("path = \"../../../forge-sdk-v2\""),
+            "{manifest}"
+        );
+    }
+
+    /// The positive control for the test above. Without it, a `de_lane` that
+    /// rewrote nothing at all would pass — the lane paths would have to reach
+    /// the manifest for the assertion to have anything to catch, and
+    /// `FORGE_LANG_ALLOW_LANE_PATHS=1` is the one route that puts them there.
+    #[test]
+    fn without_the_fix_the_lane_path_is_exactly_what_lands() {
+        let _guard = crate::lane::tests::ENV_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        let root = crate::lane::tests::working_root();
+        let lane_rt = root
+            .path()
+            .join("forge-lang--host-surface/crates/forge-lang-rt");
+        let ws = root.path().join("forge-portal-web");
+        let services = ws.join("domains/billing/services");
+        std::fs::create_dir_all(&services).unwrap();
+        std::fs::write(ws.join("workspace.json"), "{}").unwrap();
+        std::fs::write(services.join("hello.ts"), ACCEPTED_TS).unwrap();
+
+        unsafe { std::env::set_var(crate::lane::ALLOW_VAR, "1") };
+        let emitted = emit_with(&ws, &lane_rt, &root.path().join("forge-sdk-v2"));
+        unsafe { std::env::remove_var(crate::lane::ALLOW_VAR) };
+        emitted.expect("emit");
+
+        let manifest = std::fs::read_to_string(ws.join("domains/billing/Cargo.toml")).unwrap();
+        assert!(
+            manifest.contains("forge-lang--host-surface/crates/forge-lang-rt"),
+            "the opt-in must actually write the lane path, or the test above \
+             is asserting against a path that could never have arrived:\n{manifest}"
         );
     }
 }

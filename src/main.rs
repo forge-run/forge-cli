@@ -28,6 +28,7 @@ mod cmd;
 mod config;
 mod contract_lint;
 mod dialect;
+mod lane;
 
 #[derive(Debug, Parser)]
 #[command(name = "forge", version, about, long_about = None)]
