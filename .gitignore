@@ -6,3 +6,4 @@ Cargo.lock.bak
 .harness/wip
 .harness/log/
 .harness/halt
+.harness/report.json
