@@ -38,7 +38,7 @@ use std::path::{Path, PathBuf};
 
 use anyhow::Result;
 use clap::Args;
-use forge_lang_rustgen::{CompileError, Register, check_only};
+use forge_lang_rustgen::{Card, CompileError, Register, check_only};
 
 use crate::dialect;
 
@@ -105,16 +105,7 @@ pub fn run(args: CheckArgs) -> Result<()> {
     if json {
         println!("{}", envelope(&root, &found));
     } else {
-        for register in &found.registers {
-            match register.is_empty() {
-                true => eprintln!("{}: accepted", register.path),
-                false => eprint!("{}", register.render()),
-            }
-        }
-        for m in &found.mismatches {
-            eprintln!("error: {}", m.render());
-        }
-        eprintln!("{}", summary(&found));
+        eprintln!("{}", human_report(&found));
     }
     if found.ok() {
         return Ok(());
@@ -131,7 +122,7 @@ pub fn run(args: CheckArgs) -> Result<()> {
 /// the customer's source, which is always a [`Register`], empty when accepted.
 /// Split from [`run`] so the verdicts are testable: `run` ends in
 /// `process::exit`, which a test cannot survive.
-fn check(root: &Path) -> Result<Verdicts, String> {
+pub(crate) fn check(root: &Path) -> Result<Verdicts, String> {
     if !root.join("workspace.json").exists() {
         return Err(format!(
             "no workspace.json at {} — `forge check` reads a workspace; pass \
@@ -155,6 +146,11 @@ fn check(root: &Path) -> Result<Verdicts, String> {
     // second run necessary to see the second problem, which is the round trip
     // this command exists to remove.
     let mut registers: Vec<Register> = Vec::with_capacity(sources.len());
+    // The EV-7 cost cards, one entry per source aligned to `registers` — the
+    // accepted source's `Accepted::cost` carried through unchanged, and an
+    // empty vec for a refused one (a refusal has no card). Reused, never
+    // recomputed: the front end walked the tree once and this is that result.
+    let mut cards: Vec<Vec<(String, Card)>> = Vec::with_capacity(sources.len());
     // Op names per domain, collected from the SAME front-end pass that
     // produces the verdicts — a second pass would be a second chance to
     // disagree about the same file.
@@ -165,9 +161,13 @@ fn check(root: &Path) -> Result<Verdicts, String> {
                 if let Some(domain) = domain_of(root, source) {
                     defined.entry(domain).or_default().extend(accepted.ops);
                 }
+                cards.push(accepted.cost);
                 registers.push(Register::new(accepted.source));
             }
-            Err(CompileError::Rejected(register)) => registers.push(register),
+            Err(CompileError::Rejected(register)) => {
+                registers.push(register);
+                cards.push(Vec::new());
+            }
             Err(CompileError::Toolchain(m)) => {
                 return Err(format!(
                     "{}: {m} (the dialect front end validates with CPython — is \
@@ -193,6 +193,7 @@ fn check(root: &Path) -> Result<Verdicts, String> {
     };
     Ok(Verdicts {
         registers,
+        cards,
         mismatches,
         schema,
     })
@@ -210,9 +211,13 @@ fn domain_of(root: &Path, source: &Path) -> Option<String> {
 
 /// What one run of `forge check` found.
 #[derive(Debug, Default)]
-struct Verdicts {
+pub(crate) struct Verdicts {
     /// One per dialect source, empty when the source was accepted.
-    registers: Vec<Register>,
+    pub(crate) registers: Vec<Register>,
+    /// The EV-7 cost cards, aligned to `registers`: `Accepted::cost` for an
+    /// accepted source, an empty vec for a refused one. Each inner entry is
+    /// `(op, card)` in the source's declaration order.
+    pub(crate) cards: Vec<Vec<(String, Card)>>,
     /// Declared-vs-defined disagreements, across domains.
     mismatches: Vec<dialect::OpMismatch>,
     /// The compiled snapshot's content hash when the workspace was judged
@@ -235,6 +240,43 @@ impl Verdicts {
     fn ok(&self) -> bool {
         self.refused() == 0 && self.mismatches.is_empty()
     }
+}
+
+/// The engineer-facing cost card for one op, formatted in ONE place so the
+/// `forge check` and `forge push` human output cannot drift. The exact shape
+/// is `<op>: reads N (max M rows) writes W escaping E`, where the numbers are
+/// the EV-7 card's `reads`, `max_rows`, `writes` and `escaping`.
+pub(crate) fn card_line(op: &str, card: &Card) -> String {
+    format!(
+        "{op}: reads {} (max {} rows) writes {} escaping {}",
+        card.reads, card.max_rows, card.writes, card.escaping
+    )
+}
+
+/// The whole human run as one string: per-source acceptance and its cost
+/// cards, the refusals verbatim, the declared/defined mismatches, then the
+/// summary. An accepted source prints one [`card_line`] per op after its
+/// acceptance line; a refused source prints its register and no card, exactly
+/// as before.
+fn human_report(found: &Verdicts) -> String {
+    let mut out = String::new();
+    for (register, cards) in found.registers.iter().zip(&found.cards) {
+        if register.is_empty() {
+            out.push_str(&format!("{}: accepted\n", register.path));
+            for (op, card) in cards {
+                out.push_str(&card_line(op, card));
+                out.push('\n');
+            }
+        } else {
+            // `render` is already newline-terminated.
+            out.push_str(&register.render());
+        }
+    }
+    for m in &found.mismatches {
+        out.push_str(&format!("error: {}\n", m.render()));
+    }
+    out.push_str(&summary(found));
+    out
 }
 
 /// The closing line a person reads.
@@ -688,6 +730,93 @@ def hello(ctx: OpContext, input: Value) -> Greeting:
             found.mismatches.is_empty(),
             "the refusal is the diagnosis; do not stack a wrong one on it: {:?}",
             found.mismatches
+        );
+    }
+
+    /// `card_line` is the anti-drift seam, so its exact string is pinned here.
+    #[test]
+    fn card_line_pins_the_exact_format() {
+        let card = Card {
+            reads: 2,
+            writes: 1,
+            escaping: 3,
+            max_rows: 50,
+        };
+        assert_eq!(
+            card_line("hello", &card),
+            "hello: reads 2 (max 50 rows) writes 1 escaping 3"
+        );
+    }
+
+    /// An accepted source's human output carries one cost line per op. The
+    /// `ACCEPTED` fixture makes no crossings, so its card is all zeros — a
+    /// card whose exact value can be stated.
+    #[test]
+    fn the_human_output_carries_the_cost_card_for_an_accepted_op() {
+        let ws = workspace(&[
+            ("workspace.json", "{}"),
+            ("domains/a/services/hello.py", ACCEPTED),
+        ]);
+        let found = match check(ws.path()) {
+            Ok(v) => v,
+            Err(e) if skip_without_cpython(&e) => return,
+            Err(e) => panic!("{e}"),
+        };
+        let report = human_report(&found);
+        assert!(
+            report.contains("hello: reads 0 (max 0 rows) writes 0 escaping 0"),
+            "{report}"
+        );
+    }
+
+    /// FL0090 — a `storage.query` inside a `for` — is refused, so its human
+    /// output prints the register's alternative and NO card line.
+    #[test]
+    fn a_refused_fl0090_op_prints_the_alternative_and_no_card() {
+        const QUERY_IN_LOOP: &str = r#"from dataclasses import dataclass
+
+from forge import OpContext, Value, op, storage
+
+
+@dataclass
+class Counts:
+    seen: int
+
+
+@op("per_element")
+def per_element(ctx: OpContext, input: Value) -> Counts:
+    ids: list[Value] = input.get("ids", [])
+    seen: int = 0
+    for entry in ids:
+        wid: str = entry.get("id", "")
+        resp: Value = storage.query(
+            {
+                "from": "_agent_runs",
+                "filter": {"column": "workspace_id", "op": "eq", "value": wid},
+                "limit": 50,
+            }
+        )
+        seen = seen + len(storage.rows(resp))
+    return Counts(seen=seen)
+"#;
+        let ws = workspace(&[
+            ("workspace.json", "{}"),
+            ("domains/a/services/loop.py", QUERY_IN_LOOP),
+        ]);
+        let found = match check(ws.path()) {
+            Ok(v) => v,
+            Err(e) if skip_without_cpython(&e) => return,
+            Err(e) => panic!("{e}"),
+        };
+        assert_eq!(found.refused(), 1, "the loop read must be refused");
+        let report = human_report(&found);
+        assert!(report.contains("FL0090"), "{report}");
+        // The refusal names its alternative — the batched `query_batch` shape.
+        assert!(report.contains("storage.query_batch"), "{report}");
+        // A refused source has no card, so the card-line signature is absent.
+        assert!(
+            !report.contains("rows) writes"),
+            "a refused source must print no card line:\n{report}"
         );
     }
 }

@@ -66,6 +66,16 @@ pub async fn push_and_poll(
     timeout_secs: u64,
 ) -> Result<()> {
     let dir = dir.unwrap_or_else(|| Path::new("."));
+
+    // Client-side dialect gate, BEFORE any git mutation. The same check
+    // `forge check` runs over the workspace, so a refusal is seen here rather
+    // than after the server refuses the converge — and its cost cards print
+    // before the converge line. A workspace with no dialect source (or no
+    // front-end toolchain on PATH) prints nothing and pushes as before.
+    for line in dialect_cards(dir)? {
+        eprintln!("push: {line}");
+    }
+
     let branch = match branch {
         Some(b) => b.to_string(),
         None => current_branch(dir)?,
@@ -152,6 +162,44 @@ pub async fn push_and_poll(
     // bounce off to another surface's host (the app→code redirect outage).
     smoke_check_surfaces(dir).await?;
     Ok(())
+}
+
+/// The client-side dialect gate: run the shared `forge check` over `dir` and
+/// return one cost-card line per accepted op, formatted through the SAME
+/// `card_line` seam `forge check` uses so the two outputs cannot drift.
+///
+/// A refusal aborts with a nonzero error carrying the register's alternative
+/// text, before the caller pushes anything. A toolchain problem or a directory
+/// that is not a workspace is a skip, not a refusal — a repo with no dialect
+/// source pushes as it did before this gate existed.
+fn dialect_cards(dir: &Path) -> Result<Vec<String>> {
+    match crate::cmd::check::check(dir) {
+        Ok(found) => {
+            let mut lines = Vec::new();
+            let mut refusals = String::new();
+            for (register, cards) in found.registers.iter().zip(&found.cards) {
+                if register.is_empty() {
+                    for (op, card) in cards {
+                        lines.push(crate::cmd::check::card_line(op, card));
+                    }
+                } else {
+                    // `render` already ends with a newline.
+                    refusals.push_str(&register.render());
+                }
+            }
+            if !refusals.is_empty() {
+                bail!(
+                    "push refused: the dialect check refused a source — nothing was pushed:\n{}",
+                    refusals.trim_end()
+                );
+            }
+            Ok(lines)
+        }
+        Err(message) => {
+            eprintln!("push: dialect check skipped ({message})");
+            Ok(Vec::new())
+        }
+    }
 }
 
 /// After convergence, GET the root `/` of each declared landing host and assert
@@ -435,4 +483,92 @@ pub(crate) fn redact(s: &str) -> String {
         return format!("{}x-token:***@{}", &s[..i], &s[i + at + 1..]);
     }
     s.to_string()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The accepted op in the TS spelling — no crossings, so an all-zeros
+    /// card. The TS front half runs no reference toolchain, so this test
+    /// needs no python3 and never skips.
+    const ACCEPTED_TS: &str = r#"import { op, OpContext, Value } from "forge";
+
+interface Greeting {
+  text: string;
+}
+
+export const hello = op("hello", (ctx: OpContext, input: Value) => {
+  const g: Greeting = { text: "hi" };
+  return g;
+});
+"#;
+
+    /// `var` is FL1010 — a refusal that carries an alternative, so the push
+    /// gate must abort and print it.
+    const REFUSED_TS: &str = r#"import { op, OpContext, Value } from "forge";
+
+interface Greeting {
+  text: string;
+}
+
+export const hello = op("hello", (ctx: OpContext, input: Value) => {
+  var g: Greeting = { text: "hi" };
+  return g;
+});
+"#;
+
+    fn workspace(files: &[(&str, &str)]) -> tempfile::TempDir {
+        let dir = tempfile::tempdir().unwrap();
+        for (path, body) in files {
+            let full = dir.path().join(path);
+            std::fs::create_dir_all(full.parent().unwrap()).unwrap();
+            std::fs::write(full, body).unwrap();
+        }
+        dir
+    }
+
+    /// The push pre-converge print path: an accepted workspace yields the same
+    /// cost-card line `forge check` prints, before any git mutation.
+    #[test]
+    fn the_push_gate_returns_the_cost_card_for_an_accepted_op() {
+        let ws = workspace(&[
+            ("workspace.json", "{}"),
+            ("domains/a/services/hello.ts", ACCEPTED_TS),
+        ]);
+        let lines = dialect_cards(ws.path()).expect("an accepted workspace does not abort");
+        assert!(
+            lines
+                .iter()
+                .any(|l| l == "hello: reads 0 (max 0 rows) writes 0 escaping 0"),
+            "{lines:?}"
+        );
+    }
+
+    /// The push gate refuses BEFORE pushing: a refused source aborts with the
+    /// register's alternative and no card line.
+    #[test]
+    fn the_push_gate_refuses_before_pushing_and_prints_the_alternative() {
+        let ws = workspace(&[
+            ("workspace.json", "{}"),
+            ("domains/a/services/hello.ts", REFUSED_TS),
+        ]);
+        let err = dialect_cards(ws.path())
+            .expect_err("a refused source must abort the push")
+            .to_string();
+        assert!(err.contains("push refused"), "{err}");
+        assert!(err.contains("FL1010"), "{err}");
+        assert!(
+            !err.contains("rows) writes"),
+            "a refused source prints no card line:\n{err}"
+        );
+    }
+
+    /// A directory that is not a workspace is a skip, not a refusal — the push
+    /// proceeds as it did before the gate existed.
+    #[test]
+    fn a_non_workspace_dir_skips_the_gate_and_does_not_abort() {
+        let dir = tempfile::tempdir().unwrap();
+        assert!(dialect_cards(dir.path()).unwrap().is_empty());
+    }
 }
