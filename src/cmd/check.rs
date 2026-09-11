@@ -44,7 +44,7 @@ use crate::dialect;
 
 /// The versioned envelope `--format json` prints.
 ///
-/// Each element of `sources` is one `forge-lang-diagnostics/1` object exactly
+/// Each element of `sources` is one `forge-lang-diagnostics/2` object exactly
 /// as `forge-lang --format json` emits it — same fields, same meanings — so a
 /// parser written against that contract reads them unchanged. This wrapper
 /// exists only because a workspace has many sources and that envelope has one
@@ -505,7 +505,7 @@ export const hello = op("hello", (ctx: OpContext, input: Value) => {
     }
 
     /// The machine surface: one `forge-check/1` wrapper whose `sources` are
-    /// the `forge-lang-diagnostics/1` objects a parser already knows.
+    /// the `forge-lang-diagnostics/2` objects a parser already knows.
     #[test]
     fn the_json_envelope_nests_the_per_source_contract_unchanged() {
         let ws = workspace(&[
@@ -522,7 +522,7 @@ export const hello = op("hello", (ctx: OpContext, input: Value) => {
         assert_eq!(doc["accepted"], 0);
         assert_eq!(doc["refused"], 1);
         let source = &doc["sources"][0];
-        assert_eq!(source["schema_version"], "forge-lang-diagnostics/1");
+        assert_eq!(source["schema_version"], "forge-lang-diagnostics/2");
         assert_eq!(source["diagnostics"][0]["code"], "FL0024");
         assert_eq!(source["diagnostics"][0]["severity"], "error");
     }
