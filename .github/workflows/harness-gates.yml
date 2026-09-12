@@ -21,12 +21,12 @@ jobs:
         with:
           fetch-depth: 0
           path: forge-cli
-      - name: Checkout harness machinery (06ba06d)
+      - name: Checkout harness machinery (ec1ae0d)
         uses: actions/checkout@v4
         with:
           repository: forge-run/forge-sdlc-harness
           path: forge-sdlc-harness
-          ref: 06ba06dd02b35e5ab1b58e1a642c61b6316c32f3
+          ref: ec1ae0d7415424911e5e32fba1dffd304f3f4911
           clean: true
           token: ${{ secrets.FORGE_CROSS_REPO_TOKEN }}
       - name: Checkout forge-sdk-v2
