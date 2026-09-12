@@ -1,0 +1,61 @@
+{
+  "acceptance": [
+    "`forge check` on forge-dialect-dogfood prints one cost line per op; `forge push` prints the same lines before converging",
+    "A forge-cli test asserts the check output contains the card for a fixture with a known card",
+    "A refused op (FL0090 fixture) prints the register's alternative text and no card"
+  ],
+  "author": "rory",
+  "events": [
+    {
+      "at": "2026-09-11T23:08:52.892926+00:00",
+      "id": "intent-recorded",
+      "revision": 1,
+      "source": "factory-delegate"
+    },
+    {
+      "at": "2026-09-11T23:19:00.607612+00:00",
+      "boundary": "plan",
+      "id": "gap-review"
+    }
+  ],
+  "gap_reviews": [
+    {
+      "boundary": "plan",
+      "gaps": [
+        {
+          "description": "forge push gates on register refusals only, not on declared/defined op mismatches",
+          "note": "the brief said 'if any source is REFUSED'; a mismatch still fails forge check but does not block push, keeping push scoped to the brief; widening push to mismatches is a small filed follow-up",
+          "resolution": "accepted"
+        },
+        {
+          "description": "The FL0090 push-refuse test uses a simpler refusal (FL1010) while the check-refuse test uses a genuine FL0090 query-in-a-loop",
+          "note": "the acceptance's refused-op-prints-alternative-no-card is met by the FL0090 check test; the push test only needs to prove the refusal path aborts before pushing and prints the alternative, which any refusal exercises",
+          "resolution": "accepted"
+        },
+        {
+          "description": "The card in forge check's JSON envelope was left out of scope",
+          "note": "the acceptance is the human lines; the forge-check JSON schema is unchanged as instructed",
+          "resolution": "accepted"
+        },
+        {
+          "description": "none found on the three acceptance items",
+          "note": "forge check prints one card line per op on forge-dialect-dogfood (values match EV-7's pinned cards), a test asserts the card line for a known-card fixture, and a refused FL0090 op prints the alternative and no card; card reused from forge_lang_rustgen, not recomputed",
+          "resolution": "accepted"
+        }
+      ],
+      "intent_ref": ".harness/intent/evangelist-2026-09-ev-8-cost-card-at-push.json"
+    }
+  ],
+  "out_of_scope": [],
+  "refs": [
+    "plan:evangelist-2026-09",
+    "step:EV-8-cost-card-at-push"
+  ],
+  "revision": 1,
+  "schema": "forge-intent/v1",
+  "slug": "evangelist-2026-09-ev-8-cost-card-at-push",
+  "source": "factory-delegate",
+  "statement": "forge check and forge push print the cost card per op \u2014 [1h] forge-cli already drives the checker (cmd/check.rs) and push refuses on a refusal. Print the EV-7 card per op in the human output of `forge check` and in `forge push` before the converge line, one line per op: `<op>: reads N (max M rows) writes W escaping E`. This is the line an engineer screenshots. No docs page in this plan (pages are refactored later); the register text for FL0090/FL0091 is already the explanation and `forge check` prints it on a refusal.",
+  "ts": "2026-09-11T23:08:52.892926+00:00",
+  "updated_at": "2026-09-11T23:08:52.892926+00:00"
+}

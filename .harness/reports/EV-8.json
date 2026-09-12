@@ -1,0 +1,37 @@
+{
+  "author": "rory",
+  "bundle_ids": [
+    "pre-done-7b5c7222"
+  ],
+  "commits": [
+    "fb5cf90"
+  ],
+  "lane": "/Users/rory/Documents/forge-run/forge-cli--ev8-cost-at-push",
+  "notes": "Card reused from forge_lang_rustgen::Accepted.cost / Card, never recomputed. push gates only on register refusals per brief, not on op mismatches. fmt+clippy clean.",
+  "repair_attempts": 0,
+  "schema": "forge-report/v1",
+  "step": "EV-8",
+  "ts": "2026-09-11T23:17:25.397253+00:00",
+  "verdicts": [
+    {
+      "evidence": "44/44 dogfood ops print `<op>: reads N (max M rows) writes W escaping E`; check test the_human_output_carries_the_cost_card_for_an_accepted_op + a_refused_fl0090_op_prints_the_alternative_and_no_card pass",
+      "item": "forge check prints one card line per accepted op (exact format), refused prints register and no card",
+      "verdict": "met"
+    },
+    {
+      "evidence": "dialect_cards calls crate",
+      "item": "forge push prints the same lines before the converge line and refuses nonzero on a refusal via a shared pub(crate) check() + card_line",
+      "verdict": "met"
+    },
+    {
+      "evidence": "all three added and green (16 passed)",
+      "item": "Tests: check human card line, refused FL0090 alternative+no card, card_line exact-string unit test",
+      "verdict": "met"
+    },
+    {
+      "evidence": "envelope()/CHECK_SCHEMA untouched; the_json_envelope_nests_the_per_source_contract_unchanged still passes",
+      "item": "No change to forge-check JSON envelope schema",
+      "verdict": "met"
+    }
+  ]
+}

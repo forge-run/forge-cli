@@ -1,0 +1,37 @@
+{
+  "agent": "forge-implementer",
+  "author": "rory",
+  "bundle_ids": [],
+  "bundle_note": "forge-cli check+push unit tests ran green in-lane (16 passed, plain cargo hybrid lane); real forge check on forge-dialect-dogfood captured in the report note; the commit-tier gate bundle runs on the step commit.",
+  "commits": [
+    "fb5cf90"
+  ],
+  "lane": "/Users/rory/Documents/forge-run/forge-cli--ev8-cost-at-push",
+  "notes": "Delegated implement + orchestrator review; landed forge-cli main fb5cf90.",
+  "repair_attempts": 0,
+  "schema": "forge-report/v1",
+  "step": "EV-8-cost-card-at-push",
+  "ts": "2026-09-11T23:19:23.937657+00:00",
+  "verdicts": [
+    {
+      "evidence": "check.rs human_report prints card_line per accepted op (44/44 on dogfood); push.rs dialect_cards prints push: card lines before the converge line, unit-proven",
+      "item": "forge check on forge-dialect-dogfood prints one cost line per op; forge push prints the same lines before converging",
+      "verdict": "met"
+    },
+    {
+      "evidence": "the_human_output_carries_the_cost_card_for_an_accepted_op + card_line_pins_the_exact_format, green",
+      "item": "A forge-cli test asserts the check output contains the card for a fixture with a known card",
+      "verdict": "met"
+    },
+    {
+      "evidence": "a_refused_fl0090_op_prints_the_alternative_and_no_card feeds a storage.query in a for; asserts FL0090, storage.query_batch alternative, and no card line",
+      "item": "A refused op (FL0090 fixture) prints the register alternative text and no card",
+      "verdict": "met"
+    },
+    {
+      "evidence": "Accepted.cost carried through Verdicts.cards; card_line only formats; schema.rs and the forge-check envelope untouched",
+      "item": "Card reused from EV-7, not recomputed; no moat widened; JSON envelope unchanged",
+      "verdict": "met"
+    }
+  ]
+}
