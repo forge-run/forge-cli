@@ -22,6 +22,10 @@
       "sha256": "429c4f5233254787e6433ba9e757c74f4bea811ed1f6a81b47f387d205799e70"
     },
     {
+      "path": ".claude/skills/ceo/SKILL.md",
+      "sha256": "f746c03b262c652f0b5b28880f52c8a47d87d501748b146262674aa06f889930"
+    },
+    {
       "path": ".claude/skills/forge-build/SKILL.md",
       "sha256": "fbf213a12c64630fdb6a3a2489ef267812289ac6a4238a882f8f82c4ac5df510"
     },
@@ -31,7 +35,7 @@
     },
     {
       "path": ".claude/skills/forge-roadmap/SKILL.md",
-      "sha256": "cd3122011d88324d16d4d02361178cccd1587e900d70e1a52ebecc1f5814732c"
+      "sha256": "bf1465435fc54242c32d1b601c67e8586231d91dbf842b97a138b2d145108ee8"
     },
     {
       "path": ".claude/skills/forge-session-economy/SKILL.md",
@@ -51,7 +55,7 @@
     },
     {
       "path": ".github/workflows/harness-gates.yml",
-      "sha256": "4890aaa14a87567dfe7a6d6ce3d2e8998e598b5f29f42787485ce369015fb98a"
+      "sha256": "f6d830ee8783e852e91193860ff1b65c91167e3e2c5dbd9c107a5b47c90c2986"
     },
     {
       "path": ".gitignore#rules",
@@ -67,7 +71,7 @@
     },
     {
       "path": ".harness/plan.json",
-      "sha256": "f9d6be91a0631a3437df98e7dabcee1e9d527ce7544a86e41683575d34c898a8"
+      "sha256": "dab46ce4b4f82d8951c711e25f92d44bbd5e6bcd61c145d6d776918b9afa1aaa"
     },
     {
       "path": ".harness/runner.py",
@@ -91,8 +95,21 @@
     },
     {
       "kind": "skill",
-      "sha256": "5a8739169844ac4afbc490fd8bd23af5dfe821faaa2c33fd1ec282b6df52f7af",
+      "sha256": "84f91448de562c838c7723666bd2cf03dc3439364a95951573e4e69e12a1c174",
       "source": "../../core/skills/forge-roadmap"
+    },
+    {
+      "kind": "skill",
+      "params": {
+        "vision": "../forge-platform-architecture/VISION.md"
+      },
+      "sha256": "209ea5981494e7012dd2411cb5f7ab12b0db94541a582221274781ef27e3464c",
+      "source": "../../core/skills/ceo"
+    },
+    {
+      "kind": "verifier",
+      "sha256": "e23d45d674a606c22cea9f39d77fa9fee56a59af9e776caca78585286ea9d63f",
+      "source": "../../core/verifiers/ceo-review"
     },
     {
       "kind": "gate",
@@ -280,8 +297,8 @@
   "harness_dir": "harnesses/hybrid",
   "source": {
     "kind": "commit",
-    "ref": "ec1ae0d",
-    "sha": "ec1ae0d7415424911e5e32fba1dffd304f3f4911"
+    "ref": "f13393c",
+    "sha": "f13393ce07aae4768b8183774db610bb84d0d710"
   },
   "targets": [
     "claude-code",

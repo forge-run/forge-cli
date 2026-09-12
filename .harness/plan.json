@@ -455,6 +455,28 @@
   "verifiers": [
     {
       "blocking": true,
+      "description": "The CEO's judge (D-105): a fresh-context verifier that reads a roadmap and the vision canon before the plan is started, and refuses a plan that was never interrogated, cites claims the canon does not define, names rows the ledger does not carry, answers in adjectives, or does something a claim's forbids line or a never-widening refusal rules out. Bound to plan-approved and reached by `plan start` through `runner.py verify-plan`; it never fires on a commit.\n",
+      "eval_min_agreement": 0.9,
+      "evals": "evals",
+      "events": [
+        "plan-approved"
+      ],
+      "exclude": [],
+      "id": "ceo-review",
+      "include": [],
+      "inputs": [
+        "roadmap",
+        "canon"
+      ],
+      "model": "claude-fable-5",
+      "params": {},
+      "prompt": "prompt.md",
+      "rubric": "rubric.md",
+      "source": "core/verifiers/ceo-review",
+      "verdict_schema": "verdict.schema.json"
+    },
+    {
+      "blocking": true,
       "description": "The judgment half of the anti-tell prose doctrine (D-056): a fresh-context judge that reads the diff's prose sentence by sentence against the read-aloud bar — would a senior engineer say this aloud, verbatim, to a peer. Catches what the prose-tells grep cannot: stacked triads, aphoristic closers, adjective piles, uniform rhythm, keynote voice. Blocking at pre-review only — the same dormant-by-default posture D-052 left every judge in; it spends a model call only when a review is explicitly assembled (/harness-review).\n",
       "eval_min_agreement": 0.9,
       "evals": "evals",

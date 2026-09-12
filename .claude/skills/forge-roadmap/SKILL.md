@@ -77,6 +77,19 @@ committed there, then `plan start <that file>`. The plan of record may live
 elsewhere (translation-engine keeps forge-lang's) and be copied in by
 `run-plan.sh`; the copy must not drift from the record.
 
+## Before `plan start`: the CEO
+
+A roadmap is interrogated against the vision canon before it starts
+(D-105). Load the `ceo` skill, answer its six questions, and write the
+answers into the roadmap as a top-level `vision` object: `rows` (ledger
+rows moved), `claims` (`V-n` advanced), `moves`, `unit`, `if_none`,
+`forbids_checked`. `plan start` runs the plan-start judge on the file and
+refuses a plan whose block is missing, cites a claim the canon does not
+define, answers in adjectives, or does something a claim forbids. Its
+objections and questions print at the refusal; answer them in the block
+and start again. The validator does not yet require the block, so a plan
+filed without it fails at the judge, not at the Write.
+
 ## Sizing a step
 
 A step's brief must say three things: the bounded file set it touches, the
