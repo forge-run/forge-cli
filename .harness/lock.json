@@ -55,7 +55,7 @@
     },
     {
       "path": ".github/workflows/harness-gates.yml",
-      "sha256": "161751b4faaff7d2bd516450ff5b49eb21065d7bc0871f9e61e127a1274a9560"
+      "sha256": "c3da4f5085b48b2058627b83abfe07450918115df3dcbf293d84678755697259"
     },
     {
       "path": ".gitignore#rules",
@@ -71,7 +71,7 @@
     },
     {
       "path": ".harness/plan.json",
-      "sha256": "dab46ce4b4f82d8951c711e25f92d44bbd5e6bcd61c145d6d776918b9afa1aaa"
+      "sha256": "d81bef494d7b81ea8ca9c15fd3419c45e463dff8df6ac6398eff44c9f3265984"
     },
     {
       "path": ".harness/runner.py",
@@ -199,6 +199,16 @@
       "source": "../../core/gates/emitted-committed"
     },
     {
+      "kind": "gate",
+      "sha256": "04219905050166b66ae919a45527050545ca3530a13486ec4afbb16cc74cdc5f",
+      "source": "../../core/gates/code-structure"
+    },
+    {
+      "kind": "gate",
+      "sha256": "4b2b3dc2b53e6a03fc9e1d0b016024b67dec964e56f6aae10f095b38c9f19019",
+      "source": "../../core/gates/lint-waivers"
+    },
+    {
       "kind": "fence",
       "sha256": "eb5863341abf0eb7bdc5e48d8e6de2ca4601b96ea6ee1fd64ad0a6626cb7c750",
       "source": "local/no-substrate-path-deps"
@@ -297,8 +307,8 @@
   "harness_dir": "harnesses/hybrid",
   "source": {
     "kind": "commit",
-    "ref": "d15fc0a",
-    "sha": "d15fc0a41a205bac38210b5d37fbf691f01394b2"
+    "ref": "7c0ea32",
+    "sha": "7c0ea3252fac93d69342976c589ab3a1c2f43db1"
   },
   "targets": [
     "claude-code",

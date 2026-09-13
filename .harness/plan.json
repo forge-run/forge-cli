@@ -201,6 +201,60 @@
     },
     {
       "blocking": true,
+      "check": "check.py",
+      "ci_skip": false,
+      "description": "The file rules of a consumer's own `.harness/structure.yaml` (D-104), over the paths this event changed. Where a new file goes, how many public types it declares, which basenames may carry a bare `pub`, and how long a file may get. A repo with no policy file passes saying so, so no consumer goes red on arrival.\nFile rules take NO waiver. There is no `#[expect]`, no marker comment and no parameter that turns one off for a file, because the four rules cost nothing to satisfy at the moment a file is created and everything to satisfy a year later. The single exemption shape is the baseline ratchet named by `file_ceiling.baseline`:\n\n  {\"schema\": \"forge-structure-baseline/v1\", \"ceiling\": 400,\n   \"files\": {\"crates/x/src/big.rs\": 612}}\n\nA file listed there may shrink and may not grow; a file that has fallen under the ceiling is named on stderr as retirable, which is what `harness structure baseline` prunes. A baseline this gate cannot read — absent, unparseable, or declaring a schema id it does not know — is exit 2 rather than an empty ratchet, and a baseline whose `ceiling` disagrees with the policy's is a failure, since a ratchet measured at another ceiling is a different ratchet.\nADDED and MODIFIED files are judged differently and the asymmetry is the design. An added file gets every rule: creation is the only moment its placement is free. A modified file gets the ceiling alone, because a gate that goes red on a file somebody merely touched is the forge-cli fmt check again, red for a month with every gate behind it hidden. Placement, public-type and bare-`pub` defects in touched files land in `details.pre_existing` so the number stays visible to whoever is deciding what to split next.\nNot bound to post-edit. It is cheap — under a second on forge-storage's whole tree presented as changed — but a gate bound to post-edit alone can never defer, and a tree-walk over a large changed set belongs where the wall clock is.\nDeterministic given the tree, so the CI sweep runs this same file and no D-012 twin is owed. The policy is read and validated by `core/gates/_lib/structure.py`, the same reader the `harness structure` verb uses: a policy one of them accepts and the other rejects must not be able to exist.\n",
+      "events": [
+        "pre-done",
+        "pre-commit"
+      ],
+      "exclude": [
+        ".harness/evidence/**",
+        ".harness/state/**",
+        ".claude/**",
+        "target/**"
+      ],
+      "id": "code-structure",
+      "include": [
+        "**/*.rs",
+        ".harness/structure.yaml",
+        ".harness/structure-baseline.json",
+        "CLAUDE.md"
+      ],
+      "memoize": true,
+      "params": {},
+      "source": "core/gates/code-structure",
+      "timeout_seconds": 60,
+      "toolchains": []
+    },
+    {
+      "blocking": true,
+      "check": "check.py",
+      "ci_skip": false,
+      "description": "Every waiver of a governed clippy lint is a site-level `#[expect]` carrying a reason that names a design choice (D-104 b and c), over the `.rs` files this event changed. The governed set is `governed_lints` in the consumer's `.harness/structure.yaml`: `too_many_lines`, `cognitive_complexity`, `too_many_arguments`, `type_complexity` unless the repo says otherwise. Nothing else is this gate's subject. An `#[allow(clippy::approx_constant)]` is between the author and the clippy gate, and widening the set is an edit to a repo's policy, not to this check.\n`#[expect]` rather than `#[allow]` for one mechanical reason. rustc raises `unfulfilled_lint_expectations` when an expectation's lint would not have fired — warn by default, an error under the clippy gate's `-D warnings` — so the waiver on a function dies the day somebody splits it. `#[allow]` says nothing when its reason ends, which is how a whitelist outlives everyone who can explain it. The reason is compiler-carried, stable since 1.81 and the fleet pins 1.95, so it cannot drift away from the site it explains.\nFour refusals: `#[allow]` of a governed lint on an item; `#![allow]` at crate or module level, unless the file sits under `tests/` or `benches/` or the attribute is inside a `#[cfg(test)] mod`; an `#[expect]` with no reason or an empty one; and a reason drawn from the policy's `reason_refused` vocabulary — \"for now\", \"temporar\", \"todo\", \"will split\" and the rest. That last one is D-034's shape: a deferral wearing a design reason's clothes reads as a considered choice and is not one, and a debt belongs in a roadmap step with an owner.\nUnlike its sibling code-structure, this gate has NO not-applicable state. A repo with no policy file still gets the default lint list, because the waiver rule is fleet doctrine rather than a per-repo convention. Binding it everywhere on day one is safe anyway: a consumer with no governed `#[allow]` passes in milliseconds, and the number each consumer starts from is in D-104's table.\nThe evidence is the whitelist. `details.expectations` lists every governed expectation in the changed files with file, line, lint and reason, and `details.counts` totals them per lint, so a reviewer reads the waivers out of the bundle rather than grepping for them.\nMatching is textual, on lines the shared `_lib/rustscan.py` blanker has emptied of comments and string literals first. A doc comment quoting `#[allow(clippy::too_many_lines)]` to explain why it is refused must not itself be a refusal; that is the no-silent-catch precedent.\nNot bound to post-edit. It is cheap — well under half a second on forge-storage's whole tree presented as changed — but a gate bound to post-edit alone can never defer, and a scan over a large changed set belongs where the wall clock is.\nDeterministic given the tree, so the CI sweep runs this same file and no D-012 twin is owed.\n",
+      "events": [
+        "pre-done",
+        "pre-commit"
+      ],
+      "exclude": [
+        ".harness/evidence/**",
+        ".harness/state/**",
+        ".claude/**",
+        "target/**"
+      ],
+      "id": "lint-waivers",
+      "include": [
+        "**/*.rs",
+        ".harness/structure.yaml"
+      ],
+      "memoize": true,
+      "params": {},
+      "source": "core/gates/lint-waivers",
+      "timeout_seconds": 60,
+      "toolchains": []
+    },
+    {
+      "blocking": true,
       "check": "check.sh",
       "ci_skip": true,
       "description": "The stdlib-unittest suite that covers the emitted runner and dispatcher must be green before a change to them is accepted or committed.\nThis closes a hole the cargo gates cannot see. The harness repo's own `cargo-tests` is scoped to `tool/` — correctly, since that is where its crate lives — so the ~1100-test python suite that covers `core/runner/**` ran only in CI and by hand. HM2.1 found NINE reds sitting in it, unnoticed, and fixed them; nothing local would have objected while they landed (GAP-REVIEWS #hm2-1). The dispatcher those tests cover is the file every enforcement path in the fleet runs through, and its parsing code fails OPEN when wrong: a mis-parse waves the command through silently.\n`ci_skip` because ci.yml already runs exactly this discovery, in the `runner` job, on every push — this is the session-tier twin of a check that keeps its CI half (D-012), not a second copy of it.\nPath-filtered to the runner tree, so a docs or gate-asset commit does not pay for it, and memoized on that same fileset: an unchanged `core/runner/**` is a suite whose answer cannot have moved.\nNOT APPLICABLE where there is no such suite. hybrid is a shared harness and forge-portal-web has no `core/runner/`, so \"there is nothing here to run\" has to be a real answer — established by looking, the way vendor-integrity establishes its own: if a runner tests directory survives elsewhere in the tree, the pathspec MOVED and this gate is checking nothing, which is exit 2 and not a green tick. Both grep fences that died in this fleet died by matching nothing after a file move.\n",
