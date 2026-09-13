@@ -66,7 +66,13 @@ You are given a tool-call budget in the brief. Spend it on the work, not on cere
   interactively on timings that a script would have produced in a handful.
 - **Batch what repeats.** The same command across many repos is one script invocation,
   one git call per repo — not one tool call per repo.
-- **Do not poll.** Wait on a condition with one backgrounded `until` loop.
+- **Do not poll, and do not hold one tool call across five minutes.** Your prompt
+  cache lives 5 minutes; a single `until ... sleep` loop or a commit gate held in one
+  call re-buys your whole context on the next turn (77 of 79 delegated expiry turns
+  in one week, 16.3M tokens). Start long work detached with the launch line in your
+  brief and wait with `python3 <working-root>/.harness/sdk-driver.py wait <D>`, which
+  returns before the window closes (exit 0 with the job's exit code; exit 75 while it
+  still runs — call it again), or return to the orchestrator naming the job.
 - **When the budget runs out, report** — say exactly what is done, what is half-done,
   and what the next action is. Do not keep going quietly, and do not claim completion
   you cannot show evidence for. A precise resume point is worth more than one more

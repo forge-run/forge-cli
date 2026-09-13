@@ -27,6 +27,11 @@ Consequences:
   same result. Where a fence forbids naming two repos in one *command* (git hygiene),
   a script issuing one invocation per repo is the sanctioned form — the fence is
   against shell word-splitting over a typed list, not against automation.
+- **A large tool result is read as a tail or a grep, never pasted whole** — a driven
+  session's Bash results past 10,000 chars are persisted to a file with a 2 KB preview
+  and the path (`bashOutputMaxChars`, S-6), because tool results are **61% of every
+  byte the model re-reads** across 206 driven sessions and a result re-read on ~80
+  later calls costs more than the one call that follows the pointer.
 - **Read once.** Re-reading a file you just wrote, or re-running a suite an implementer
   already ran and pasted, is a turn spent to feel sure. Prefer the evidence you were
   given; re-run only what you actually doubt.
@@ -42,8 +47,10 @@ Consequences:
   build lock is held p95 ≈ 7min, so a delegate that sits through either re-buys its
   whole prefix on the next turn — measured: **47.4M cache-write tokens re-bought in
   one week (~29% of all delegate cache writes)**, the `expiry rewrites` section in
-  `usage report`. Warm the focused build shape before spawning, or hold the long wait
-  in the orchestrator and spawn after it clears.
+  `usage report`; re-measured 2026-09-06..13, every one of the 77 re-buys was an
+  `until ... sleep` loop or a commit gate held in ONE tool call. A delegate waits with
+  `python3 .harness/sdk-driver.py wait <D>`, which returns before the window closes
+  (exit 75 = still running, call again), or returns to the orchestrator naming the job.
 - **Over context budget? Hand off, don't push on.** `python3 .harness/dispatch.py
   handoff --note "<what you were about to do>"` writes a ~few-KB capsule (plan
   records, delegations, live intents, lanes); a fresh session reads that instead of
