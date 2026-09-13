@@ -36,6 +36,14 @@ Copy this and fill it in. Every key shown on a step is REQUIRED except
   "model": "claude-fable-5-1",
   "budget": {"max_wall_hours": 8, "max_wakeups_without_evidence": 3},
   "out_of_scope": ["What this plan deliberately does not touch, one item per line."],
+  "vision": {
+    "rows": ["A ledger row this plan moves, spelled as the ledger spells it."],
+    "claims": ["V-7"],
+    "moves": "What a customer stops paying for, running or tuning when this lands.",
+    "unit": "The unit a cited claim lists, the reading today and the reading expected after.",
+    "if_none": "When rows is empty: the claim this serves, or plainly that it is tooling for building forge.",
+    "forbids_checked": "For each cited claim, one sentence on how this plan stays clear of its forbids line."
+  },
   "steps": [
     {
       "id": "E-1-short-slug",
@@ -69,6 +77,13 @@ Copy this and fill it in. Every key shown on a step is REQUIRED except
 - `blocked_on`, when present, is `null`, `user`, `ci` or `budget`.
 - `scope`, when present, is a non-empty array of path prefixes.
 - `evidence`, when present, is an array.
+- `vision` is required until the plan's first step is done: an object with
+  `rows` and `claims` (arrays of strings, either may be empty) and the
+  non-empty strings `moves`, `unit`, `if_none`, `forbids_checked`. The
+  validator checks presence and type; what the block SAYS is the judge's
+  business. A plan already part-done is not asked for one at the Write,
+  because the driver rewrites its own roadmap at every landed step — it
+  meets the judge at its next `plan start` instead.
 
 ## Where it goes
 
@@ -87,8 +102,14 @@ rows moved), `claims` (`V-n` advanced), `moves`, `unit`, `if_none`,
 refuses a plan whose block is missing, cites a claim the canon does not
 define, answers in adjectives, or does something a claim forbids. Its
 objections and questions print at the refusal; answer them in the block
-and start again. The validator does not yet require the block, so a plan
-filed without it fails at the judge, not at the Write.
+and start again.
+
+Write the block when you file the roadmap, not when you start it. The
+`roadmap-valid` gate asks for it at the Write on any plan whose steps are
+all still todo, because the alternative is what happened to the
+evangelist plan on 2026-09-13: filed without a block, driven to 16 of 20
+steps, and then held at a restart by a requirement nobody could satisfy
+without stopping to answer six questions mid-recovery.
 
 ## Sizing a step
 
