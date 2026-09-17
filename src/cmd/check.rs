@@ -130,7 +130,20 @@ pub(crate) fn check(root: &Path) -> Result<Verdicts, String> {
             root.display()
         ));
     }
-    let sources = dialect::sources(root);
+    // Pinned units (shared-code SC-11): a tree with `forge.units.json` is
+    // checked over a scratch copy with each pin staged beside its consumers,
+    // exactly as the control plane splices them at push, and every verdict
+    // is spelled back under the workspace root. A tree with no pins is read
+    // in place, as it always was.
+    let pinned = match crate::pins::read(root)? {
+        Some(pins) => {
+            let resolved = crate::pins::resolve(root, &pins)?;
+            Some(crate::pins::stage(root, &resolved)?)
+        }
+        None => None,
+    };
+    let source_root: &Path = pinned.as_ref().map_or(root, |s| s.root.as_path());
+    let sources = dialect::sources(source_root);
     if sources.is_empty() {
         return Ok(Verdicts::default());
     }
@@ -176,7 +189,7 @@ pub(crate) fn check(root: &Path) -> Result<Verdicts, String> {
                     .to_string());
             }
             Ok(accepted) => {
-                if let Some(domain) = domain_of(root, source) {
+                if let Some(domain) = domain_of(source_root, source) {
                     defined.entry(domain).or_default().extend(accepted.ops);
                 }
                 cards.push(accepted.cost);
@@ -208,6 +221,28 @@ pub(crate) fn check(root: &Path) -> Result<Verdicts, String> {
     let mismatches = match registers.iter().all(|r| r.is_empty()) {
         true => dialect::op_mismatches(root, &defined),
         false => Vec::new(),
+    };
+    let (registers, units) = match &pinned {
+        Some(staged) => (
+            registers
+                .into_iter()
+                .map(|mut r| {
+                    r.path = crate::pins::unstage(&r.path, &staged.root, root);
+                    r
+                })
+                .collect(),
+            units
+                .iter()
+                .map(|u| {
+                    PathBuf::from(crate::pins::unstage(
+                        &u.display().to_string(),
+                        &staged.root,
+                        root,
+                    ))
+                })
+                .collect(),
+        ),
+        None => (registers, units),
     };
     Ok(Verdicts {
         registers,
@@ -950,5 +985,123 @@ def plan_badge(ctx: OpContext, input: Value) -> Badge:
                 .to_string(),
         );
         assert_eq!(err, expected.trim_end());
+    }
+
+    // ── pinned units (shared-code SC-11) ────────────────────────────
+
+    const STORAGE_UNIT: &str = "from forge import Value, storage\n\n\ndef tier_for(name: str) -> str:\n    resp: Value = storage.query({\"from\": \"plans\", \"limit\": 10})\n    return \"pro\"\n";
+
+    /// Put `source` in the workspace's unit store under its own address and
+    /// pin `name` to it, as `forge units pull` would.
+    fn pin_into_store(ws: &Path, name: &str, file_name: &str, source: &str) -> String {
+        let address = crate::pins::unit_address(source.as_bytes());
+        let dir = crate::pins::store_dir(ws).join(address.as_str());
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join(file_name), source).unwrap();
+        std::fs::write(
+            ws.join(forge_platform_wire::UNIT_PINS_PATH),
+            format!(r#"{{"version":1,"units":{{"{name}":"{address}"}}}}"#),
+        )
+        .unwrap();
+        address.to_string()
+    }
+
+    /// The CLI half of the pair: the same storage-reaching unit is accepted
+    /// carried beside the op and refused pinned, with `FL0115` against the
+    /// unit's file spelled under the WORKSPACE root, naming its address —
+    /// the register the control plane renders at push over the same tree.
+    #[test]
+    fn a_pinned_unit_reaching_storage_is_refused_and_the_same_unit_in_tree_is_not() {
+        let carried = workspace(&[
+            ("workspace.json", "{}"),
+            ("domains/plans/services/plan_badge.py", CONSUMER_WITH_UNIT),
+            ("domains/plans/services/plan_rules.py", STORAGE_UNIT),
+        ]);
+        let found = match check(carried.path()) {
+            Ok(v) => v,
+            Err(e) if skip_without_cpython(&e) => return,
+            Err(e) => panic!("{e}"),
+        };
+        assert!(
+            found.ok(),
+            "the in-tree arm is refused: {}",
+            human_report(&found)
+        );
+
+        let pinned = workspace(&[
+            ("workspace.json", "{}"),
+            ("domains/plans/services/plan_badge.py", CONSUMER_WITH_UNIT),
+        ]);
+        let address = pin_into_store(pinned.path(), "plan_rules", "plan_rules.py", STORAGE_UNIT);
+        let found = match check(pinned.path()) {
+            Ok(v) => v,
+            Err(e) if skip_without_cpython(&e) => return,
+            Err(e) => panic!("{e}"),
+        };
+        assert_eq!(found.registers.len(), 1);
+        let register = &found.registers[0];
+        assert_eq!(register.rejections.len(), 1, "{}", human_report(&found));
+        assert_eq!(register.rejections[0].code, "FL0115");
+        assert!(
+            register
+                .path
+                .starts_with(&pinned.path().display().to_string()),
+            "spelled under the workspace root, not the scratch copy: {}",
+            register.path
+        );
+        assert!(
+            register
+                .path
+                .ends_with("domains/plans/services/plan_rules.py")
+        );
+        let text = register.rejections[0].to_string();
+        assert!(text.contains(&address), "{text}");
+        assert!(
+            !pinned
+                .path()
+                .join("domains/plans/services/plan_rules.py")
+                .exists(),
+            "the pinned unit is never written into the customer's tree"
+        );
+        assert_eq!(found.units.len(), 1);
+        assert!(found.units[0].starts_with(pinned.path()));
+    }
+
+    /// A pin the store does not hold refuses before any source is read,
+    /// naming the unit, the address and the verb that fetches it.
+    #[test]
+    fn a_pin_missing_from_the_store_is_refused_naming_it() {
+        let ws = workspace(&[
+            ("workspace.json", "{}"),
+            ("domains/plans/services/plan_badge.py", CONSUMER_WITH_UNIT),
+            (
+                forge_platform_wire::UNIT_PINS_PATH,
+                r#"{"version":1,"units":{"plan_rules":"sha256-e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"}}"#,
+            ),
+        ]);
+        let err = check(ws.path()).expect_err("an unresolvable pin");
+        assert!(err.contains("`plan_rules`"), "{err}");
+        assert!(err.contains("sha256-e3b0c442"), "{err}");
+        assert!(err.contains("forge units pull"), "{err}");
+    }
+
+    /// Bytes in the store that do not hash to their address are refused:
+    /// the store is verified, never trusted.
+    #[test]
+    fn a_tampered_store_entry_is_refused() {
+        let ws = workspace(&[
+            ("workspace.json", "{}"),
+            ("domains/plans/services/plan_badge.py", CONSUMER_WITH_UNIT),
+        ]);
+        let address = pin_into_store(ws.path(), "plan_rules", "plan_rules.py", UNIT);
+        std::fs::write(
+            crate::pins::store_dir(ws.path())
+                .join(&address)
+                .join("plan_rules.py"),
+            STORAGE_UNIT,
+        )
+        .unwrap();
+        let err = check(ws.path()).expect_err("edited bytes");
+        assert!(err.contains("does not hash to its address"), "{err}");
     }
 }

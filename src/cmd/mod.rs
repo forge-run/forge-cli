@@ -26,6 +26,7 @@ pub mod static_cmd;
 pub mod surface_lint;
 pub mod tenant;
 pub mod tokens;
+pub mod units;
 pub mod update;
 pub mod wasm_upload;
 pub mod whoami;
