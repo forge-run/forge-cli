@@ -16,6 +16,9 @@ name = "forge"
 path = "src/main.rs"
 
 [dependencies]
+# The pinned check stages a scratch copy of the tree (`pins::stage`), so the
+# scratch dir is a runtime dependency and not only the tests'.
+tempfile = "3"
 anyhow = "1"
 clap = { version = "4", features = ["derive", "env"] }
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "rustls-tls-native-roots", "json"] }
