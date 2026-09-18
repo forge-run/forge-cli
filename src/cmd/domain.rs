@@ -92,14 +92,14 @@ pub async fn run(cmd: DomainCmd) -> Result<()> {
 
 // ── HTTP plumbing ────────────────────────────────────────────────
 
-struct CpClient {
-    client: reqwest::Client,
-    base_url: String,
-    bearer: String,
+pub(crate) struct CpClient {
+    pub(crate) client: reqwest::Client,
+    pub(crate) base_url: String,
+    pub(crate) bearer: String,
 }
 
 impl CpClient {
-    fn from_env() -> Result<Self> {
+    pub(crate) fn from_env() -> Result<Self> {
         let base_url = std::env::var("FORGE_CP_URL").context(
             "FORGE_CP_URL not set — point at the control-plane base URL \
              (e.g., https://cp.internal.forge.run). Required for `forge domain`.",
@@ -120,7 +120,7 @@ impl CpClient {
     }
 }
 
-fn resolve_tenant_id(override_id: Option<String>) -> Result<String> {
+pub(crate) fn resolve_tenant_id(override_id: Option<String>) -> Result<String> {
     if let Some(id) = override_id {
         return Ok(id);
     }

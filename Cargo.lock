@@ -842,6 +842,7 @@ dependencies = [
  "clap",
  "forge-lang-rustgen",
  "forge-manifest",
+ "forge-platform-wire",
  "forge-schema",
  "forge-types",
  "forge-web-build",
@@ -932,6 +933,17 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "blake3",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "forge-platform-wire"
+version = "0.1.0"
+dependencies = [
+ "base64",
+ "ed25519-dalek",
+ "getrandom 0.2.17",
  "serde",
  "serde_json",
 ]

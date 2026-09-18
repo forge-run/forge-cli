@@ -16,6 +16,9 @@ name = "forge"
 path = "src/main.rs"
 
 [dependencies]
+# The pinned check stages a scratch copy of the tree (`pins::stage`), so the
+# scratch dir is a runtime dependency and not only the tests'.
+tempfile = "3"
 anyhow = "1"
 clap = { version = "4", features = ["derive", "env"] }
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "rustls-tls-native-roots", "json"] }
@@ -79,6 +82,10 @@ forge-web-build = { path = "../forge-web/build" }
 # two can link this crate at two revisions. `EMITTER_VERSION` and a named
 # refusal are what close that (§4.2).
 forge-lang-rustgen = { path = "../forge-lang/crates/forge-lang-rustgen" }
+# Shared units (D-110): the pin file, the address and the publish/record
+# shapes are the wire crate's, so `forge check`, `forge units` and the
+# control plane read one definition.
+forge-platform-wire = { path = "../forge-platform-wire" }
 # Wrap the wasm32-wasip1 cdylib as a Component-Model artifact
 # before deploy. forge-runtime W3 cutover (2026-05-15) made the
 # runtime reject core modules — only Components instantiate. The

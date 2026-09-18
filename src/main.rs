@@ -29,6 +29,7 @@ mod config;
 mod contract_lint;
 mod dialect;
 mod lane;
+mod pins;
 
 #[derive(Debug, Parser)]
 #[command(name = "forge", version, about, long_about = None)]
@@ -188,6 +189,13 @@ enum Cmd {
     #[command(subcommand)]
     Domain(cmd::domain::DomainCmd),
 
+    /// Shared units published by content hash (D-110). Operator-only
+    /// (direct-to-CP via FORGE_CP_URL + FORGE_ADMIN_TOKEN): publish a
+    /// unit, list an owner's, or pull what forge.units.json pins into the
+    /// local store `forge check` reads.
+    #[command(subcommand)]
+    Units(cmd::units::UnitsCmd),
+
     /// Phase G.1 — watch the project tree and redeploy on change.
     /// Foreground process; runs `forge build` + `forge deploy`
     /// (+ `forge static upload`) when a `.page.json`, `.component.css`,
@@ -315,6 +323,7 @@ async fn main() -> Result<()> {
         Cmd::Update(args) => cmd::update::run(args).await,
         Cmd::Tenant(t) => cmd::tenant::run(t).await,
         Cmd::Domain(d) => cmd::domain::run(d).await,
+        Cmd::Units(u) => cmd::units::run(u).await,
         Cmd::Dev(args) => cmd::dev::run(args).await,
         Cmd::Pages(args) => cmd::pages::run(args).await,
         Cmd::Components(args) => cmd::components::run(args).await,
