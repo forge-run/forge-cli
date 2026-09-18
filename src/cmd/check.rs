@@ -959,7 +959,7 @@ def plan_badge(ctx: OpContext, input: Value) -> Badge:
         };
         assert_eq!(found.registers.len(), 1, "{}", human_report(&found));
         let rendered = found.registers[0].render();
-        assert!(rendered.contains("FL0113"), "{rendered}");
+        assert!(rendered.contains("FL0115"), "{rendered}");
         assert!(rendered.contains("plan_rules.py"), "{rendered}");
         assert_eq!(found.units.len(), 2, "both files are units of the one op");
     }
@@ -1007,7 +1007,7 @@ def plan_badge(ctx: OpContext, input: Value) -> Badge:
     }
 
     /// The CLI half of the pair: the same storage-reaching unit is accepted
-    /// carried beside the op and refused pinned, with `FL0115` against the
+    /// carried beside the op and refused pinned, with `FL0117` against the
     /// unit's file spelled under the WORKSPACE root, naming its address —
     /// the register the control plane renders at push over the same tree.
     #[test]
@@ -1041,7 +1041,7 @@ def plan_badge(ctx: OpContext, input: Value) -> Badge:
         assert_eq!(found.registers.len(), 1);
         let register = &found.registers[0];
         assert_eq!(register.rejections.len(), 1, "{}", human_report(&found));
-        assert_eq!(register.rejections[0].code, "FL0115");
+        assert_eq!(register.rejections[0].code, "FL0117");
         assert!(
             register
                 .path
