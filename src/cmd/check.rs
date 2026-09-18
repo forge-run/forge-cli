@@ -237,7 +237,7 @@ impl Verdicts {
     }
 
     /// Anything at all that should stop a build.
-    fn ok(&self) -> bool {
+    pub(crate) fn ok(&self) -> bool {
         self.refused() == 0 && self.mismatches.is_empty()
     }
 }

@@ -23,7 +23,7 @@ use std::path::PathBuf;
 
 use anyhow::{Context, Result};
 use clap::Args;
-use forge_lang_rustgen::workspace_types;
+use forge_lang_rustgen::{Lang, subset_skill, workspace_types};
 
 #[derive(Debug, Args)]
 pub struct NewArgs {
@@ -41,6 +41,26 @@ pub struct NewArgs {
     /// List the available starter templates and exit.
     #[arg(long)]
     list: bool,
+
+    /// Write the `workspace` template's starter op in a dialect —
+    /// `python`, `typescript`, `java` or `rust` — instead of as a raw wasm
+    /// crate, with that dialect's subset skill under `.forge/skill/` for the
+    /// coding agent that writes the next op.
+    #[arg(long, value_parser = parse_dialect)]
+    dialect: Option<Lang>,
+}
+
+/// `--dialect`'s value, as the author would spell the language.
+fn parse_dialect(s: &str) -> std::result::Result<Lang, String> {
+    match s {
+        "python" | "py" => Ok(Lang::Python),
+        "typescript" | "ts" => Ok(Lang::TypeScript),
+        "java" => Ok(Lang::Java),
+        "rust" | "rs" => Ok(Lang::Rust),
+        other => Err(format!(
+            "unknown dialect `{other}` — one of python, typescript, java, rust"
+        )),
+    }
 }
 
 /// One-line description per template, shown by `--list`. Keep in sync with
@@ -189,6 +209,16 @@ pub async fn run(args: NewArgs) -> Result<()> {
     })?;
 
     validate_crate_name(crate_name)?;
+
+    if let Some(lang) = args.dialect {
+        if template != "workspace" {
+            anyhow::bail!(
+                "--dialect scaffolds the `workspace` template; `{template}` is a single \
+                 wasm crate with no dialect to choose"
+            );
+        }
+        return scaffold_dialect_workspace(crate_name, lang);
+    }
 
     // Workspace-graph templates take a different scaffolding path (multi-dir
     // tree + `forge ship` next-steps).
@@ -342,6 +372,129 @@ fn scaffold_workspace(crate_name: &str, template: &str, files: &[(&str, &str)]) 
     eprintln!("  git remote add forge https://git.forge.run/<workspace-id>/{crate_name}");
     eprintln!("  forge ship                             # build → upload → push → converge");
     Ok(())
+}
+
+/// The dialect scaffold's own files: the README and one starter op per
+/// dialect. Everything else comes from the `workspace` template minus its
+/// wasm crate — a dialect workspace builds nothing on the author's side.
+const DIALECT_README: &str = include_str!("../../templates/workspace-dialect/README.md");
+const DIALECT_OPS: &[(Lang, &str, &str)] = &[
+    (
+        Lang::Python,
+        "hello.py",
+        include_str!("../../templates/workspace-dialect/hello.py"),
+    ),
+    (
+        Lang::TypeScript,
+        "hello.ts",
+        include_str!("../../templates/workspace-dialect/hello.ts"),
+    ),
+    (
+        Lang::Java,
+        "Hello.java",
+        include_str!("../../templates/workspace-dialect/Hello.java"),
+    ),
+    (
+        Lang::Rust,
+        "hello.rs",
+        include_str!("../../templates/workspace-dialect/hello.rs"),
+    ),
+];
+
+/// The `workspace` template's files a dialect workspace does not carry: the
+/// cargo manifests and the raw wasm module.
+const WASM_ONLY: &[&str] = &[
+    "Cargo.toml",
+    "domains/{{domain}}/Cargo.toml",
+    "domains/{{domain}}/services/lib.rs",
+    "README.md",
+];
+
+fn dialect_name(lang: Lang) -> &'static str {
+    match lang {
+        Lang::Python => "Python",
+        Lang::TypeScript => "TypeScript",
+        Lang::Java => "Java",
+        Lang::Rust => "Rust",
+    }
+}
+
+/// `forge new --template workspace --dialect <lang>`: a workspace whose
+/// starter op is dialect source, and whose coding agent has the subset skill.
+fn scaffold_dialect_workspace(crate_name: &str, lang: Lang) -> Result<()> {
+    let target_dir = PathBuf::from(crate_name);
+    if target_dir.exists() {
+        anyhow::bail!(
+            "directory `{}` already exists — pick a different name or remove it first",
+            target_dir.display(),
+        );
+    }
+    let domain = derive_domain_name(crate_name);
+    let skill = write_dialect_tree(&target_dir, crate_name, &domain, lang)?;
+    git_init_scaffold(&target_dir);
+
+    eprintln!(
+        "created {} workspace {} (domain `{}`)",
+        dialect_name(lang),
+        target_dir.display(),
+        domain,
+    );
+    eprintln!(
+        "the subset skill for your coding agent: {}",
+        skill.display()
+    );
+    eprintln!();
+    eprintln!("next steps:");
+    eprintln!("  cd {}", target_dir.display());
+    eprintln!("  forge check                            # the push's verdict, locally");
+    eprintln!("  forge ws use <workspace-id>");
+    eprintln!("  git remote add forge https://git.forge.run/<workspace-id>/{crate_name}");
+    eprintln!("  git push forge main");
+    Ok(())
+}
+
+/// Everything a dialect scaffold writes before `git init`: the workspace
+/// tree with the starter op in `lang`, then the dialect's subset skill
+/// (typed-boundary TB-7) beside the schema surface TB-6 writes. Answers the
+/// skill's path.
+fn write_dialect_tree(
+    target_dir: &std::path::Path,
+    crate_name: &str,
+    domain: &str,
+    lang: Lang,
+) -> Result<PathBuf> {
+    let (_, base) = WORKSPACE_TEMPLATES[0];
+    let (_, op_file, op_body) = DIALECT_OPS
+        .iter()
+        .find(|(l, _, _)| *l == lang)
+        .expect("every dialect has a starter op");
+    let op_path = format!("domains/{{{{domain}}}}/services/{op_file}");
+    let readme = DIALECT_README
+        .replace("{{dialect_name}}", dialect_name(lang))
+        .replace("{{op_file}}", op_file)
+        .replace("{{skill_file}}", subset_skill::file_name(lang));
+
+    let mut files: Vec<(&str, &str)> = base
+        .iter()
+        .filter(|(path, _)| !WASM_ONLY.contains(path))
+        .copied()
+        .collect();
+    files.push(("README.md", &readme));
+    files.push((&op_path, op_body));
+    // The Rust dialect shares `.rs` with raw wasm Rust; the marker is the
+    // workspace's ruling that its `.rs` sources are dialect (`dialect.rs`).
+    if lang == Lang::Rust {
+        files.push((".forge-interpret", ""));
+    }
+    write_workspace_tree(target_dir, crate_name, domain, "", &files)?;
+
+    subset_skill::write(target_dir, lang).with_context(|| {
+        format!(
+            "writing {}/{}",
+            subset_skill::SKILL_DIR,
+            subset_skill::file_name(lang)
+        )
+    })
 }
 
 /// Everything a workspace scaffold writes before `git init`: the template,
@@ -870,5 +1023,56 @@ mod tests {
             tree,
             "regenerated types moved the tree"
         );
+    }
+
+    /// typed-boundary TB-7: `forge new --dialect` hands the coding agent the
+    /// dialect's subset skill beside the schema surface, byte-identical to
+    /// the template the front half generates (and its golden test pins), and
+    /// the starter op beside it is one the push's checker admits.
+    #[test]
+    fn a_dialect_scaffold_emits_the_generated_skill_and_an_admitted_starter() {
+        for lang in [Lang::Python, Lang::TypeScript, Lang::Java, Lang::Rust] {
+            let tmp = tempfile::tempdir().unwrap();
+            let dir = tmp.path().join("acme");
+            let skill = write_dialect_tree(&dir, "acme", "acme", lang).unwrap();
+
+            // The template in the forge-lang tree this binary linked, which
+            // that tree's golden test pins to the generator.
+            let template = subset_skill::template_path(lang);
+            let emitted = std::fs::read(&skill).unwrap();
+            let generated =
+                std::fs::read(&template).unwrap_or_else(|e| panic!("{}: {e}", template.display()));
+            assert!(
+                emitted == generated,
+                "{lang:?}: the emitted skill is not the generated {}",
+                template.display()
+            );
+            assert_eq!(emitted, subset_skill::text(lang).as_bytes());
+            assert!(
+                skill.starts_with(dir.join(workspace_types::TYPES_DIR).parent().unwrap()),
+                "{lang:?}: the skill is not beside the schema surface"
+            );
+            assert!(dir.join(workspace_types::TYPES_DIR).is_dir());
+            for wasm in ["Cargo.toml", "domains/acme/services/lib.rs"] {
+                assert!(!dir.join(wasm).exists(), "{lang:?}: {wasm} scaffolded");
+            }
+
+            match crate::cmd::check::check(&dir) {
+                Ok(found) => {
+                    assert_eq!(found.registers.len(), 1, "{lang:?}: one starter op");
+                    assert!(
+                        found.ok(),
+                        "{lang:?}: the starter is refused:\n{}",
+                        found.registers[0].render()
+                    );
+                }
+                Err(e) => panic!("{lang:?}: the checker could not run: {e}"),
+            }
+
+            git(&dir, &["init", "-q", "-b", "main"]);
+            git(&dir, &["add", "-A"]);
+            let pushed = git(&dir, &["ls-files"]);
+            assert!(!pushed.contains(".forge/"), "the push carries the skill");
+        }
     }
 }
