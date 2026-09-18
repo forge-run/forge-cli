@@ -81,5 +81,8 @@ pub async fn run(args: PullArgs, client: &ForgeClient) -> Result<()> {
         }
         eprintln!("pull: fast-forwarded {branch}");
     }
+    // The editor's schema types follow the tree's `schema.lock`, which a
+    // fast-forward may just have moved (typed-boundary TB-6).
+    crate::cmd::schema::refresh_types(dir);
     Ok(())
 }

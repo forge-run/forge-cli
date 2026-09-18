@@ -23,6 +23,7 @@ use std::path::PathBuf;
 
 use anyhow::{Context, Result};
 use clap::Args;
+use forge_lang_rustgen::workspace_types;
 
 #[derive(Debug, Args)]
 pub struct NewArgs {
@@ -314,27 +315,8 @@ fn scaffold_workspace(crate_name: &str, template: &str, files: &[(&str, &str)]) 
     }
 
     let domain = derive_domain_name(crate_name);
-    let domain_crate = format!("forge-domain-{domain}");
     let (sdk_dep_line, sdk_resolved) = resolve_sdk_dep();
-
-    let subst = |s: &str| -> String {
-        s.replace("{{domain}}", &domain)
-            .replace("{{domain_crate}}", &domain_crate)
-            .replace("{{workspace_name}}", crate_name)
-            .replace("forge-sdk-v2 = { path = \"../..\" }", &sdk_dep_line)
-    };
-
-    for (rel_path, content) in files {
-        // `{{domain}}` appears in emitted paths too (the domain directory).
-        let rel = subst(rel_path);
-        let path = target_dir.join(&rel);
-        if let Some(parent) = path.parent() {
-            std::fs::create_dir_all(parent)
-                .with_context(|| format!("creating {}", parent.display()))?;
-        }
-        std::fs::write(&path, subst(content))
-            .with_context(|| format!("writing {}", path.display()))?;
-    }
+    write_workspace_tree(&target_dir, crate_name, &domain, &sdk_dep_line, files)?;
 
     git_init_scaffold(&target_dir);
 
@@ -359,6 +341,58 @@ fn scaffold_workspace(crate_name: &str, template: &str, files: &[(&str, &str)]) 
     eprintln!("  forge ws use <workspace-id>");
     eprintln!("  git remote add forge https://git.forge.run/<workspace-id>/{crate_name}");
     eprintln!("  forge ship                             # build → upload → push → converge");
+    Ok(())
+}
+
+/// Everything a workspace scaffold writes before `git init`: the template,
+/// the two editor configs committed once at the root, `schema.lock`, and the
+/// git-ignored `.forge/types/` the editor configs point at (typed-boundary
+/// TB-6) — so the first file the engineer opens already resolves
+/// `forge.schema`. A schema that will not compile leaves the scaffold intact
+/// and says so; `forge schema compile` writes both later.
+fn write_workspace_tree(
+    target_dir: &std::path::Path,
+    crate_name: &str,
+    domain: &str,
+    sdk_dep_line: &str,
+    files: &[(&str, &str)],
+) -> Result<()> {
+    let domain_crate = format!("forge-domain-{domain}");
+    let subst = |s: &str| -> String {
+        s.replace("{{domain}}", domain)
+            .replace("{{domain_crate}}", &domain_crate)
+            .replace("{{workspace_name}}", crate_name)
+            .replace("forge-sdk-v2 = { path = \"../..\" }", sdk_dep_line)
+    };
+
+    let editor = [
+        ("tsconfig.json", workspace_types::ROOT_TSCONFIG),
+        ("pyrightconfig.json", workspace_types::ROOT_PYRIGHTCONFIG),
+    ];
+    for (rel_path, content) in files.iter().chain(editor.iter()) {
+        // `{{domain}}` appears in emitted paths too (the domain directory).
+        let rel = subst(rel_path);
+        let path = target_dir.join(&rel);
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent)
+                .with_context(|| format!("creating {}", parent.display()))?;
+        }
+        std::fs::write(&path, subst(content))
+            .with_context(|| format!("writing {}", path.display()))?;
+    }
+
+    match crate::cmd::schema::compile_snapshot(target_dir) {
+        Ok(compiled) => {
+            let lock = target_dir.join(forge_lang_rustgen::SNAPSHOT_FILE);
+            std::fs::write(&lock, &compiled.text)
+                .with_context(|| format!("writing {}", lock.display()))?;
+            crate::cmd::schema::refresh_types(target_dir);
+        }
+        Err(e) => eprintln!(
+            "⚠  schema.lock not written ({e:#}) — run `forge schema compile` once the \
+             schema compiles, and your editor's types come with it"
+        ),
+    }
     Ok(())
 }
 
@@ -747,5 +781,94 @@ mod tests {
                  substitution will silently leave the template's name in the customer's crate",
             );
         }
+    }
+
+    fn git(dir: &std::path::Path, args: &[&str]) -> String {
+        let out = std::process::Command::new("git")
+            .args([
+                "-c",
+                "user.name=forge-test",
+                "-c",
+                "user.email=test@forge.invalid",
+            ])
+            .args(args)
+            .current_dir(dir)
+            .output()
+            .expect("git runs");
+        assert!(
+            out.status.success(),
+            "git {args:?}: {}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+        String::from_utf8_lossy(&out.stdout).trim().to_string()
+    }
+
+    /// V-2, asserted rather than assumed (typed-boundary TB-6): a scaffold
+    /// writes the editor's schema types, and the tree `git push` would carry
+    /// is byte-identical with them present, absent, and regenerated — the
+    /// push, and so push-to-live, cannot see them.
+    #[test]
+    fn a_workspace_scaffold_writes_the_editor_types_and_pushes_without_them() {
+        let tmp = tempfile::tempdir().unwrap();
+        let dir = tmp.path().join("acme");
+        let (_, files) = WORKSPACE_TEMPLATES[0];
+        write_workspace_tree(&dir, "acme", "acme", "forge-sdk-v2 = \"0\"", files).unwrap();
+
+        let types = dir.join(workspace_types::TYPES_DIR);
+        for rel in [
+            "py/forge/__init__.py",
+            "py/forge_schema/__init__.py",
+            "ts/forge.d.ts",
+            "ts/schema.ts",
+            "rust/src/schema.rs",
+        ] {
+            assert!(types.join(rel).is_file(), "{rel} missing from the scaffold");
+        }
+        // The runtime-owned tables reach the editor from a fresh scaffold.
+        assert!(types.join("py/forge_schema/audit_events.py").is_file());
+        assert_eq!(
+            std::fs::read_to_string(dir.join("tsconfig.json")).unwrap(),
+            workspace_types::ROOT_TSCONFIG
+        );
+        assert_eq!(
+            std::fs::read_to_string(dir.join("pyrightconfig.json")).unwrap(),
+            workspace_types::ROOT_PYRIGHTCONFIG
+        );
+
+        git(&dir, &["init", "-q", "-b", "main"]);
+        git(&dir, &["add", "-A"]);
+        git(&dir, &["commit", "-q", "-m", "scaffold"]);
+        let pushed = git(&dir, &["ls-tree", "-r", "--name-only", "HEAD"]);
+        assert!(
+            !pushed.contains(".forge/"),
+            "the push carries the types:\n{pushed}"
+        );
+        for committed in ["schema.lock", "tsconfig.json", "pyrightconfig.json"] {
+            assert!(
+                pushed.lines().any(|l| l == committed),
+                "{committed} not committed"
+            );
+        }
+        let tree = git(&dir, &["rev-parse", "HEAD^{tree}"]);
+
+        std::fs::remove_dir_all(&types).unwrap();
+        git(&dir, &["add", "-A"]);
+        assert_eq!(
+            git(&dir, &["write-tree"]),
+            tree,
+            "absent types moved the tree"
+        );
+
+        crate::cmd::schema::refresh_types(&dir);
+        assert!(
+            types.join("ts/schema.ts").is_file(),
+            "refresh did not rewrite"
+        );
+        git(&dir, &["add", "-A"]);
+        assert_eq!(
+            git(&dir, &["write-tree"]),
+            tree,
+            "regenerated types moved the tree"
+        );
     }
 }

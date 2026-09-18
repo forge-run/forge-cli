@@ -569,6 +569,43 @@ export const hello = op("hello", (ctx: OpContext, input: Value) => {
         assert_eq!(source["diagnostics"][0]["severity"], "error");
     }
 
+    /// The editor's schema types are never an input to the verdict
+    /// (typed-boundary TB-6): the same workspace, judged against the same
+    /// `schema.lock`, answers byte-for-byte the same envelope with
+    /// `.forge/types/` absent and present — and the tree holds dozens of `.py`
+    /// and `.ts` files a checker that walked it would have judged.
+    #[test]
+    fn the_editor_types_are_never_an_input_to_the_verdict() {
+        let ws = workspace(&[
+            ("workspace.json", "{}"),
+            ("domains/a/services/hello.py", ACCEPTED),
+            ("domains/b/services/hello.py", REFUSED),
+            ("domains/c/services/hello.ts", ACCEPTED_TS),
+        ]);
+        let compiled = crate::cmd::schema::compile_snapshot(ws.path()).unwrap();
+        std::fs::write(
+            ws.path().join(forge_lang_rustgen::SNAPSHOT_FILE),
+            &compiled.text,
+        )
+        .unwrap();
+        let judge = || match check(ws.path()) {
+            Ok(v) => Some(envelope(ws.path(), &v)),
+            Err(e) if skip_without_cpython(&e) => None,
+            Err(e) => panic!("{e}"),
+        };
+        let Some(absent) = judge() else { return };
+        crate::cmd::schema::refresh_types(ws.path());
+        let types = ws
+            .path()
+            .join(forge_lang_rustgen::workspace_types::TYPES_DIR);
+        assert!(types.join("py/forge_schema/audit_events.py").is_file());
+        assert!(types.join("ts/schema.ts").is_file());
+        let present = judge().expect("the toolchain answered once already");
+        assert_eq!(absent, present);
+        let doc: serde_json::Value = serde_json::from_str(&present).unwrap();
+        assert_eq!(doc["sources"].as_array().map(Vec::len), Some(3));
+    }
+
     /// Rule zero, through the command: a table no loaded schema declares is
     /// FL0078, and the schema scope that finds it is the WHOLE workspace —
     /// this source is in `b` and the table it reads is declared by `a`.

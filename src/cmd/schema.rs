@@ -140,7 +140,43 @@ fn compile(args: CompileArgs) -> Result<()> {
         compiled.authored,
         compiled.bundle,
     );
+    refresh_types(&root);
     Ok(())
+}
+
+/// Regenerate `.forge/types/` from the workspace's `schema.lock`: the
+/// generated schema surface and the dialect library, in all four dialects,
+/// for the engineer's editor to resolve (typed-boundary TB-6).
+///
+/// Never fails the command it rides on. The tree is for READING — the push,
+/// `forge check` and the serving path never touch it — so a machine with no
+/// JDK, or a schema the generator will not map, is reported and the command
+/// goes on.
+pub(crate) fn refresh_types(root: &Path) {
+    use forge_lang_rustgen::workspace_types;
+    if !root.join(SNAPSHOT_FILE).is_file() {
+        eprintln!(
+            "types: no {SNAPSHOT_FILE} at {} — `forge schema compile` writes it, \
+             and {} with it",
+            root.display(),
+            workspace_types::TYPES_DIR
+        );
+        return;
+    }
+    match workspace_types::write(root) {
+        Ok(written) => {
+            eprintln!(
+                "wrote {} ({} files) — the schema your editor resolves; git-ignored, never pushed",
+                written.root.display(),
+                written.files
+            );
+            if let Err(why) = &written.java {
+                let first = why.lines().next().unwrap_or_default();
+                eprintln!("  java: no forge-schema.jar — {first}");
+            }
+        }
+        Err(e) => eprintln!("⚠  {} not written: {e}", workspace_types::TYPES_DIR),
+    }
 }
 
 #[derive(Debug, Args)]
