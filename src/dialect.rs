@@ -15,8 +15,8 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{Result, bail};
 use forge_lang_rustgen::{
-    CompileError, CompileSpec, Compiled, Defect, EMITTER_VERSION, Layout, Plants, Tables,
-    compile_all, lang_of,
+    CompileError, CompileSpec, Compiled, Defect, EMITTER_VERSION, InputSchemas, Layout, Plants,
+    Tables, compile_all_with_inputs, lang_of,
 };
 
 /// The reference directory a workspace keeps runtime-owned table schemas in.
@@ -276,6 +276,44 @@ pub fn schema_roots(root: &Path) -> Vec<PathBuf> {
     roots
 }
 
+/// Each op's declared `input_schema` from a domain's `service.json`, as JSON
+/// text keyed by op name — what the emitted crate checks an invocation
+/// against before the op body runs (forge-lang SF-4, `FL-INPUT-SCHEMA`).
+///
+/// The same map the control plane builds for both served tiers
+/// (`forge-control-plane` `interp::input_schemas`): both authored shapes, an
+/// op with no schema object left out, no `service.json` an empty map. A
+/// `service.json` that will not parse is refused, because emitting its ops
+/// unchecked would silently drop the checks its author declared.
+pub fn input_schemas(domain: &Path) -> Result<InputSchemas> {
+    let path = domain.join("service.json");
+    let Ok(bytes) = std::fs::read(&path) else {
+        return Ok(InputSchemas::new());
+    };
+    let doc: serde_json::Value = serde_json::from_slice(&bytes)
+        .map_err(|e| anyhow::anyhow!("parse {}: {e}", path.display()))?;
+    let ops_of = |v: &serde_json::Value| -> Vec<serde_json::Value> {
+        v.get("operations")
+            .and_then(serde_json::Value::as_array)
+            .cloned()
+            .unwrap_or_default()
+    };
+    let mut ops = ops_of(&doc);
+    if let Some(services) = doc.get("services").and_then(serde_json::Value::as_array) {
+        ops.extend(services.iter().flat_map(ops_of));
+    }
+    Ok(ops
+        .iter()
+        .filter_map(|op| {
+            let name = op.get("name")?.as_str()?;
+            let schema = op.get("input_schema")?;
+            schema
+                .is_object()
+                .then(|| (name.to_string(), schema.to_string()))
+        })
+        .collect())
+}
+
 /// The op names a domain's `service.json` DECLARES.
 ///
 /// `None` when there is no `service.json` — a domain may legitimately have
@@ -509,7 +547,8 @@ pub fn emit_with(root: &Path, rt: &Path, sdk: &Path) -> Result<Vec<EmittedDomain
             });
             continue;
         }
-        let compiled = compile_all(
+        let inputs = input_schemas(dir)?;
+        let compiled = compile_all_with_inputs(
             sources,
             tables.as_ref(),
             &CompileSpec {
@@ -545,6 +584,10 @@ pub fn emit_with(root: &Path, rt: &Path, sdk: &Path) -> Result<Vec<EmittedDomain
                 // different path (J-5: the S2 cutover requires this).
                 source_root: Some(root.to_path_buf()),
             },
+            // SF-4: the op input schemas, so the crate emitted here is the
+            // crate the control plane's compiled tier builds from the same
+            // tree, and both refuse what the interpreted tier refuses.
+            &inputs,
         )
         .map_err(|e| refusal(&name, e))?;
         emitted.push(EmittedDomain {
@@ -851,6 +894,54 @@ public final class Hello {
             eprintln!("skipping: {e}");
         }
         missing
+    }
+
+    /// SF-4: a domain whose `service.json` declares an op's `input_schema`
+    /// emits the check the served tiers run — the schema as the same text
+    /// the control plane hands the compiled tier, and the call before the
+    /// dispatch. A domain that declares none emits no check at all.
+    #[test]
+    fn a_declared_input_schema_is_emitted_as_the_ops_input_check() {
+        let schema = serde_json::json!({"type": "object", "required": ["name"]});
+        let service = serde_json::json!({"services": [
+            {"name": "greetings", "operations": [{"name": "hello", "input_schema": schema}]},
+        ]});
+        let ws = tree(&[
+            ("workspace.json", "{}"),
+            ("domains/greetings/services/hello.py", ACCEPTED),
+            ("domains/greetings/service.json", &service.to_string()),
+        ]);
+        match emit(ws.path()) {
+            Ok(_) => {}
+            Err(e) if skip_without_cpython(&format!("{e:#}")) => return,
+            Err(e) => panic!("{e:#}"),
+        }
+        let lib = std::fs::read_to_string(ws.path().join("domains/greetings/src/lib.rs")).unwrap();
+        assert!(
+            lib.contains(&format!("\"hello\" => {:?}", schema.to_string())),
+            "{lib}"
+        );
+        assert!(
+            lib.contains("crate::check_input(&ctx.op_name, &parsed)"),
+            "{lib}"
+        );
+
+        let flat = serde_json::json!({"operations": [{"name": "hello"}]});
+        std::fs::write(
+            ws.path().join("domains/greetings/service.json"),
+            flat.to_string(),
+        )
+        .unwrap();
+        emit(ws.path()).unwrap();
+        let lib = std::fs::read_to_string(ws.path().join("domains/greetings/src/lib.rs")).unwrap();
+        assert!(!lib.contains("check_input"), "{lib}");
+
+        std::fs::write(ws.path().join("domains/greetings/service.json"), "{").unwrap();
+        let Err(err) = emit(ws.path()) else {
+            panic!("an unparseable service.json was emitted unchecked");
+        };
+        let err = format!("{err:#}");
+        assert!(err.contains("service.json"), "{err}");
     }
 
     /// The emitted crate lands where the portal's Rust domains already are, is
