@@ -38,7 +38,7 @@ use std::path::{Path, PathBuf};
 
 use anyhow::Result;
 use clap::Args;
-use forge_lang_rustgen::{Card, CompileError, Register, check_only};
+use forge_lang_rustgen::{Card, CompileError, NativeValidation, Register, check_only};
 
 use crate::dialect;
 
@@ -179,7 +179,7 @@ pub(crate) fn check(root: &Path) -> Result<Verdicts, String> {
     // disagree about the same file.
     let mut defined: BTreeMap<String, Vec<String>> = BTreeMap::new();
     for source in &sources {
-        match check_only(source, tables.as_ref()) {
+        match check_only(source, tables.as_ref(), NativeValidation::Run) {
             // The emit refuses an op-less source, and this command says the
             // same thing in the same words rather than accepting a file
             // `forge wasm-build` will refuse a minute later.

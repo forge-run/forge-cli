@@ -537,6 +537,9 @@ pub fn emit_with(root: &Path, rt: &Path, sdk: &Path) -> Result<Vec<EmittedDomain
                     out_dir: dir.join("services/jgen"),
                     source_root: Some(root.to_path_buf()),
                 },
+                // The author's own machine: the native validators run here,
+                // and only here (PS-2a).
+                forge_lang_rustgen::NativeValidation::Run,
             )
             .map_err(|e| refusal(&name, e))?;
             emitted.push(EmittedDomain {
@@ -583,6 +586,7 @@ pub fn emit_with(root: &Path, rt: &Path, sdk: &Path) -> Result<Vec<EmittedDomain
                 // emitted crate is committed and CI checks it out at a
                 // different path (J-5: the S2 cutover requires this).
                 source_root: Some(root.to_path_buf()),
+                native: forge_lang_rustgen::NativeValidation::Run,
             },
             // SF-4: the op input schemas, so the crate emitted here is the
             // crate the control plane's compiled tier builds from the same
