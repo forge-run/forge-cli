@@ -523,6 +523,7 @@
         "roadmap",
         "canon"
       ],
+      "max_budget_usd": 2.0,
       "model": "claude-fable-5",
       "params": {},
       "prompt": "prompt.md",
@@ -550,6 +551,7 @@
       "inputs": [
         "diff"
       ],
+      "max_budget_usd": null,
       "model": "claude-fable-5",
       "params": {},
       "prompt": "prompt.md",
