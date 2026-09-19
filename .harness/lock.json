@@ -55,7 +55,7 @@
     },
     {
       "path": ".github/workflows/harness-gates.yml",
-      "sha256": "8b76026dd7eee17faf98e0dd0524bafa49120b92fbe32bca870338be691ce8b0"
+      "sha256": "1c00396ba08ab8c19e3231e3346fe5f2d6d0bf4c35a9f5a865f9c824b845b682"
     },
     {
       "path": ".gitignore#rules",
@@ -71,7 +71,7 @@
     },
     {
       "path": ".harness/plan.json",
-      "sha256": "47896e0aef7dd1597b7c270d392ae683329b344c74f54fee8bc458fc594028e4"
+      "sha256": "b1e8ba53c3f178ce6921e22243ad3bc34f3f75ac81b8658835066de36b1d7020"
     },
     {
       "path": ".harness/runner.py",
@@ -108,7 +108,7 @@
     },
     {
       "kind": "verifier",
-      "sha256": "3d4f283ddb41a41ba6e9312af1c9de9bf3e0a8f2fca5d144399badd18204a960",
+      "sha256": "d10bcc9be00e008178ae6db593e662d4ec1a5eb3a775c345b1396b2094230d3b",
       "source": "../../core/verifiers/ceo-review"
     },
     {
@@ -308,8 +308,8 @@
   "harness_dir": "harnesses/hybrid",
   "source": {
     "kind": "commit",
-    "ref": "0724ab09333967212171289afb16aa1016b956c4",
-    "sha": "0724ab09333967212171289afb16aa1016b956c4"
+    "ref": "aa9f3f578ef97d7a41ec8371ef091a5c57d1c422",
+    "sha": "aa9f3f578ef97d7a41ec8371ef091a5c57d1c422"
   },
   "targets": [
     "claude-code",

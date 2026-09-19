@@ -523,7 +523,7 @@
         "roadmap",
         "canon"
       ],
-      "max_budget_usd": 2.0,
+      "max_budget_usd": 8.0,
       "model": "claude-fable-5",
       "params": {},
       "prompt": "prompt.md",
