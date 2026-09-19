@@ -34,6 +34,7 @@ Copy this and fill it in. Every key shown on a step is REQUIRED except
   "intent": "What is true when every step is done, and why it is worth doing. Name the measurement.",
   "execution": "continuous",
   "model": "claude-fable-5-1",
+  "effort": "high",
   "budget": {"max_wall_hours": 8, "max_wakeups_without_evidence": 3},
   "out_of_scope": ["What this plan deliberately does not touch, one item per line."],
   "vision": {
@@ -71,6 +72,12 @@ Copy this and fill it in. Every key shown on a step is REQUIRED except
   note in `intent`, not an execution value.
 - `model`, when present, is a non-empty string naming the tier every turn
   runs on (`/forge-model-tiers`).
+- `effort`, when present, is one of `low`, `medium`, `high`, `xhigh`, `max`
+  (the CLI's `--effort` levels), and it applies to every turn of the driver.
+  Leave it out to run at the CLI default: the launch line prints "effort ...
+  (from CLI default)". `plan start <plan> -- --effort <level>` overrides it
+  for one run. It is the ORCHESTRATOR's effort. A delegated agent's effort
+  comes from its own frontmatter.
 - Every step: `id`, `title`, `status`, `acceptance` are required; `acceptance`
   is a non-empty array of strings. `status` is free text; the loop asks only
   whether it is one of `done`, `landed`, `landed_v0`.

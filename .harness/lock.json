@@ -2,7 +2,7 @@
   "emitted": [
     {
       "path": ".claude/agents/forge-implementer.md",
-      "sha256": "88fd09252516544c5b8fe52ff97c4fd472d2e78432473b3f4da834dc29a0d6c5"
+      "sha256": "1fa383baacfed99d560b0bd90b94d23dac530ddac9120d8badf9dbd7f5fded38"
     },
     {
       "path": ".claude/agents/forge-mechanic.md",
@@ -31,11 +31,11 @@
     },
     {
       "path": ".claude/skills/forge-model-tiers/SKILL.md",
-      "sha256": "d5a6f76b487cada62d4412a633ed9edccb485803db2ed6fd4d5d6031f48ec383"
+      "sha256": "ab54aad0984fa8cfd799bc5f283dc7c6fb166e756817e390afffa1519429e65e"
     },
     {
       "path": ".claude/skills/forge-roadmap/SKILL.md",
-      "sha256": "e5491c911dbd50089ce46d4c4b9d860a7bdb808ceefa762a9f141e302f330ff7"
+      "sha256": "b9637c6c6883e7733c70c6c0b0c37c9b6bd6836524c05e7adf34d95b708b76e0"
     },
     {
       "path": ".claude/skills/forge-session-economy/SKILL.md",
@@ -55,7 +55,7 @@
     },
     {
       "path": ".github/workflows/harness-gates.yml",
-      "sha256": "65bb891ad5c9bba3214c57736b980e267849e727a78926a50a6297af4aceaa38"
+      "sha256": "58a2ce10cd94315b3bb973190cd9edcdf0c96030b486446340232b9da26a041c"
     },
     {
       "path": ".gitignore#rules",
@@ -85,7 +85,7 @@
   "entries": [
     {
       "kind": "skill",
-      "sha256": "6730570e9808d61b837fc4689694e37bdf8c8bdfc55af00a564a6a25f8300529",
+      "sha256": "354ad6872f934578c9d8c0836472b431e95b1c37d515043bd71003540214c8e3",
       "source": "../../core/skills/forge-model-tiers"
     },
     {
@@ -95,7 +95,7 @@
     },
     {
       "kind": "skill",
-      "sha256": "e91291e6abfcf8beb9212637ac4dd0e53befb5b04e7f9f047a575e46879927c0",
+      "sha256": "b8775c702f53337f79d1f5f3388ae28704093e5e4e3e429d399ebe526b5ead7d",
       "source": "../../core/skills/forge-roadmap"
     },
     {
@@ -139,7 +139,7 @@
         "cargo": "cargo",
         "cargo_wrap": "bash -c"
       },
-      "sha256": "a0974b3aa6191c1b1d995f08d56c567a52b729f6b07be9fe85212a7d438099d5",
+      "sha256": "89d185013efd857092365897cd3f872ceea558ce0db25a93ad060cf622dae63a",
       "source": "../../core/agents/forge-mechanic"
     },
     {
@@ -148,7 +148,7 @@
         "cargo": "cargo",
         "cargo_wrap": "bash -c"
       },
-      "sha256": "2292b75875b64e57b525d476dc1ea56c47a1192691a3b2228ef713be7f85fbf1",
+      "sha256": "81c6d378431d1daeb50739e108371aa5a1e140a04ab3ab0fa9a62ed67fd7d034",
       "source": "../../core/agents/forge-implementer"
     },
     {
@@ -308,8 +308,8 @@
   "harness_dir": "harnesses/hybrid",
   "source": {
     "kind": "commit",
-    "ref": "a0b55fb7abb0af80934391723c5e1100368ee69f",
-    "sha": "a0b55fb7abb0af80934391723c5e1100368ee69f"
+    "ref": "0cd118e23c7b2061f8149deaf2c55d602be08615",
+    "sha": "0cd118e23c7b2061f8149deaf2c55d602be08615"
   },
   "targets": [
     "claude-code",
