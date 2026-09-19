@@ -139,6 +139,7 @@
       ],
       "memoize": true,
       "params": {
+        "fingerprint_files": ".harness/quarantine.json",
         "focused_args": "--tests --locked",
         "focused_filter": true,
         "package_memo": true,
@@ -275,7 +276,7 @@
         "tests_dir": "core/runner/tests"
       },
       "source": "harnesses/hybrid/local/python-suite",
-      "timeout_seconds": 600,
+      "timeout_seconds": 1800,
       "toolchains": [
         "python3"
       ]

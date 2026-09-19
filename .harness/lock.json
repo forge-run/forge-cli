@@ -55,7 +55,7 @@
     },
     {
       "path": ".github/workflows/harness-gates.yml",
-      "sha256": "fdcdeb7b86a9a17cfd70413398093f0ed781bb8672f00d23699bbc2734f49d35"
+      "sha256": "65bb891ad5c9bba3214c57736b980e267849e727a78926a50a6297af4aceaa38"
     },
     {
       "path": ".gitignore#rules",
@@ -71,7 +71,7 @@
     },
     {
       "path": ".harness/plan.json",
-      "sha256": "d81bef494d7b81ea8ca9c15fd3419c45e463dff8df6ac6398eff44c9f3265984"
+      "sha256": "0ff9f370e149b393d38e2831716dd2a5bda4bbe01db465ea93b0bdf5845da343"
     },
     {
       "path": ".harness/runner.py",
@@ -172,6 +172,7 @@
     {
       "kind": "gate",
       "params": {
+        "fingerprint_files": ".harness/quarantine.json",
         "focused_args": "--tests --locked",
         "focused_filter": true,
         "package_memo": true,
@@ -180,7 +181,7 @@
         "scope": "full",
         "test_args": "--workspace --locked"
       },
-      "sha256": "e47bbb2d9bec2e5b159bc65ce76c84035a669c4593af62a6731dcbde52f09c71",
+      "sha256": "9c27b45d295a0a38c184664bd7c8a176d0d3ff01540e3eaf7dfed4d75b51a865",
       "source": "../../core/gates/cargo-tests"
     },
     {
@@ -223,7 +224,7 @@
       "params": {
         "tests_dir": "core/runner/tests"
       },
-      "sha256": "a5f20517d6827b3f529c3c05fe06cdd987f3b1ff185de96cdc104f47e227870d",
+      "sha256": "446c8dd3fb7a7696f11d63ab7e89c4d172e73743967c26986d8c33d05035262e",
       "source": "local/python-suite"
     },
     {
@@ -307,8 +308,8 @@
   "harness_dir": "harnesses/hybrid",
   "source": {
     "kind": "commit",
-    "ref": "3f2f825",
-    "sha": "3f2f825324348a81bce563c8e15cac9101f641e3"
+    "ref": "a0b55fb7abb0af80934391723c5e1100368ee69f",
+    "sha": "a0b55fb7abb0af80934391723c5e1100368ee69f"
   },
   "targets": [
     "claude-code",
