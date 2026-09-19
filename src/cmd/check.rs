@@ -38,7 +38,7 @@ use std::path::{Path, PathBuf};
 
 use anyhow::Result;
 use clap::Args;
-use forge_lang_rustgen::{Card, CompileError, Register, check_only};
+use forge_lang_rustgen::{Card, CompileError, NativeValidation, Register, check_only};
 
 use crate::dialect;
 
@@ -179,7 +179,7 @@ pub(crate) fn check(root: &Path) -> Result<Verdicts, String> {
     // disagree about the same file.
     let mut defined: BTreeMap<String, Vec<String>> = BTreeMap::new();
     for source in &sources {
-        match check_only(source, tables.as_ref()) {
+        match check_only(source, tables.as_ref(), NativeValidation::Run) {
             // The emit refuses an op-less source, and this command says the
             // same thing in the same words rather than accepting a file
             // `forge wasm-build` will refuse a minute later.
@@ -502,6 +502,52 @@ export const hello = op("hello", (ctx: OpContext, input: Value) => {
             eprintln!("skipping: {e}");
         }
         missing
+    }
+
+    /// `forge check` is where the native validators run, and since PS-2a the
+    /// only place: the control plane checks a pushed tree with none of them.
+    /// The Rust gate's cargo is pointed at a stand-in that records the call
+    /// and then runs the real cargo, so a test sharing the variable is
+    /// unharmed. A call site flipped to `NativeValidation::Skip` never
+    /// reaches it, and this fails.
+    #[cfg(unix)]
+    #[test]
+    fn forge_check_runs_the_native_rust_gate_on_the_authors_machine() {
+        use std::os::unix::fs::PermissionsExt;
+        const RUST_OP: &str = "use forge::{OpContext, Value};\nuse serde::Serialize;\n\n\
+#[derive(Serialize)]\npub struct Out {\n    n: i64,\n}\n\n\
+pub fn op(ctx: &OpContext, input: &Value) -> Out {\n    \
+let n: i64 = input.get_i64(\"n\", 0);\n    Out { n: n }\n}\n";
+        let ws = workspace(&[
+            ("workspace.json", "{}"),
+            // The marker that makes `.rs` the Rust dialect (`rust_is_dialect`).
+            (".forge-interpret", ""),
+            ("domains/a/services/op.rs", RUST_OP),
+        ]);
+        let ran = ws.path().join("cargo-ran");
+        let sentinel = ws.path().join("sentinel-cargo");
+        std::fs::write(
+            &sentinel,
+            format!(
+                "#!/bin/sh\nprintf 'ran\\n' >> '{}'\nexec \"${{CARGO:-cargo}}\" \"$@\"\n",
+                ran.display()
+            ),
+        )
+        .unwrap();
+        std::fs::set_permissions(&sentinel, std::fs::Permissions::from_mode(0o755)).unwrap();
+        // SAFETY: the sentinel passes through to the real cargo, so a test
+        // reading this variable concurrently behaves as it did without it.
+        unsafe { std::env::set_var("FORGE_LANG_RUST_GATE_CARGO", &sentinel) };
+        let found = check(ws.path());
+        unsafe { std::env::remove_var("FORGE_LANG_RUST_GATE_CARGO") };
+        let found = found.unwrap_or_else(|e| panic!("{e}"));
+        assert!(!found.is_empty(), "the Rust source was not walked");
+        assert_eq!(found.refused(), 0, "{}", human_report(&found));
+        assert!(
+            ran.exists(),
+            "`forge check` did not run the native Rust gate: the author's own \
+             machine is the one place it still runs"
+        );
     }
 
     #[test]
