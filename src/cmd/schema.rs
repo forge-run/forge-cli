@@ -422,6 +422,12 @@ pub fn compile_snapshot(root: &Path) -> Result<CompiledSnapshot> {
             if col.primary_key {
                 doc.insert("primary_key".into(), true.into());
             }
+            // Presence only, never the value: the lock is a shape artifact,
+            // and a checker refusing an insert that omits a NOT NULL column
+            // needs to know only that the database will fill it.
+            if col.default.is_some() {
+                doc.insert("has_default".into(), true.into());
+            }
             if system.contains(&col.name) {
                 doc.insert("system".into(), true.into());
             }
@@ -642,6 +648,37 @@ mod tests {
         // The parse is the apply's parse: `accept_destructive` was stripped
         // as a directive, not rejected as an unknown field.
         assert_eq!(doc["forge_schema_lock"], 1);
+    }
+
+    #[test]
+    fn has_default_marks_only_defaulted_columns() {
+        let ws = workspace();
+        std::fs::write(
+            ws.path().join("domains/d/schemas/gadgets.table.json"),
+            r#"{"name":"gadgets","archetype":"Base",
+                "label":"Gadget","plural_label":"Gadgets","header_fields":["label"],
+                "columns":[{"name":"status","type":"string","default":"new"},
+                           {"name":"label","type":"string"}]}"#,
+        )
+        .unwrap();
+        let compiled = compile_snapshot(ws.path()).unwrap();
+        let doc: serde_json::Value = serde_json::from_str(&compiled.text).unwrap();
+        let cols = doc["tables"]["gadgets"]["columns"].as_array().unwrap();
+        let col = |n: &str| cols.iter().find(|c| c["name"] == n).unwrap();
+        // Both NOT NULL; only the defaulted one carries the mark, and the
+        // default's value never enters the lock.
+        assert_eq!(col("status")["nullable"], false);
+        assert_eq!(col("label")["nullable"], false);
+        assert_eq!(col("status")["has_default"], true);
+        assert!(col("label").get("has_default").is_none());
+        assert!(!compiled.text.contains("\"new\""), "{}", compiled.text);
+
+        // A table with no defaults serializes exactly as before the field
+        // existed: the key is omitted, never written as `false`, so such a
+        // lock keeps its bytes and its content_hash.
+        let parts = serde_json::to_string_pretty(&doc["tables"]["widget_parts"]).unwrap();
+        assert!(!parts.contains("has_default"), "{parts}");
+        assert!(!compiled.text.contains("\"has_default\": false"));
     }
 
     #[test]
