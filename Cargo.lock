@@ -906,6 +906,7 @@ dependencies = [
  "forge-lang-rust",
  "forge-lang-tree",
  "forge-lang-ts",
+ "serde_json",
 ]
 
 [[package]]
@@ -923,8 +924,10 @@ dependencies = [
  "forge-lang-tree",
  "oxc_allocator",
  "oxc_ast",
+ "oxc_ast_visit",
  "oxc_parser",
  "oxc_span",
+ "oxc_syntax",
 ]
 
 [[package]]
