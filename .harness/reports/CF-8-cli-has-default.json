@@ -1,0 +1,47 @@
+{
+  "author": "rory",
+  "bundle_ids": [
+    "pre-commit-443bfb3c"
+  ],
+  "commits": [
+    "87aaa93"
+  ],
+  "lane": "/Users/rory/Documents/forge-run/forge-cli--conformance",
+  "notes": "every committed schema.lock with defaults goes stale under forge schema compile --check after this toolchain lands (portal included); portal lock not committed per brief",
+  "repair_attempts": 0,
+  "schema": "forge-report/v1",
+  "step": "CF-8-cli-has-default",
+  "ts": "2026-09-23T21:33:26.726162+00:00",
+  "verdicts": [
+    {
+      "evidence": "src/cmd/schema.rs, commit 87aaa93",
+      "item": "compile_snapshot records has_default (presence only, omitted otherwise)",
+      "verdict": "met"
+    },
+    {
+      "evidence": "has_default_marks_only_defaulted_columns fails with emission removed (left Null), passes with it; no golden existed to pin",
+      "item": "test failing before the change; no-defaults table carries no key",
+      "verdict": "met"
+    },
+    {
+      "evidence": "Snapshot",
+      "item": "reader audit (deny_unknown_fields / content_hash recompute)",
+      "verdict": "met"
+    },
+    {
+      "evidence": "140+1 tests pass, clippy clean, fmt clean",
+      "item": "build/test per CI, fmt + clippy -D warnings",
+      "verdict": "met"
+    },
+    {
+      "evidence": "cf8-lock-defaults pushed at 87aaa93",
+      "item": "commit + push branch, no merge/PR",
+      "verdict": "met"
+    },
+    {
+      "evidence": "15 columns gain has_default, content_hash 650538d5 -> 66f22790, no other diff",
+      "item": "portal lock regenerated in /tmp, has_default appears",
+      "verdict": "met"
+    }
+  ]
+}
