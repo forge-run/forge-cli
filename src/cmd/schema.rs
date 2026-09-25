@@ -55,6 +55,7 @@ use clap::{Args, Subcommand};
 use forge_lang_rustgen::{SNAPSHOT_FILE, Snapshot};
 use forge_types::ForgeType;
 use forge_types::schema::SchemaDefinition;
+use forge_types::schema::metadata::{EnumDef, EnumRefOrInline, EnumValue};
 
 #[derive(Debug, Subcommand)]
 pub enum SchemaCmd {
@@ -428,6 +429,19 @@ pub fn compile_snapshot(root: &Path) -> Result<CompiledSnapshot> {
             if col.default.is_some() {
                 doc.insert("has_default".into(), true.into());
             }
+            // The column's closed sets, the two storage refuses a write
+            // outside (`forge-storage/src/mutation/validate.rs`). A named
+            // enum that does not resolve writes nothing: storage imposes no
+            // constraint on it, and a checker must never refuse what storage
+            // admits. Picklist display text is not written — values only.
+            if let Some(domain) = enum_doc(col.enum_ref.as_ref(), entry.schema.enums()) {
+                doc.insert("enum".into(), domain);
+            }
+            if let Some(values) = &col.values {
+                let values: Vec<serde_json::Value> =
+                    values.iter().map(|v| v.value.clone().into()).collect();
+                doc.insert("picklist".into(), values.into());
+            }
             if system.contains(&col.name) {
                 doc.insert("system".into(), true.into());
             }
@@ -528,6 +542,28 @@ pub fn compile_snapshot(root: &Path) -> Result<CompiledSnapshot> {
 /// rule zero judges `.get`s by (`forge-lang-tree`'s `Wire`). Kept in exact
 /// step with what storage serialization does to each `ForgeType`, and with
 /// the checker's historical treatment of the authored spellings.
+/// A column's `enum` key: `{"name", "values"}` for a named enum resolved
+/// through the schema's `enums`, `{"values"}` for an inline one, in
+/// declaration order. `None` for no enum and for a name that does not
+/// resolve.
+fn enum_doc(enum_ref: Option<&EnumRefOrInline>, enums: &[EnumDef]) -> Option<serde_json::Value> {
+    match enum_ref? {
+        EnumRefOrInline::Inline(values) => Some(serde_json::json!({ "values": values })),
+        EnumRefOrInline::Named(name) => {
+            let def = enums.iter().find(|e| &e.name == name)?;
+            let values: Vec<&str> = def
+                .values
+                .iter()
+                .map(|v| match v {
+                    EnumValue::Simple(s) => s.as_str(),
+                    EnumValue::Labeled { value, .. } => value.as_str(),
+                })
+                .collect();
+            Some(serde_json::json!({ "name": name, "values": values }))
+        }
+    }
+}
+
 fn wire_of(ft: ForgeType) -> &'static str {
     match ft {
         ForgeType::Text | ForgeType::Uuid => "text",
@@ -679,6 +715,57 @@ mod tests {
         let parts = serde_json::to_string_pretty(&doc["tables"]["widget_parts"]).unwrap();
         assert!(!parts.contains("has_default"), "{parts}");
         assert!(!compiled.text.contains("\"has_default\": false"));
+    }
+
+    #[test]
+    fn enum_and_picklist_record_only_their_closed_sets() {
+        let ws = workspace();
+        std::fs::write(
+            ws.path().join("domains/d/schemas/tickets.table.json"),
+            r#"{"name":"tickets","archetype":"Base",
+                "label":"Ticket","plural_label":"Tickets","header_fields":["title"],
+                "enums":[{"name":"ticket_state","values":["open",
+                          {"value":"closed","label":"Closed for good"}]}],
+                "columns":[{"name":"state","type":"string","enum":"ticket_state"},
+                           {"name":"rating","type":"string","enum":["hot","cold"]},
+                           {"name":"ghost","type":"string","enum":"no_such_enum"},
+                           {"name":"size","type":"string",
+                            "values":[{"value":"s","display":"Small"},{"value":"l"}]},
+                           {"name":"title","type":"string"}]}"#,
+        )
+        .unwrap();
+        let compiled = compile_snapshot(ws.path()).unwrap();
+        let doc: serde_json::Value = serde_json::from_str(&compiled.text).unwrap();
+        let cols = doc["tables"]["tickets"]["columns"].as_array().unwrap();
+        let col = |n: &str| cols.iter().find(|c| c["name"] == n).unwrap();
+        // Named: resolved through `enums`, labelled values by their value.
+        assert_eq!(
+            col("state")["enum"],
+            serde_json::json!({"name": "ticket_state", "values": ["open", "closed"]})
+        );
+        // Inline: values only, no name.
+        assert_eq!(
+            col("rating")["enum"],
+            serde_json::json!({"values": ["hot", "cold"]})
+        );
+        // Unresolved name: storage enforces nothing, so no key.
+        assert!(col("ghost").get("enum").is_none());
+        // Picklist: values in order, display text never written.
+        assert_eq!(col("size")["picklist"], serde_json::json!(["s", "l"]));
+        assert!(!compiled.text.contains("Small"), "{}", compiled.text);
+        assert!(
+            !compiled.text.contains("Closed for good"),
+            "{}",
+            compiled.text
+        );
+        // A plain column carries neither key.
+        assert!(col("title").get("enum").is_none());
+        assert!(col("title").get("picklist").is_none());
+        let parts = serde_json::to_string_pretty(&doc["tables"]["widget_parts"]).unwrap();
+        assert!(
+            !parts.contains("\"enum\"") && !parts.contains("picklist"),
+            "{parts}"
+        );
     }
 
     #[test]
