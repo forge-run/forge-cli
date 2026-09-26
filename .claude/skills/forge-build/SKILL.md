@@ -281,6 +281,15 @@ fileset fingerprint it was computed for, so by the time the hook fires the answe
 already exists. Measured on a fixture whose gate takes 3 s: post-edit falls from ~3.4 s to
 ~30 ms.
 
+**It moves the wait; it does not shorten it.** The watcher runs the same suite the hook
+would. In a repo whose full suite takes twenty minutes (forge-lang: 1605 tests, a watcher's
+full pass measured at 1,319 s on 2026-09-27) a pass can be superseded by the next edit before
+anything adopts it, and it holds the build lock while it compiles. It is not the mitigation
+for a Stop that cannot fit its suite — that is the Stop ceiling (G-11): pre-done runs under
+what is left of the 1200 s Stop budget, and a gate whose recorded cost cannot fit is deferred
+to the step commit with the reason in evidence. A watcher still pays where the suite is
+minutes, not tens of minutes.
+
 ```bash
 cd <repo-or-worktree>
 python3 .harness/runner.py watch &        # one per lane; leave it running
