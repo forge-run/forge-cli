@@ -256,6 +256,39 @@
     },
     {
       "blocking": true,
+      "check": "check.py",
+      "ci_skip": false,
+      "description": "A pin to a fact is current, resolvable and, for a business fact, still verified (forge-facts-2026-09 FF-12). A pin is an `<!-- atom: <key> -->` block in a markdown file or a string under an `atom`/`atoms` key in a JSON file, and the fact it names is a sealed atom in the sibling `forge-facts` repo. Over the changed *.md and *.json files this runs `forge-facts/bin/facts render --check` and refuses four findings: `stale-pin` (an explicit @n below the latest, or a slug another atom supersedes), `dangling-pin` (no such atom or version, or a string that is not a spec), `expired-business` (a business temporal atom whose review_by has passed; the finding names its owner) and `malformed-pin` (markers that do not pair, or a file that is not JSON). `differs` (rendered prose behind its atom) and `no-derived-value` are reported in the evidence and refused by nothing: a stale pin is a claim about a fact that has moved; stale prose under a current pin is a render away from fixed and `facts render` is the repair, not a refusal.\nBound to plan-approved as well as the commit boundary, so `runner.py verify-plan` runs it over the roadmap before `plan start` spends anything: a plan that cites an expired business atom is refused there, naming the key and its owner. That is how a business fact reaches its owner: one question at the moment a plan depends on it, never as a queue (V-14).\nA consumer with no forge-facts beside it passes with the reason in its evidence (`details.skipped`, a `skipped:` summary), never silently: the pins there are unjudged and the bundle says so. In CI the sibling is what `ci.sibling_checkouts` puts there, so a consumer whose list lacks forge-facts has this gate skipping on every push and its evidence reads that way.\nNot memoized, and the one gate whose verdict is allowed to move under an unchanged tree: the atoms live outside the consumer and a business atom's review_by is a date. Both are the subject, not noise; the evidence carries the facts root it read.\n",
+      "events": [
+        "pre-done",
+        "pre-commit",
+        "plan-approved"
+      ],
+      "exclude": [
+        ".harness/evidence/**",
+        ".harness/state/**",
+        ".harness/log/**",
+        ".harness/reports/**",
+        ".claude/settings.json",
+        "**/target/**",
+        "**/node_modules/**",
+        "**/fixtures/**"
+      ],
+      "id": "fact-pins",
+      "include": [
+        "**/*.md",
+        "**/*.json"
+      ],
+      "memoize": false,
+      "params": {
+        "facts_root": "../forge-facts"
+      },
+      "source": "core/gates/fact-pins",
+      "timeout_seconds": 60,
+      "toolchains": []
+    },
+    {
+      "blocking": true,
       "check": "check.sh",
       "ci_skip": true,
       "description": "The stdlib-unittest suite that covers the emitted runner and dispatcher must be green before a change to them is accepted or committed.\nThis closes a hole the cargo gates cannot see. The harness repo's own `cargo-tests` is scoped to `tool/` — correctly, since that is where its crate lives — so the ~1100-test python suite that covers `core/runner/**` ran only in CI and by hand. HM2.1 found NINE reds sitting in it, unnoticed, and fixed them; nothing local would have objected while they landed (GAP-REVIEWS #hm2-1). The dispatcher those tests cover is the file every enforcement path in the fleet runs through, and its parsing code fails OPEN when wrong: a mis-parse waves the command through silently.\n`ci_skip` because ci.yml already runs exactly this discovery, in the `runner` job, on every push — this is the session-tier twin of a check that keeps its CI half (D-012), not a second copy of it.\nPath-filtered to the runner tree, so a docs or gate-asset commit does not pay for it, and memoized on that same fileset: an unchanged `core/runner/**` is a suite whose answer cannot have moved.\nNOT APPLICABLE where there is no such suite. hybrid is a shared harness and forge-portal-web has no `core/runner/`, so \"there is nothing here to run\" has to be a real answer — established by looking, the way vendor-integrity establishes its own: if a runner tests directory survives elsewhere in the tree, the pathspec MOVED and this gate is checking nothing, which is exit 2 and not a green tick. Both grep fences that died in this fleet died by matching nothing after a file move.\n",

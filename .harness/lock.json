@@ -59,7 +59,7 @@
     },
     {
       "path": ".github/workflows/harness-gates.yml",
-      "sha256": "426c2e6ff1ca39debc372553849dc52120345288dc5044beccb1c6bf7fb15589"
+      "sha256": "ae2658a5cbb39835d1843338f8b32c07ca13330d57c0d558336cfda8ced4a826"
     },
     {
       "path": ".gitignore#rules",
@@ -75,7 +75,7 @@
     },
     {
       "path": ".harness/plan.json",
-      "sha256": "b1e8ba53c3f178ce6921e22243ad3bc34f3f75ac81b8658835066de36b1d7020"
+      "sha256": "27f2af153188e77821a3cd48134362e8091e4b94786066d4875cc109754f3d38"
     },
     {
       "path": ".harness/runner.py",
@@ -219,6 +219,14 @@
       "source": "../../core/gates/lint-waivers"
     },
     {
+      "kind": "gate",
+      "params": {
+        "facts_root": "../forge-facts"
+      },
+      "sha256": "f9eae6c6cbcb8f7b542b83b714ceb0e63fbe39eeda19ca787958c74b40697f2f",
+      "source": "../../core/gates/fact-pins"
+    },
+    {
       "kind": "fence",
       "sha256": "eb5863341abf0eb7bdc5e48d8e6de2ca4601b96ea6ee1fd64ad0a6626cb7c750",
       "source": "local/no-substrate-path-deps"
@@ -317,8 +325,8 @@
   "harness_dir": "harnesses/hybrid",
   "source": {
     "kind": "commit",
-    "ref": "d9d4b2dace36591bb17d77e97a2c3e70bdb2bd06",
-    "sha": "d9d4b2dace36591bb17d77e97a2c3e70bdb2bd06"
+    "ref": "8f0d80a",
+    "sha": "8f0d80ac9b6e9c29386a2975a5d1b643d1ec1113"
   },
   "targets": [
     "claude-code",
