@@ -27,7 +27,7 @@
     },
     {
       "path": ".claude/skills/forge-build/SKILL.md",
-      "sha256": "39d887c80be22273c5f8428060bbbe978fdcebbb9188718a07b3d072a62c6382"
+      "sha256": "72121279d7234d473decc1c03d30fca43968811a3efd455b4a3d267f2c907395"
     },
     {
       "path": ".claude/skills/forge-model-tiers/SKILL.md",
@@ -43,7 +43,7 @@
     },
     {
       "path": ".claude/skills/forge-wire-change/SKILL.md",
-      "sha256": "71f13b73130c6b407884bc0dffe1747a13a4a88ff9588a2fa927fb2adfb58c46"
+      "sha256": "58c67872c251318be9c45fcd7469afabe240fb6e26133646b93c92657bc0629b"
     },
     {
       "path": ".claude/skills/prose-style/SKILL.md",
@@ -59,7 +59,7 @@
     },
     {
       "path": ".github/workflows/harness-gates.yml",
-      "sha256": "256d481621ab5785c03427abb11122400608e0647ad4c89e963b37b47b7b1cab"
+      "sha256": "7d4a575a9e6470814fcd8a7c58ca54e1c5c3282aff9fe894db8d4f3e32c90311"
     },
     {
       "path": ".gitignore#rules",
@@ -75,7 +75,7 @@
     },
     {
       "path": ".harness/plan.json",
-      "sha256": "27f2af153188e77821a3cd48134362e8091e4b94786066d4875cc109754f3d38"
+      "sha256": "eee8fe54e2c39dca8d069e0f5eff9700e108cd8acc45c7798b92f3932618a523"
     },
     {
       "path": ".harness/runner.py",
@@ -139,7 +139,7 @@
       "params": {
         "cargo": "cargo"
       },
-      "sha256": "91a44b7313c811579269f7b60eced7d9c6f1f85c66439d15d34333f9e4f9218a",
+      "sha256": "0a12d566b088b28f4ad2b195151add0e0d983b0d8dcd1e32113b532c8e72b82f",
       "source": "../../core/skills/forge-wire-change"
     },
     {
@@ -223,7 +223,7 @@
       "params": {
         "facts_root": "../forge-facts"
       },
-      "sha256": "f9eae6c6cbcb8f7b542b83b714ceb0e63fbe39eeda19ca787958c74b40697f2f",
+      "sha256": "39553e2b393793160acf6f0f2a7b1c2d13abb7db426374c590ca9244c8281ce7",
       "source": "../../core/gates/fact-pins"
     },
     {
@@ -325,8 +325,8 @@
   "harness_dir": "harnesses/hybrid",
   "source": {
     "kind": "commit",
-    "ref": "bb3f0c4",
-    "sha": "bb3f0c41458e092075904f3599667c04e8d69a0b"
+    "ref": "3795745",
+    "sha": "3795745195283ba5d682bebbe426437887f44b18"
   },
   "targets": [
     "claude-code",

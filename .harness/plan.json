@@ -284,7 +284,7 @@
         "facts_root": "../forge-facts"
       },
       "source": "core/gates/fact-pins",
-      "timeout_seconds": 60,
+      "timeout_seconds": 20,
       "toolchains": []
     },
     {

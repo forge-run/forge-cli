@@ -123,11 +123,9 @@ Nodes converge themselves: forge-reconciler.timer fires every 60 s, fetches mani
 
 forge nodes converge themselves. `forge-reconciler.timer` fires every 60s on each node, fetches `forge-platform-operations/manifest.yaml` over the GitHub API, compares `versions:` against `/etc/forge-versions/<crate>`, and atomic-swaps any binary that differs (sha256-verified, prior copy kept at `<bin>.prev`).
 
-The operator edits the manifest — `just bump <crate> vX.Y.Z` — rather than pushing binaries. `forge-runtime` is service-less, so its rollout lands gradually as workspaces cold-start.
+The operator edits the manifest, `just bump <crate> vX.Y.Z`, rather than pushing binaries. `forge-runtime` is service-less, so its rollout lands gradually as workspaces cold-start.
 
-**Why:** `forge-platform-architecture/runbooks/deploy.md` and `ARCHITECTURE.md` still document the older push-based `just deploy` + rsync model, and `just deploy` still exists in the Justfile — so both the docs and the recipe list will mislead.
-
-**How to apply:** Two consequences that bite. (1) `just rollback` is SSH-side and does NOT edit the manifest, so the reconciler pulls the bad version forward again within 60s — always follow a rollback by bumping the manifest back. (2) Nodes poll independently, so mixed versions are always live for at least one cycle; a non-additive wire change is an outage in that window. See [[forge-architecture-doc-precedence]] and [[forge-run-multi-repo-root]].
+**How to apply:** two consequences that bite. (1) `just rollback` is SSH-side and does NOT edit the manifest, so the reconciler pulls the bad version forward again within 60s; always follow a rollback by bumping the manifest back. (2) Nodes poll independently, so mixed versions are always live for at least one cycle; a non-additive wire change is an outage in that window. Version 1 warned that `runbooks/deploy.md` still documented the push model; AR-4 retired that section and the runbook pins this atom.
 
 Nodes converge independently, so **there is always a window where mixed versions are
 live.** A non-additive change is a real outage in that window.
@@ -164,9 +162,9 @@ cd forge-platform-wire && cargo test --tests --locked   # wire-shape regression 
 ```
 
 <!-- fact: platform/fleet-check-script -->
-forge-platform-architecture/graph/tools/fleet-check.sh is the drift gate: FORGE_* env docs against code, the crate inventory against the forge-* dirs, and the pull deploy model.
+forge-platform-architecture/graph/tools/fleet-check.sh is the drift gate as a thin wrapper over forge-facts: facts sweep against the working root, then facts judge --strict and facts render --check over every document and runbook this repo renders.
 
-`bash forge-platform-architecture/graph/tools/fleet-check.sh` runs every static reconciler and exits non-zero on drift: `extract-env.mjs --strict` (FORGE_* env vars in docs against code), the SCIP graph checks when indexes exist, the crate inventory between the `<!-- inventory:start -->` markers of ARCHITECTURE.md against every `forge-*` crate in the root, and the deploy model (`forge-reconciler.timer` present). Run it after a cross-process change; a boundary change rather than a field change also needs an ADR in `forge-platform-architecture/decisions/`.
+`bash forge-platform-architecture/graph/tools/fleet-check.sh` runs three steps, one direction: `facts sweep` re-runs every atom's verify against the working root (`FORGE_FLEET_ROOT`, else the sibling layout; forge-facts at `FORGE_FACTS_ROOT`, else beside the root), `facts judge --strict` refuses on any pin in ARCHITECTURE.md, BOUNDARIES.md, TRUST.md, STANDING.md, README.md or a runbook whose verdict is not holds, and `facts render --check` refuses a block that is not the render of its atom. Exit 0 means every pinned atom holds and every block is current; non-zero names the keys; 2 means the gate could not run. Run it after a cross-process change; a boundary change rather than a field change also needs an ADR in `forge-platform-architecture/decisions/`. Version 1 ran the hand-authored graph's reconcilers, which retired with the graph: forge-graph holds the code graph now.
 
 If you added a cross-process field, `forge-platform-architecture` may need a matching
 edit — and if you changed a boundary rather than a field, that needs an ADR in
