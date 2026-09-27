@@ -54,8 +54,12 @@
       "sha256": "8ee11ec8aea41e339b59ae692c6221710c97e8b8cc92a95edeab8d4aabf0dc7a"
     },
     {
+      "path": ".claude/skills/working-a-red-gate/SKILL.md",
+      "sha256": "619cf8ee7e2d2cdb32605f02955a061b2d4ba70d668f6eacf2cbd9473d5fd129"
+    },
+    {
       "path": ".github/workflows/harness-gates.yml",
-      "sha256": "cb8c348dd8c4509b64640a94cd213d0220db0c753b92f6f186002cc55779aaca"
+      "sha256": "50e2b5d8bbdc0b115ad41e3e0b56653136936c29a4006807d91a368417c90ab1"
     },
     {
       "path": ".gitignore#rules",
@@ -92,6 +96,11 @@
       "kind": "skill",
       "sha256": "56ef3699f4010e7bc959ac8523b76fdcb9117923ccc604e2db1b2ad1cb768369",
       "source": "../../core/skills/forge-session-economy"
+    },
+    {
+      "kind": "skill",
+      "sha256": "61315969569fe4a2ef9f39ff2776e3cda9b509f95f8d4bcdf4e8e3ff7a6473c0",
+      "source": "../../core/skills/working-a-red-gate"
     },
     {
       "kind": "skill",
@@ -308,8 +317,8 @@
   "harness_dir": "harnesses/hybrid",
   "source": {
     "kind": "commit",
-    "ref": "33ce3f5d38b72b8df03bb80f09dab54a894a1782",
-    "sha": "33ce3f5d38b72b8df03bb80f09dab54a894a1782"
+    "ref": "1e5f82db44b1870fc8b6f7a295aeebdd4751b88e",
+    "sha": "1e5f82db44b1870fc8b6f7a295aeebdd4751b88e"
   },
   "targets": [
     "claude-code",
