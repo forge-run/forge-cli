@@ -16,7 +16,7 @@ use std::path::{Path, PathBuf};
 use anyhow::{Result, bail};
 use forge_lang_rustgen::{
     CompileError, CompileSpec, Compiled, ContractSurfaces, Defect, EMITTER_VERSION, InputSchemas,
-    Layout, Plants, Tables, compile_all_with_inputs, lang_of,
+    Layout, Plants, Tables, compile_all_with_contracts, lang_of,
 };
 
 /// The reference directory a workspace keeps runtime-owned table schemas in.
@@ -332,6 +332,12 @@ pub fn contract_surfaces(root: &Path) -> Result<ContractSurfaces, String> {
         let path = format!("domains/{name}/service.json");
         surfaces.add_service(&path, &with_domain(&name, &text))?;
     }
+    // The tables the generated surface carries: the same `schema.lock`
+    // `workspace_tables` judges against. None is a workspace with no tables.
+    let lock = root.join(forge_lang_rustgen::SNAPSHOT_FILE);
+    if let Ok(text) = std::fs::read_to_string(&lock) {
+        surfaces.add_schema_lock(forge_lang_rustgen::SNAPSHOT_FILE, &text)?;
+    }
     Ok(surfaces)
 }
 
@@ -557,6 +563,10 @@ pub fn emit_with(root: &Path, rt: &Path, sdk: &Path) -> Result<Vec<EmittedDomain
     // Snapshot-first, same as `forge check` — the two must give the same
     // answers, and the snapshot is now one of the answers.
     let (tables, _snapshot_hash) = workspace_tables(root).map_err(|e| anyhow::anyhow!("{e}"))?;
+    // ST-6: the generated surface `forge check` scopes — every domain's
+    // `service.json` and the `schema.lock` tables — so the emit resolves
+    // `forge.schema.*` without a staged `FORGE_LANG_SCHEMA_*`.
+    let contracts = contract_surfaces(root).map_err(|e| anyhow::anyhow!("{e}"))?;
 
     let mut emitted = Vec::with_capacity(domains.len());
     for (dir, sources) in &domains {
@@ -566,7 +576,7 @@ pub fn emit_with(root: &Path, rt: &Path, sdk: &Path) -> Result<Vec<EmittedDomain
         // module for the host's fallback arm instead of replacing the crate;
         // the member list and the domain manifest stay the author's.
         if dir.join("services/lib.rs").is_file() {
-            let module = forge_lang_rustgen::compile_module(
+            let module = forge_lang_rustgen::compile_module_with_contracts(
                 sources,
                 tables.as_ref(),
                 &forge_lang_rustgen::ModuleSpec {
@@ -576,6 +586,7 @@ pub fn emit_with(root: &Path, rt: &Path, sdk: &Path) -> Result<Vec<EmittedDomain
                 // The author's own machine: the native validators run here,
                 // and only here (PS-2a).
                 forge_lang_rustgen::NativeValidation::Run,
+                &contracts,
             )
             .map_err(|e| refusal(&name, e))?;
             emitted.push(EmittedDomain {
@@ -587,7 +598,7 @@ pub fn emit_with(root: &Path, rt: &Path, sdk: &Path) -> Result<Vec<EmittedDomain
             continue;
         }
         let inputs = input_schemas(dir)?;
-        let compiled = compile_all_with_inputs(
+        let compiled = compile_all_with_contracts(
             sources,
             tables.as_ref(),
             &CompileSpec {
@@ -628,6 +639,7 @@ pub fn emit_with(root: &Path, rt: &Path, sdk: &Path) -> Result<Vec<EmittedDomain
             // crate the control plane's compiled tier builds from the same
             // tree, and both refuse what the interpreted tier refuses.
             &inputs,
+            &contracts,
         )
         .map_err(|e| refusal(&name, e))?;
         emitted.push(EmittedDomain {
@@ -943,9 +955,10 @@ public final class Hello {
     #[test]
     fn a_declared_input_schema_is_emitted_as_the_ops_input_check() {
         let schema = serde_json::json!({"type": "object", "required": ["name"]});
-        let service = serde_json::json!({"services": [
-            {"name": "greetings", "operations": [{"name": "hello", "input_schema": schema}]},
-        ]});
+        let service = serde_json::json!({
+            "domain": "greetings",
+            "operations": [{"name": "hello", "input_schema": schema}],
+        });
         let ws = tree(&[
             ("workspace.json", "{}"),
             ("domains/greetings/services/hello.py", ACCEPTED),
@@ -1129,6 +1142,77 @@ public final class Hello {
             root.contains(&format!("exclude = [\"{DEPS_DIR}\"]")),
             "{root}"
         );
+    }
+
+    /// ST-6: `forge wasm-build` emits from the surface `forge check` scopes —
+    /// the domain's `service.json` and the workspace's `schema.lock` — so a
+    /// Java op importing `forge.schema.Notes` and its generated request and
+    /// response compiles with no `FORGE_LANG_SCHEMA_*` staged. Before, the
+    /// emit scoped no contracts and javac answered "package forge.schema
+    /// does not exist". Needs a JDK, like the test above.
+    #[test]
+    fn emitting_resolves_the_generated_types_from_service_json_and_schema_lock() {
+        const NOTES_TABLE: &str = r#"{
+  "name": "notes",
+  "archetype": "Base",
+  "columns": [{"name": "title", "type": "string", "nullable": false}]
+}"#;
+        const NOTES_OP: &str = r#"import forge.Forge;
+import forge.Op;
+import forge.OpContext;
+import forge.Storage;
+import forge.Value;
+import forge.schema.Notes;
+import forge.schema.inputs.billing.PlanRefundRequest;
+import forge.schema.inputs.billing.PlanRefundResponse;
+
+import java.util.List;
+
+/** Reads the notes table. */
+public final class PlanRefund {
+
+  /** Answers {@code billing::plan_refund}. */
+  @Op
+  public static PlanRefundResponse planRefund(OpContext ctx, PlanRefundRequest req) {
+    List<Notes.Row> rows = Notes.rows(Storage.query(Value.obj("from", "notes", "limit", 1L)));
+    if (rows.isEmpty() || Forge.nth(rows, 0L).title("").equals("")) {
+      return new PlanRefundResponse();
+    }
+    return new PlanRefundResponse();
+  }
+}
+"#;
+        for var in [
+            "FORGE_LANG_SCHEMA_PY",
+            "FORGE_LANG_SCHEMA_TS",
+            "FORGE_LANG_SCHEMA_JAVA",
+            "FORGE_LANG_SCHEMA_RS",
+        ] {
+            assert!(
+                std::env::var_os(var).is_none(),
+                "{var} is staged; this test holds that nothing needs to be"
+            );
+        }
+        let empty = serde_json::json!({"type": "object", "properties": {}});
+        let service = serde_json::json!({"domain": "billing", "operations": [{
+            "name": "plan_refund", "kind": "query",
+            "input_schema": empty, "output_schema": empty, "errors": [],
+        }]});
+        let ws = tree(&[
+            ("workspace.json", "{}"),
+            ("domains/billing/schemas/notes.table.json", NOTES_TABLE),
+            ("domains/billing/service.json", &service.to_string()),
+            ("domains/billing/services/PlanRefund.java", NOTES_OP),
+        ]);
+        let compiled = crate::cmd::schema::compile_snapshot(ws.path()).unwrap();
+        std::fs::write(
+            ws.path().join(forge_lang_rustgen::SNAPSHOT_FILE),
+            &compiled.text,
+        )
+        .unwrap();
+        let emitted = emit(ws.path()).unwrap_or_else(|e| panic!("{e:#}"));
+        assert_eq!(emitted.len(), 1);
+        assert!(ws.path().join("domains/billing/src/lib.rs").is_file());
     }
 
     /// Discovery finds all THREE spellings under one domain, and sorts them.
