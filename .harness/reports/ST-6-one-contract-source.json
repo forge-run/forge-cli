@@ -1,0 +1,36 @@
+{
+  "agent": "forge-implementer",
+  "author": "rory",
+  "bundle_ids": [],
+  "bundle_note": "gates ran as detached sdk jobs st6-s4-cli (log pasted in report); the commit fence run wrote no new bundle in this lane",
+  "commits": [
+    "f8fddb9"
+  ],
+  "lane": "/Users/rory/Documents/forge-run/forge-cli--st6",
+  "repair_attempts": 0,
+  "schema": "forge-report/v1",
+  "step": "ST-6-one-contract-source",
+  "ts": "2026-09-28T13:20:44.969064+00:00",
+  "verdicts": [
+    {
+      "evidence": "f8fddb9; per-facet + agree + hand-written tests pass; 151 passed 0 failed 1 ignored",
+      "item": "1. forge check renders ContractDiff; forge-check/3 envelope gains contract_mismatches; any finding exits 1",
+      "verdict": "met"
+    },
+    {
+      "evidence": "f8fddb9; entry/stub/refusals/lang default green; op new then forge check green is #[ignore]d pending ST-6 slice 2 core",
+      "item": "2. forge schema op new",
+      "verdict": "met-with-owed"
+    },
+    {
+      "evidence": "a_fresh_workspace_maps_service_json_to_its_json_schema ok",
+      "item": "3. service.schema.json + .vscode/settings.json",
+      "verdict": "met"
+    },
+    {
+      "evidence": "surface build refuses no domains/*/service.json, but forge check and the push refuse forge-dialect-dogfood: 26 sources FL0148 (hand-written return where output_schema declared); STOPPED",
+      "item": "live-workspace proof (coordinator 3)",
+      "verdict": "not-met"
+    }
+  ]
+}

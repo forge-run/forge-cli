@@ -1,0 +1,13 @@
+# Lane-local: resolve forge-lang to forge-lang--conformance. NEVER commit.
+[patch."file:///Users/rory/Documents/forge-run/forge-lang/crates/forge-lang-java"]
+forge-lang-java = { path = "/Users/rory/Documents/forge-run/forge-lang--conformance/crates/forge-lang-java" }
+[patch."file:///Users/rory/Documents/forge-run/forge-lang/crates/forge-lang-py"]
+forge-lang-py = { path = "/Users/rory/Documents/forge-run/forge-lang--conformance/crates/forge-lang-py" }
+[patch."file:///Users/rory/Documents/forge-run/forge-lang/crates/forge-lang-rust"]
+forge-lang-rust = { path = "/Users/rory/Documents/forge-run/forge-lang--conformance/crates/forge-lang-rust" }
+[patch."file:///Users/rory/Documents/forge-run/forge-lang/crates/forge-lang-rustgen"]
+forge-lang-rustgen = { path = "/Users/rory/Documents/forge-run/forge-lang--conformance/crates/forge-lang-rustgen" }
+[patch."file:///Users/rory/Documents/forge-run/forge-lang/crates/forge-lang-tree"]
+forge-lang-tree = { path = "/Users/rory/Documents/forge-run/forge-lang--conformance/crates/forge-lang-tree" }
+[patch."file:///Users/rory/Documents/forge-run/forge-lang/crates/forge-lang-ts"]
+forge-lang-ts = { path = "/Users/rory/Documents/forge-run/forge-lang--conformance/crates/forge-lang-ts" }
