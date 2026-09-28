@@ -69,6 +69,40 @@ pub enum SchemaCmd {
     /// staleness-detector family: build-locally-deterministic is canonical
     /// and the live stack confirms, so this always exits 0 and never gates.
     Diff(DiffArgs),
+
+    /// Author an op's contract: `forge schema op new <domain>::<op>` appends
+    /// its `service.json` entry and writes a handler stub that binds the
+    /// generated request and returns the generated response.
+    #[command(subcommand)]
+    Op(OpCmd),
+}
+
+#[derive(Debug, Subcommand)]
+pub enum OpCmd {
+    /// Declare a new op in `domains/<domain>/service.json` (empty input and
+    /// output shapes, no errors), write its typed handler stub under
+    /// `domains/<domain>/services/`, and refresh `.forge/types`.
+    New(OpNewArgs),
+}
+
+#[derive(Debug, Args)]
+pub struct OpNewArgs {
+    /// The op to declare, as `<domain>::<op>`.
+    target: String,
+
+    /// The stub's language — `py`, `ts`, `java` or `rust`. Defaults to the
+    /// language of the domain's existing ops; required when it has none.
+    #[arg(long)]
+    lang: Option<String>,
+
+    /// The op's kind, `query` or `mutation`.
+    #[arg(long, default_value = "mutation")]
+    kind: String,
+
+    /// Workspace root (the directory holding `workspace.json`). Defaults to
+    /// the current directory.
+    #[arg(long)]
+    manifest_dir: Option<PathBuf>,
 }
 
 #[derive(Debug, Args)]
@@ -91,6 +125,18 @@ pub async fn run(
     match cmd {
         SchemaCmd::Compile(args) => compile(args),
         SchemaCmd::Diff(args) => diff(args, client()?).await,
+        SchemaCmd::Op(OpCmd::New(args)) => {
+            let root = args
+                .manifest_dir
+                .clone()
+                .unwrap_or_else(|| PathBuf::from("."));
+            let written = op_new(&root, &args)?;
+            for path in &written {
+                eprintln!("wrote {}", path.display());
+            }
+            refresh_types(&root);
+            Ok(())
+        }
     }
 }
 
@@ -154,6 +200,29 @@ fn compile(args: CompileArgs) -> Result<()> {
 /// JDK, or a schema the generator will not map, is reported and the command
 /// goes on.
 pub(crate) fn refresh_types(root: &Path) {
+    refresh_surface(root);
+    write_service_schema(root);
+}
+
+/// `.forge/types/service.schema.json`: the JSON Schema of `service.json`
+/// (ST-6), for the editor the `forge new` template's `.vscode/settings.json`
+/// points at it. Written after the surface, which replaces the directory.
+fn write_service_schema(root: &Path) {
+    let dir = root.join(forge_lang_rustgen::workspace_types::TYPES_DIR);
+    let path = dir.join(SERVICE_SCHEMA_FILE);
+    let text = serde_json::to_string_pretty(&forge_lang_rustgen::service_json_schema())
+        .expect("the schema is plain data");
+    let written = std::fs::create_dir_all(&dir).and_then(|()| std::fs::write(&path, text + "\n"));
+    if let Err(e) = written {
+        eprintln!("⚠  {} not written: {e}", path.display());
+    }
+}
+
+/// The editor's JSON Schema of `service.json`, inside `.forge/types/`.
+pub(crate) const SERVICE_SCHEMA_FILE: &str = "service.schema.json";
+
+/// The generated schema surface and dialect library, from `schema.lock`.
+fn refresh_surface(root: &Path) {
     use forge_lang_rustgen::workspace_types;
     if !root.join(SNAPSHOT_FILE).is_file() {
         eprintln!(
@@ -587,6 +656,308 @@ fn archetypes_hash() -> String {
     sha256(text.as_bytes())
 }
 
+// ── `forge schema op new` (ST-6 decision 4) ─────────────────────────────
+
+use forge_lang_rustgen::scaffold;
+
+/// Everything `op new` checks before it writes, then the two writes: the
+/// `service.json` entry and the handler stub. Answers the paths written.
+/// Nothing is written when any check refuses.
+fn op_new(root: &Path, args: &OpNewArgs) -> Result<Vec<PathBuf>> {
+    if !root.join("workspace.json").exists() {
+        bail!(
+            "no workspace.json at {} — `forge schema op new` writes into a \
+             workspace; pass --manifest-dir or run from the workspace root",
+            root.display()
+        );
+    }
+    let Some((domain, op)) = args.target.split_once("::") else {
+        bail!("`{}` is not `<domain>::<op>`", args.target);
+    };
+    for (what, name) in [("domain", domain), ("op", op)] {
+        if !is_snake_ident(name) {
+            bail!("the {what} `{name}` is not a snake_case name (`[a-z][a-z0-9_]*`)");
+        }
+    }
+    if !matches!(args.kind.as_str(), "query" | "mutation") {
+        bail!(
+            "unknown --kind `{}` (expected `query` or `mutation`)",
+            args.kind
+        );
+    }
+    let dir = root.join("domains").join(domain);
+    let service_path = dir.join("service.json");
+    let Ok(text) = std::fs::read_to_string(&service_path) else {
+        bail!(
+            "unknown domain `{domain}`: no {} — the domains are {}",
+            service_path.display(),
+            known_domains(root)
+        );
+    };
+    if dialect::declared_ops(&dir)
+        .unwrap_or_default()
+        .iter()
+        .any(|o| o == op)
+    {
+        bail!(
+            "`{domain}::{op}` already exists in {}",
+            service_path.display()
+        );
+    }
+    let lang = match &args.lang {
+        Some(word) => scaffold::Lang::parse(word)
+            .with_context(|| format!("unknown --lang `{word}` (one of py, ts, java, rust)"))?,
+        None => domain_lang(&dir, domain)?,
+    };
+    let (stub_rel, stub) = scaffold::handler_stub(lang, domain, op);
+    let stub_path = root.join(&stub_rel);
+    if stub_path.exists() {
+        bail!(
+            "{} already exists — `op new` never overwrites a handler",
+            stub_path.display()
+        );
+    }
+    let appended = append_op(&text, &scaffold::service_entry(op, &args.kind))
+        .with_context(|| format!("append `{op}` to {}", service_path.display()))?;
+
+    std::fs::write(&service_path, appended)
+        .with_context(|| format!("write {}", service_path.display()))?;
+    if let Some(parent) = stub_path.parent() {
+        std::fs::create_dir_all(parent).with_context(|| format!("mkdir {}", parent.display()))?;
+    }
+    std::fs::write(&stub_path, stub).with_context(|| format!("write {}", stub_path.display()))?;
+    Ok(vec![service_path, stub_path])
+}
+
+fn is_snake_ident(name: &str) -> bool {
+    let mut chars = name.chars();
+    chars.next().is_some_and(|c| c.is_ascii_lowercase())
+        && chars.all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_')
+}
+
+/// The workspace's domains, for a refusal that names what does exist.
+fn known_domains(root: &Path) -> String {
+    let names: Vec<String> = dialect::domains(root)
+        .iter()
+        .filter(|d| d.join("service.json").is_file())
+        .map(|d| format!("`{}`", dialect::domain_name(d)))
+        .collect();
+    match names.is_empty() {
+        true => "none yet".to_string(),
+        false => names.join(", "),
+    }
+}
+
+/// The language of the domain's existing ops, when they share one.
+fn domain_lang(dir: &Path, domain: &str) -> Result<scaffold::Lang> {
+    use forge_lang_rustgen::Lang;
+    let mut langs: Vec<scaffold::Lang> = dialect::sources_of(dir)
+        .iter()
+        .filter_map(|s| forge_lang_rustgen::lang_of(s))
+        .map(|l| match l {
+            Lang::Python => scaffold::Lang::Py,
+            Lang::TypeScript => scaffold::Lang::Ts,
+            Lang::Java => scaffold::Lang::Java,
+            Lang::Rust => scaffold::Lang::Rust,
+        })
+        .collect();
+    langs.dedup();
+    match langs.as_slice() {
+        [one] => Ok(*one),
+        [] => bail!(
+            "domain `{domain}` has no ops to take a language from: pass --lang py|ts|java|rust"
+        ),
+        _ => bail!(
+            "domain `{domain}` holds ops in more than one language: pass --lang py|ts|java|rust"
+        ),
+    }
+}
+
+/// `text` with `entry` appended to its top-level `operations` array, every
+/// other byte as it was: the file's key order, indent and formatting are
+/// the author's, and re-serialising the whole document would reorder its
+/// keys. The entry is written in the file's indent unit, its keys in the
+/// order the file's first op uses. The result is parsed back and compared
+/// with the intended document before it is answered.
+fn append_op(text: &str, entry: &serde_json::Value) -> Result<String> {
+    let mut doc: serde_json::Value = serde_json::from_str(text).context("not valid JSON")?;
+    let Some(ops) = doc.get_mut("operations").and_then(|o| o.as_array_mut()) else {
+        bail!("no top-level `operations` array to append to");
+    };
+    ops.push(entry.clone());
+    let (open, close) = operations_span(text).context("no top-level `operations` array")?;
+    let unit = indent_unit(text);
+    let order = first_op_keys(text);
+    let rank = |key: &str| -> (usize, usize) {
+        const DEFAULT: [&str; 8] = [
+            "name",
+            "kind",
+            "type",
+            "properties",
+            "required",
+            "input_schema",
+            "output_schema",
+            "errors",
+        ];
+        match order.iter().position(|k| k == key) {
+            Some(i) => (0, i),
+            None => (
+                1,
+                DEFAULT
+                    .iter()
+                    .position(|k| *k == key)
+                    .unwrap_or(DEFAULT.len()),
+            ),
+        }
+    };
+    let mut rendered = String::new();
+    write_json(entry, &unit, 2, &rank, &mut rendered);
+    let inner = &text[open + 1..close];
+    let head = text[..close].trim_end();
+    let sep = match inner.trim().is_empty() {
+        true => "",
+        false => ",",
+    };
+    let out = format!(
+        "{head}{sep}\n{}{rendered}\n{unit}{}",
+        unit.repeat(2),
+        &text[close..]
+    );
+    let back: serde_json::Value = serde_json::from_str(&out).context("the appended file")?;
+    if back != doc {
+        bail!("the appended file does not read back as the intended document");
+    }
+    Ok(out)
+}
+
+/// The byte offsets of the top-level `operations` array's `[` and `]`.
+fn operations_span(text: &str) -> Option<(usize, usize)> {
+    let bytes = text.as_bytes();
+    let mut depth = 0usize;
+    let mut i = 0;
+    let mut last_key: Option<(usize, usize)> = None;
+    let mut open = None;
+    while i < bytes.len() {
+        match bytes[i] {
+            b'"' => {
+                let start = i;
+                i += 1;
+                while i < bytes.len() && bytes[i] != b'"' {
+                    i += if bytes[i] == b'\\' { 2 } else { 1 };
+                }
+                last_key = Some((start + 1, i));
+            }
+            b'{' | b'[' => {
+                depth += 1;
+                if bytes[i] == b'['
+                    && depth == 2
+                    && open.is_none()
+                    && last_key.is_some_and(|(a, b)| &text[a..b] == "operations")
+                {
+                    open = Some(i);
+                }
+            }
+            b'}' | b']' => {
+                if depth == 2 && bytes[i] == b']' && open.is_some() {
+                    return open.map(|o| (o, i));
+                }
+                depth = depth.saturating_sub(1);
+            }
+            b',' => last_key = None,
+            _ => {}
+        }
+        i += 1;
+    }
+    None
+}
+
+/// The file's indent unit: the leading whitespace of its first indented
+/// line, else two spaces.
+fn indent_unit(text: &str) -> String {
+    text.lines()
+        .map(|l| &l[..l.len() - l.trim_start().len()])
+        .find(|ws| !ws.is_empty())
+        .unwrap_or("  ")
+        .to_string()
+}
+
+/// The keys of the file's first op, in the order the file writes them.
+fn first_op_keys(text: &str) -> Vec<String> {
+    use serde::Deserialize;
+    use serde::de::{IgnoredAny, MapAccess, Visitor};
+
+    struct Keys(Vec<String>);
+    impl<'de> Deserialize<'de> for Keys {
+        fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<Keys, D::Error> {
+            struct V;
+            impl<'de> Visitor<'de> for V {
+                type Value = Keys;
+                fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+                    f.write_str("an object")
+                }
+                fn visit_map<A: MapAccess<'de>>(self, mut map: A) -> Result<Keys, A::Error> {
+                    let mut keys = Vec::new();
+                    while let Some(key) = map.next_key::<String>()? {
+                        map.next_value::<IgnoredAny>()?;
+                        keys.push(key);
+                    }
+                    Ok(Keys(keys))
+                }
+            }
+            d.deserialize_map(V)
+        }
+    }
+    #[derive(Deserialize)]
+    struct Service {
+        #[serde(default)]
+        operations: Vec<Keys>,
+    }
+    serde_json::from_str::<Service>(text)
+        .ok()
+        .and_then(|s| s.operations.into_iter().next())
+        .map(|k| k.0)
+        .unwrap_or_default()
+}
+
+/// `value` as pretty JSON at `level` indents of `unit`, object keys ordered
+/// by `rank` — the layout `serde_json::to_string_pretty` writes, with the
+/// file's indent and key order in place of its own.
+fn write_json(
+    value: &serde_json::Value,
+    unit: &str,
+    level: usize,
+    rank: &dyn Fn(&str) -> (usize, usize),
+    out: &mut String,
+) {
+    match value {
+        serde_json::Value::Object(map) if !map.is_empty() => {
+            let mut keys: Vec<&String> = map.keys().collect();
+            keys.sort_by_key(|k| (rank(k), (*k).clone()));
+            out.push_str("{\n");
+            for (i, key) in keys.iter().enumerate() {
+                out.push_str(&unit.repeat(level + 1));
+                out.push_str(&serde_json::to_string(key).expect("a string"));
+                out.push_str(": ");
+                write_json(&map[key.as_str()], unit, level + 1, rank, out);
+                out.push_str(if i + 1 < keys.len() { ",\n" } else { "\n" });
+            }
+            out.push_str(&unit.repeat(level));
+            out.push('}');
+        }
+        serde_json::Value::Array(items) if !items.is_empty() => {
+            out.push_str("[\n");
+            for (i, item) in items.iter().enumerate() {
+                out.push_str(&unit.repeat(level + 1));
+                write_json(item, unit, level + 1, rank, out);
+                out.push_str(if i + 1 < items.len() { ",\n" } else { "\n" });
+            }
+            out.push_str(&unit.repeat(level));
+            out.push(']');
+        }
+        other => out.push_str(&serde_json::to_string(other).expect("plain data")),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -820,5 +1191,176 @@ mod tests {
         let err = dialect::workspace_tables(ws.path()).unwrap_err();
         assert!(err.contains("stale"), "{err}");
         assert!(err.contains("widgets.table.json"), "{err}");
+    }
+
+    // ── `forge schema op new` and the editor schema (ST-6) ──────────────
+
+    /// A fresh `forge new --template workspace --dialect <lang>` tree.
+    fn dialect_workspace(lang: forge_lang_rustgen::Lang) -> (tempfile::TempDir, PathBuf) {
+        let tmp = tempfile::tempdir().unwrap();
+        let dir = tmp.path().join("acme");
+        crate::cmd::new::write_dialect_tree(&dir, "acme", "acme", lang).unwrap();
+        (tmp, dir)
+    }
+
+    fn op_new_args(root: &Path, target: &str, lang: Option<&str>) -> OpNewArgs {
+        OpNewArgs {
+            target: target.to_string(),
+            lang: lang.map(str::to_string),
+            kind: "mutation".to_string(),
+            manifest_dir: Some(root.to_path_buf()),
+        }
+    }
+
+    /// The four languages, with the stub path `op new` writes for
+    /// `acme::plan_refund`.
+    const STUBS: [(forge_lang_rustgen::Lang, &str, &str); 4] = [
+        (
+            forge_lang_rustgen::Lang::Python,
+            "py",
+            "domains/acme/services/plan_refund.py",
+        ),
+        (
+            forge_lang_rustgen::Lang::TypeScript,
+            "ts",
+            "domains/acme/services/plan_refund.ts",
+        ),
+        (
+            forge_lang_rustgen::Lang::Java,
+            "java",
+            "domains/acme/services/PlanRefund.java",
+        ),
+        (
+            forge_lang_rustgen::Lang::Rust,
+            "rust",
+            "domains/acme/services/plan_refund.rs",
+        ),
+    ];
+
+    /// For each language: `op new` in a workspace from the `forge new`
+    /// template declares the op after the starter and writes its stub; a
+    /// second `op new` of the same op is refused, naming it.
+    #[test]
+    fn op_new_declares_the_op_writes_its_stub_and_refuses_a_second() {
+        for (lang, word, stub) in STUBS {
+            let (_tmp, dir) = dialect_workspace(lang);
+            let args = op_new_args(&dir, "acme::plan_refund", Some(word));
+            let written = op_new(&dir, &args).unwrap_or_else(|e| panic!("{word}: {e:#}"));
+            assert_eq!(written[1], dir.join(stub), "{word}");
+            let (_, text) =
+                scaffold::handler_stub(scaffold::Lang::parse(word).unwrap(), "acme", "plan_refund");
+            assert_eq!(std::fs::read_to_string(&written[1]).unwrap(), text);
+            let declared = crate::dialect::declared_ops(&dir.join("domains/acme")).unwrap();
+            assert_eq!(declared, ["hello", "plan_refund"], "{word}");
+
+            let again = op_new(&dir, &args).expect_err("a second `op new` of the same op");
+            assert!(
+                format!("{again:#}").contains("`acme::plan_refund` already exists"),
+                "{word}: {again:#}"
+            );
+        }
+    }
+
+    /// ST-6 decision 4: after `op new`, `forge check` over the workspace is
+    /// green in every language. It is not on the forge-lang this lane links:
+    /// `forge check` stages no generated surface, the scoped contract
+    /// surfaces do not make an empty declared request or response a known
+    /// type (py FL0014, ts FL1053), and javac and the Rust gate cannot
+    /// resolve `forge.schema` / `forge::schema` at all. The same stubs are
+    /// accepted with `$FORGE_LANG_SCHEMA_{PY,TS,RS}` pointed at `.forge/types`.
+    /// ST-6 slice 2 core closes it in forge-lang: the contract-scoped check
+    /// generates the surface from the scoped `service.json` itself, so the
+    /// input stays `service.json` and never the editor's `.forge/types`.
+    #[test]
+    #[ignore = "ST-6 slice 2 core: check_only_with generates the surface from the scoped service.json when none is staged"]
+    fn op_new_then_forge_check_is_green_in_every_language() {
+        let mut refused: Vec<String> = Vec::new();
+        for (lang, word, _) in STUBS {
+            let (_tmp, dir) = dialect_workspace(lang);
+            op_new(&dir, &op_new_args(&dir, "acme::plan_refund", Some(word)))
+                .unwrap_or_else(|e| panic!("{word}: {e:#}"));
+            refresh_types(&dir);
+            match crate::cmd::check::check(&dir) {
+                Ok(found) if found.ok() => assert_eq!(found.registers.len(), 2, "{word}"),
+                Ok(found) => {
+                    let text: String = found.registers.iter().map(|r| r.render()).collect();
+                    refused.push(format!("{word}:\n{text}"));
+                }
+                Err(e) => refused.push(format!("{word}: the checker could not run: {e}")),
+            }
+        }
+        assert!(
+            refused.is_empty(),
+            "`forge check` refused the scaffold:\n{}",
+            refused.join("\n")
+        );
+    }
+
+    /// With no `--lang`, the stub takes the domain's existing ops' language;
+    /// an unknown domain is refused naming it and the domains there are.
+    #[test]
+    fn op_new_defaults_the_language_and_refuses_an_unknown_domain() {
+        let (_tmp, dir) = dialect_workspace(forge_lang_rustgen::Lang::TypeScript);
+        let written = op_new(&dir, &op_new_args(&dir, "acme::list_plans", None)).unwrap();
+        assert_eq!(written[1], dir.join("domains/acme/services/list_plans.ts"));
+
+        let err = op_new(&dir, &op_new_args(&dir, "billing::charge", None)).unwrap_err();
+        let err = format!("{err:#}");
+        assert!(err.contains("unknown domain `billing`"), "{err}");
+        assert!(err.contains("`acme`"), "{err}");
+    }
+
+    /// The append keeps every byte of the file the author wrote — its key
+    /// order and its indent — and writes the new entry in both.
+    #[test]
+    fn the_append_keeps_the_files_key_order_and_indent() {
+        let text = "{\n    \"name\": \"billing\",\n    \"domain\": \"billing\",\n    \
+                    \"operations\": [\n        {\n            \"name\": \"charge\",\n            \
+                    \"kind\": \"mutation\",\n            \"summary\": \"Charge.\"\n        }\n    ]\n}\n";
+        let entry = scaffold::service_entry("refund", "query");
+        let out = append_op(text, &entry).unwrap();
+        let head = "{\n    \"name\": \"billing\",\n    \"domain\": \"billing\",\n    \
+                    \"operations\": [\n        {\n            \"name\": \"charge\",\n            \
+                    \"kind\": \"mutation\",\n            \"summary\": \"Charge.\"\n        },\n";
+        assert!(out.starts_with(head), "{out}");
+        assert_eq!(
+            &out[head.len()..],
+            "        {\n            \"name\": \"refund\",\n            \"kind\": \"query\",\n            \
+             \"input_schema\": {\n                \"type\": \"object\",\n                \
+             \"properties\": {}\n            },\n            \"output_schema\": {\n                \
+             \"type\": \"object\",\n                \"properties\": {}\n            },\n            \
+             \"errors\": []\n        }\n    ]\n}\n"
+        );
+    }
+
+    /// A fresh `forge new` and `forge schema compile` leave the editor both
+    /// halves: `.forge/types/service.schema.json`, and the committed
+    /// `.vscode/settings.json` that maps every domain's `service.json` to it.
+    #[test]
+    fn a_fresh_workspace_maps_service_json_to_its_json_schema() {
+        let (_tmp, dir) = dialect_workspace(forge_lang_rustgen::Lang::Python);
+        compile(CompileArgs {
+            manifest_dir: Some(dir.clone()),
+            check: false,
+        })
+        .unwrap();
+        let schema = dir
+            .join(forge_lang_rustgen::workspace_types::TYPES_DIR)
+            .join(SERVICE_SCHEMA_FILE);
+        let written: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(&schema).unwrap()).unwrap();
+        assert_eq!(written, forge_lang_rustgen::service_json_schema());
+
+        let settings: serde_json::Value = serde_json::from_str(
+            &std::fs::read_to_string(dir.join(".vscode/settings.json")).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(
+            settings["json.schemas"],
+            serde_json::json!([{
+                "fileMatch": ["domains/*/service.json"],
+                "url": "./.forge/types/service.schema.json",
+            }])
+        );
     }
 }

@@ -38,8 +38,10 @@ use std::path::{Path, PathBuf};
 
 use anyhow::Result;
 use clap::Args;
-use forge_lang_rustgen::{Card, CompileError, NativeValidation, Register, check_only};
+use forge_lang_rustgen::ContractDiff;
+use forge_lang_rustgen::{Card, CompileError, NativeValidation, Register, check_only_with};
 
+use crate::cmd::contract_diff;
 use crate::dialect;
 
 /// The versioned envelope `--format json` prints.
@@ -50,7 +52,7 @@ use crate::dialect;
 /// exists only because a workspace has many sources and that envelope has one
 /// `path`. Additive-only, and the `N` bumps when a field is added
 /// (`forge-lang/REJECTIONS.md`, the machine-envelope section).
-const CHECK_SCHEMA: &str = "forge-check/2";
+const CHECK_SCHEMA: &str = "forge-check/3";
 
 /// This machine could not do its job — the toolchain exit code, distinct from
 /// a refusal so a CI step can tell "your source is wrong" from "my runner is".
@@ -164,6 +166,10 @@ pub(crate) fn check(root: &Path) -> Result<Verdicts, String> {
     // without one keeps the directory walk; rule zero stays off when a
     // workspace declares nothing at all.
     let (tables, schema) = dialect::workspace_tables(root)?;
+    // ST-6: what each domain's `service.json` declares for its ops' input,
+    // output and errors, scoped around every source's front end — the same
+    // surfaces the control plane scopes at push, so the two refuse alike.
+    let contracts = dialect::contract_surfaces(root)?;
 
     // Every source is checked. Stopping at the first refusal would make a
     // second run necessary to see the second problem, which is the round trip
@@ -179,7 +185,7 @@ pub(crate) fn check(root: &Path) -> Result<Verdicts, String> {
     // disagree about the same file.
     let mut defined: BTreeMap<String, Vec<String>> = BTreeMap::new();
     for source in &sources {
-        match check_only(source, tables.as_ref(), NativeValidation::Run) {
+        match check_only_with(source, tables.as_ref(), NativeValidation::Run, &contracts) {
             // The emit refuses an op-less source, and this command says the
             // same thing in the same words rather than accepting a file
             // `forge wasm-build` will refuse a minute later.
@@ -222,6 +228,18 @@ pub(crate) fn check(root: &Path) -> Result<Verdicts, String> {
         true => dialect::op_mismatches(root, &defined),
         false => Vec::new(),
     };
+    // The contract findings' structured diffs, in source order, each code
+    // location spelled under the workspace root as the registers are.
+    let contract_mismatches: Vec<ContractDiff> = registers
+        .iter()
+        .flat_map(|r| r.contract_diffs().cloned())
+        .map(|mut d| {
+            if let Some(staged) = &pinned {
+                d.code = d.code.map(|c| crate::pins::unstage(&c, &staged.root, root));
+            }
+            d
+        })
+        .collect();
     let (registers, units) = match &pinned {
         Some(staged) => (
             registers
@@ -248,6 +266,7 @@ pub(crate) fn check(root: &Path) -> Result<Verdicts, String> {
         registers,
         cards,
         mismatches,
+        contract_mismatches,
         schema,
         units,
     })
@@ -274,6 +293,10 @@ pub(crate) struct Verdicts {
     pub(crate) cards: Vec<Vec<(String, Card)>>,
     /// Declared-vs-defined disagreements, across domains.
     mismatches: Vec<dialect::OpMismatch>,
+    /// ST-6: every contract finding's diff against `service.json`. Each is
+    /// also a refusal in its source's register, so it already fails the run;
+    /// this is the same finding as a named diff.
+    pub(crate) contract_mismatches: Vec<ContractDiff>,
     /// The compiled snapshot's content hash when the workspace was judged
     /// against a `schema.lock` — named in the output so a verdict can be
     /// tied to the exact schema it was made under. `None` on the
@@ -331,6 +354,9 @@ fn human_report(found: &Verdicts) -> String {
             out.push_str(&register.render());
         }
     }
+    for d in &found.contract_mismatches {
+        out.push_str(&contract_diff::render(d));
+    }
     for m in &found.mismatches {
         out.push_str(&format!("error: {}\n", m.render()));
     }
@@ -363,6 +389,12 @@ fn summary(found: &Verdicts) -> String {
             found.mismatches.len()
         ));
     }
+    if !found.contract_mismatches.is_empty() {
+        line.push_str(&format!(
+            "; {} contract mismatch(es)",
+            found.contract_mismatches.len()
+        ));
+    }
     if !found.units.is_empty() {
         line.push_str(&format!("; {} unit(s) resolved", found.units.len()));
     }
@@ -389,6 +421,14 @@ fn envelope(root: &Path, found: &Verdicts) -> String {
         // forge-check/2, additive: the units the sources reached, so a
         // machine reader sees the file was resolved and not skipped.
         "units": found.units.iter().map(|u| u.display().to_string()).collect::<Vec<_>>(),
+        // forge-check/3 (ST-6): each contract finding as a named
+        // diff — op, facet, where service.json declares it, the code's
+        // location, one row per field.
+        "contract_mismatches": found
+            .contract_mismatches
+            .iter()
+            .map(contract_diff::to_json)
+            .collect::<Vec<_>>(),
         "op_mismatches": found.mismatches.iter().map(|m| serde_json::json!({
             "domain": m.domain,
             "op": m.op,

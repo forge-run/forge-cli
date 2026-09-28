@@ -15,8 +15,8 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{Result, bail};
 use forge_lang_rustgen::{
-    CompileError, CompileSpec, Compiled, Defect, EMITTER_VERSION, InputSchemas, Layout, Plants,
-    Tables, compile_all_with_inputs, lang_of,
+    CompileError, CompileSpec, Compiled, ContractSurfaces, Defect, EMITTER_VERSION, InputSchemas,
+    Layout, Plants, Tables, compile_all_with_inputs, lang_of,
 };
 
 /// The reference directory a workspace keeps runtime-owned table schemas in.
@@ -312,6 +312,42 @@ pub fn input_schemas(domain: &Path) -> Result<InputSchemas> {
                 .then(|| (name.to_string(), schema.to_string()))
         })
         .collect())
+}
+
+/// ST-6: every domain's `service.json`, parsed into the contract surfaces
+/// `forge check` scopes around each source's front end, so a response its
+/// `output_schema` does not allow, a read of an input field its
+/// `input_schema` does not declare and a raise of a code its op does not
+/// declare are refused here as the push refuses them. Each file is named the
+/// way the diff names it, relative to the workspace root. A `service.json`
+/// the generator cannot read is refused: its ops' contracts would otherwise
+/// go unchecked.
+pub fn contract_surfaces(root: &Path) -> Result<ContractSurfaces, String> {
+    let mut surfaces = ContractSurfaces::default();
+    for domain in domains(root) {
+        let Ok(text) = std::fs::read_to_string(domain.join("service.json")) else {
+            continue;
+        };
+        let name = domain_name(&domain);
+        let path = format!("domains/{name}/service.json");
+        surfaces.add_service(&path, &with_domain(&name, &text))?;
+    }
+    Ok(surfaces)
+}
+
+/// `text` with its `domain` key filled from the directory it sits in when the
+/// file leaves it out, as the control plane reads it: a domain's ops are
+/// read by that directory, so a `service.json` that names no domain is still
+/// that domain's. Anything that is not a JSON object is answered unchanged,
+/// for the parse to refuse in its own words.
+fn with_domain(domain: &str, text: &str) -> String {
+    match serde_json::from_str(text) {
+        Ok(serde_json::Value::Object(mut doc)) if !doc.contains_key("domain") => {
+            doc.insert("domain".to_string(), domain.into());
+            serde_json::Value::Object(doc).to_string()
+        }
+        _ => text.to_string(),
+    }
 }
 
 /// The op names a domain's `service.json` DECLARES.

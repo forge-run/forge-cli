@@ -457,7 +457,7 @@ fn scaffold_dialect_workspace(crate_name: &str, lang: Lang) -> Result<()> {
 /// tree with the starter op in `lang`, then the dialect's subset skill
 /// (typed-boundary TB-7) beside the schema surface TB-6 writes. Answers the
 /// skill's path.
-fn write_dialect_tree(
+pub(crate) fn write_dialect_tree(
     target_dir: &std::path::Path,
     crate_name: &str,
     domain: &str,
@@ -497,6 +497,20 @@ fn write_dialect_tree(
     })
 }
 
+/// The editor mapping for `service.json` (ST-6): every domain's declaration
+/// validates and completes against the JSON Schema `forge schema compile`
+/// writes into `.forge/types/`. The template carries no other VS Code
+/// settings, so this is the whole file.
+const VSCODE_SETTINGS: &str = r#"{
+  "json.schemas": [
+    {
+      "fileMatch": ["domains/*/service.json"],
+      "url": "./.forge/types/service.schema.json"
+    }
+  ]
+}
+"#;
+
 /// Everything a workspace scaffold writes before `git init`: the template,
 /// the two editor configs committed once at the root, `schema.lock`, and the
 /// git-ignored `.forge/types/` the editor configs point at (typed-boundary
@@ -521,6 +535,7 @@ fn write_workspace_tree(
     let editor = [
         ("tsconfig.json", workspace_types::ROOT_TSCONFIG),
         ("pyrightconfig.json", workspace_types::ROOT_PYRIGHTCONFIG),
+        (".vscode/settings.json", VSCODE_SETTINGS),
     ];
     for (rel_path, content) in files.iter().chain(editor.iter()) {
         // `{{domain}}` appears in emitted paths too (the domain directory).

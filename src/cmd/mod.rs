@@ -5,6 +5,7 @@ pub mod brand;
 pub mod build;
 pub mod check;
 pub mod components;
+pub(crate) mod contract_diff;
 pub mod deploy;
 pub mod dev;
 pub mod domain;
