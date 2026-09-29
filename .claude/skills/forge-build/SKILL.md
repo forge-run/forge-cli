@@ -100,7 +100,7 @@ cargo build --workspace --tests --locked --features adapters
 FORGE_AUTH_CACHE_TTL_SECS=0 FORGE_DESIRED_STATE_CAS_ATTEMPTS=96 \
   cargo test --workspace --tests --no-fail-fast --locked --features adapters
 cargo check --bin forge-runtime --locked --no-default-features --features adapters
-cd examples/api-smoke && cargo check --locked
+bash -c 'cd examples/api-smoke && cargo check --locked'
 ```
 
 - These are the steps `forge-runtime/.github/workflows/ci.yml` runs in `forge-runtime/`, after its grep fences (the legacy auth-carrier fence among them), in order.
@@ -122,7 +122,7 @@ cargo test --tests --no-fail-fast --locked --features chaos-tests
 cargo test --workspace --exclude forge-storage --no-fail-fast --locked -F forge-storage-tx/chaos-tests
 FORGE_STRICT_DECLARATIONS=1 cargo test --tests --no-fail-fast --locked strict_mode
 ./scripts/reachability-check.py
-(cd examples/embed-smoke && cargo check)
+bash -c 'cd examples/embed-smoke && cargo check'
 ./scripts/ffi-guard-check.py
 ./scripts/verify-sdk-tsc.sh
 ```
