@@ -266,7 +266,7 @@ resolution error — not something you need to set up.
 ## Cost awareness
 
 <!-- fact: platform/crate-line-counts -->
-forge-runtime holds 204539 lines of tracked Rust and forge-storage 309576.
+forge-runtime holds 204539 lines of tracked Rust and forge-storage 309694.
 
 Both are genuinely slow from cold — tens of minutes. Prefer `cargo check` while iterating,
 and set `CARGO_TARGET_DIR` to a stable path so the heavy unchanging deps stay compiled
