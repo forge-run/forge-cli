@@ -82,6 +82,10 @@ forge-web-build = { path = "../forge-web/build" }
 # two can link this crate at two revisions. `EMITTER_VERSION` and a named
 # refusal are what close that (§4.2).
 forge-lang-rustgen = { path = "../forge-lang/crates/forge-lang-rustgen" }
+# `forge test` (forge-lang CF-23): a domain's tests in the op's own lane,
+# run by the interpreter the platform serves. The library half lives in
+# forge-lang so the platform can run the same tests later.
+forge-lang-test = { path = "../forge-lang/crates/forge-lang-test" }
 # Shared units (D-110): the pin file, the address and the publish/record
 # shapes are the wire crate's, so `forge check`, `forge units` and the
 # control plane read one definition.

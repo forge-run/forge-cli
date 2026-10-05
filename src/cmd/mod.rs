@@ -26,6 +26,7 @@ pub mod sso;
 pub mod static_cmd;
 pub mod surface_lint;
 pub mod tenant;
+pub mod test;
 pub mod tokens;
 pub mod units;
 pub mod update;
