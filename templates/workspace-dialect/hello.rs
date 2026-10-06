@@ -1,14 +1,13 @@
-use forge::{OpContext, Value};
-use serde::Serialize;
+//! The `{{domain}}::hello` starter op.
 
-#[derive(Serialize)]
-pub struct Greeting {
-    message: String,
-}
+use forge::schema::inputs::{{domain}}::{HelloRequest, HelloResponse};
+use forge::{op, OpContext};
 
-pub fn hello(ctx: &OpContext, input: &Value) -> Greeting {
-    let name: String = input.get_str("name", "world");
-    Greeting {
-        message: format!("hello, {}, from {{domain}}", name),
+/// Greets the caller by the name they sent.
+#[op]
+#[must_use]
+pub fn hello(_ctx: &OpContext, req: &HelloRequest) -> HelloResponse {
+    HelloResponse {
+        message: format!("hello, {}, from {{domain}}", req.name),
     }
 }

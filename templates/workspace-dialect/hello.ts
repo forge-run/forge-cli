@@ -1,11 +1,7 @@
-import { op, OpContext, Value } from "forge";
+/** The `{{domain}}::hello` starter op. */
+import { op, OpContext } from "forge";
+import { HelloRequest, HelloResponse } from "forge/schema";
 
-interface Greeting {
-  message: string;
-}
-
-export const hello = op("hello", (ctx: OpContext, input: Value) => {
-  const name: string = input.get("name", "world");
-  const out: Greeting = { message: "hello, " + name + ", from {{domain}}" };
-  return out;
+export const hello = op((ctx: OpContext, req: HelloRequest): HelloResponse => {
+  return { message: "hello, " + req.name + ", from {{domain}}" };
 });

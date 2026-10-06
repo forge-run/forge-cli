@@ -1,0 +1,30 @@
+{
+  "name": "{{domain}}",
+  "domain": "{{domain}}",
+  "api_version": 1,
+  "operations": [
+    {
+      "name": "hello",
+      "kind": "query",
+      "auth": "authenticated",
+      "idempotency": "idempotent",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" }
+        },
+        "required": ["name"]
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "message": { "type": "string" }
+        },
+        "required": ["message"]
+      },
+      "error_codes": [],
+      "summary": "Return a greeting.",
+      "description": "The starter op. Proves the workspace builds, ships, and serves. Bind it from a page with @op:{{domain}}::hello."
+    }
+  ]
+}

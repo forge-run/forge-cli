@@ -374,10 +374,12 @@ fn scaffold_workspace(crate_name: &str, template: &str, files: &[(&str, &str)]) 
     Ok(())
 }
 
-/// The dialect scaffold's own files: the README and one starter op per
-/// dialect. Everything else comes from the `workspace` template minus its
-/// wasm crate — a dialect workspace builds nothing on the author's side.
+/// The dialect scaffold's own files: the README, a `service.json` declaring
+/// `hello`'s request and response, and one starter op per dialect binding
+/// them. Everything else comes from the `workspace` template minus its wasm
+/// crate — a dialect workspace builds nothing on the author's side.
 const DIALECT_README: &str = include_str!("../../templates/workspace-dialect/README.md");
+const DIALECT_SERVICE: &str = include_str!("../../templates/workspace-dialect/service.json");
 const DIALECT_OPS: &[(Lang, &str, &str)] = &[
     (
         Lang::Python,
@@ -402,11 +404,13 @@ const DIALECT_OPS: &[(Lang, &str, &str)] = &[
 ];
 
 /// The `workspace` template's files a dialect workspace does not carry: the
-/// cargo manifests and the raw wasm module.
+/// cargo manifests and the raw wasm module, plus the README and the untyped
+/// `service.json` it writes its own of.
 const WASM_ONLY: &[&str] = &[
     "Cargo.toml",
     "domains/{{domain}}/Cargo.toml",
     "domains/{{domain}}/services/lib.rs",
+    "domains/{{domain}}/service.json",
     "README.md",
 ];
 
@@ -480,6 +484,7 @@ pub(crate) fn write_dialect_tree(
         .copied()
         .collect();
     files.push(("README.md", &readme));
+    files.push(("domains/{{domain}}/service.json", DIALECT_SERVICE));
     files.push((&op_path, op_body));
     // The Rust dialect shares `.rs` with raw wasm Rust; the marker is the
     // workspace's ruling that its `.rs` sources are dialect (`dialect.rs`).
