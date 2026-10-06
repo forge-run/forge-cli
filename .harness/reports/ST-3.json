@@ -1,0 +1,34 @@
+{
+  "author": "rory",
+  "bundle_ids": [],
+  "bundle_note": "not committed per brief; evidence is the sdk-bg job logs st3-cli-test and st3-cli-lang2 and /tmp/st3-nt.json",
+  "commits": [],
+  "lane": "/Users/rory/Documents/forge-run/forge-cli--step-st3",
+  "notes": "FL1007 forced a block-bodied TS op; FL2002 forbids a private constructor in Hello.java. Seal now also covers service.json.",
+  "repair_attempts": 0,
+  "schema": "forge-report/v1",
+  "step": "ST-3",
+  "ts": "2026-10-06T00:27:22.540033+00:00",
+  "verdicts": [
+    {
+      "evidence": "style-gate.py run --sets new-templates: py/ts/java/rs 1 file 0 findings each",
+      "item": "forge new dialect templates pass the new-templates gate with zero findings in all four lanes",
+      "verdict": "met"
+    },
+    {
+      "evidence": "forge-lang build --check-only accepts all four rendered templates; forge-cli a_dialect_scaffold_emits_the_generated_skill_and_an_admitted_starter passes",
+      "item": "templates bind generated HelloRequest/HelloResponse from a dialect service.json",
+      "verdict": "met"
+    },
+    {
+      "evidence": "schemagen",
+      "item": "schemagen surface verb with unit test",
+      "verdict": "met"
+    },
+    {
+      "evidence": "gate ran 0 findings; new-templates and gate-instrument seals in baseline.json owe an orchestrator reseal",
+      "item": "style gate renders templates and sets SET_SURFACE[new-templates], FORGE_STYLE_CLI_ROOT override",
+      "verdict": "met-with-owed"
+    }
+  ]
+}
