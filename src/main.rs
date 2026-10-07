@@ -107,6 +107,13 @@ enum Cmd {
     /// envelope.
     Check(cmd::check::CheckArgs),
 
+    /// Run the workspace's tests: every `domains/<d>/tests/*` file, written
+    /// in the op's own language (`def test_*()`, `describe`/`it`, `@Test`,
+    /// `#[test] fn`) against the fixture surface, run by the interpreter the
+    /// platform serves with no build. `--json` prints the `forge-test/1`
+    /// envelope; any failure or refusal exits non-zero.
+    Test(cmd::test::TestArgs),
+
     /// The workspace's compiled schema: `forge schema compile` writes
     /// `schema.lock` (authored tables + the runtime-owned bundle + archetype
     /// system columns, resolved and content-addressed); `--check` is the
@@ -270,6 +277,7 @@ async fn main() -> Result<()> {
             cmd::sdk::run(s, &client).await
         }
         Cmd::Check(args) => cmd::check::run(args),
+        Cmd::Test(args) => cmd::test::run(args),
         Cmd::Schema(cmd) => {
             cmd::schema::run(cmd, || {
                 let cfg = config::resolve(cli.base_url, cli.token, cli.profile)?;
