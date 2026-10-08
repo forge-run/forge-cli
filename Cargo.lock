@@ -952,6 +952,7 @@ dependencies = [
 name = "forge-lang-tree"
 version = "0.1.0"
 dependencies = [
+ "forge-platform-wire",
  "serde",
  "serde_json",
 ]
