@@ -27,7 +27,7 @@
     },
     {
       "path": ".claude/skills/forge-build/SKILL.md",
-      "sha256": "17e53494e3a563a496408b642b28c93f98ea6877702de78b6974b50ee1113de5"
+      "sha256": "600c484d692a49708898873c9485f32fdec2a7e689260a3f16658369b9256c79"
     },
     {
       "path": ".claude/skills/forge-model-tiers/SKILL.md",
@@ -59,7 +59,7 @@
     },
     {
       "path": ".github/workflows/harness-gates.yml",
-      "sha256": "87295d2e03bf143cc4cb09f1412a63912708b9b00d338e323416dd4d4c9984f8"
+      "sha256": "f9c65900be1a117ebfe62a6fc6d592c11749ae22ea3c2d6cece72e2f4dd33328"
     },
     {
       "path": ".gitignore#rules",
@@ -75,7 +75,7 @@
     },
     {
       "path": ".harness/plan.json",
-      "sha256": "eee8fe54e2c39dca8d069e0f5eff9700e108cd8acc45c7798b92f3932618a523"
+      "sha256": "200f300e6a493889131618c7c633b138c32eb4f83d9f2cbda37e379ebc514319"
     },
     {
       "path": ".harness/runner.py",
@@ -297,7 +297,7 @@
       "params": {
         "roots": "content"
       },
-      "sha256": "b65cabe7f8e958c2104e40f802bec78e3d3fab01edf579dc2651528106ebac6f",
+      "sha256": "c0b4798dd796fb9caccc11d564399cfa6806ae2187aa98f72d811e99858981f1",
       "source": "local/prose-tells"
     },
     {
@@ -325,8 +325,8 @@
   "harness_dir": "harnesses/hybrid",
   "source": {
     "kind": "commit",
-    "ref": "84f13b552c71f34a4bf542f9ca9b70738473983c",
-    "sha": "84f13b552c71f34a4bf542f9ca9b70738473983c"
+    "ref": "2754beae9b4c1c1953bfbac2017758761e0afb82",
+    "sha": "2754beae9b4c1c1953bfbac2017758761e0afb82"
   },
   "targets": [
     "claude-code",
