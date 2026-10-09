@@ -363,6 +363,23 @@ async fn fetch_status(client: &ForgeClient) -> Result<Reconcile> {
         .map_err(|e| anyhow::anyhow!("reconcile/status: {e}"))
 }
 
+/// Is the status about OUR push: it names our SHA, or has moved past the
+/// commit it named before we pushed (or named none)?
+fn is_this_push(st: &Reconcile, pushed_sha: &str, before_sha: &str) -> bool {
+    st.git_sha == pushed_sha || before_sha.is_empty() || st.git_sha != before_sha
+}
+
+/// The failure to report for this push, if the status carries one. A
+/// `last_error` the status still holds from the PREVIOUS push (its
+/// `git_sha` is the pre-push commit) is not this push's verdict: the wait
+/// goes on until the server picks the push up.
+fn failure_of_this_push(st: &Reconcile, pushed_sha: &str, before_sha: &str) -> Option<String> {
+    if !(st.stuck || st.last_error.is_some()) || !is_this_push(st, pushed_sha, before_sha) {
+        return None;
+    }
+    Some(st.last_error.clone().unwrap_or_else(|| "stuck".into()))
+}
+
 async fn poll_until_converged(
     client: &ForgeClient,
     pushed_sha: &str,
@@ -382,18 +399,13 @@ async fn poll_until_converged(
     loop {
         let st = fetch_status(client).await?;
 
-        if st.stuck || st.last_error.is_some() {
-            bail!(
-                "converge FAILED CLOSED (the previous version keeps serving): {}",
-                st.last_error.unwrap_or_else(|| "stuck".into())
-            );
+        if let Some(failure) = failure_of_this_push(&st, pushed_sha, before_sha) {
+            bail!("converge FAILED CLOSED (the previous version keeps serving): {failure}");
         }
 
         // Converged: in sync, live == desired, AND the server is on our push
         // (matches our SHA, or has advanced past the pre-push commit).
-        let is_ours = st.git_sha == pushed_sha
-            || (!before_sha.is_empty() && st.git_sha != before_sha)
-            || before_sha.is_empty();
+        let is_ours = is_this_push(&st, pushed_sha, before_sha);
         if st.in_sync && st.live_hash == st.desired_hash && is_ours {
             eprintln!("push: ✅ converged @ {}", short(&st.git_sha));
             return Ok(st);
@@ -551,6 +563,30 @@ export const hello = op("hello", (ctx: OpContext, input: Value) => {
   return g;
 });
 "#;
+
+    /// A push that follows a failed one: until the server picks the new
+    /// commit up, the status still carries the previous push's error, and
+    /// that is not this push's verdict. Once the status names the push, its
+    /// error is.
+    #[test]
+    fn a_previous_push_failure_is_not_this_push_verdict() {
+        let stale = Reconcile {
+            git_sha: "before".into(),
+            last_error: Some("app_bundle validation failed".into()),
+            ..Reconcile::default()
+        };
+        assert_eq!(failure_of_this_push(&stale, "pushed", "before"), None);
+        let ours = Reconcile {
+            git_sha: "pushed".into(),
+            ..stale.clone()
+        };
+        assert_eq!(
+            failure_of_this_push(&ours, "pushed", "before").as_deref(),
+            Some("app_bundle validation failed")
+        );
+        // No pre-push commit: whatever the status says is about this push.
+        assert!(failure_of_this_push(&stale, "pushed", "").is_some());
+    }
 
     fn workspace(files: &[(&str, &str)]) -> tempfile::TempDir {
         let dir = tempfile::tempdir().unwrap();
