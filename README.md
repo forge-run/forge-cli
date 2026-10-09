@@ -131,11 +131,18 @@ on the tree the push stages (`after`). It reports and never holds a converge.
 | `ops[].missing_in_candidate` | `true` when the pushed tree no longer has this op: its captures were not replayed (`replayed` is `0`). |
 | `ops[].not_replayed` | Captures of this op not replayed: the op is gone from one tree, or the replay budget ran out first. |
 | `replay_error` | Why the diff is incomplete: a bundle that would not load, a failed capture read, the wall-time budget running out. Absent when the replay completed. |
+| `schema_changes[]` | OR-4: the changes this push makes to tables the workspace already has that a captured request can feel, read off the live table before the push applies: `{kind, table, column, from?, to?}`, `kind` one of `dropped_column`, `narrowed_type` (`from`/`to` the live and pushed types), `not_null_no_default`. Always present; `[]` when the push changes no such column. |
+| `schema_findings[]` | OR-4: the captured requests those changes reach, replayed on the pushed tree with their recorded rows mapped onto the new schema. One entry per `{kind, op, table, column}`, sorted; `kind` is `dropped_column_read` (the query names the column, or the op reads it from a row), `narrowed_type_read` (a recorded value the new type cannot hold) or `not_null_write` (an insert or upsert that leaves the new column unset, an update that sets it null). Always present; `[]` when no captured request feels the change. |
+| `schema_findings[].captures[]` | Every capture of that op the change reaches: `capture_id`, `input` (verbatim), `fails` (`true` when storage refuses the request or the op ends in an error on the new schema; `false` when it answers, differently), `detail` (what it meets, in words), `after` (for a read the replay answered: the outcome over the mapped rows). |
 
 To act on it: an op with `changed > 0` answers differently after this push;
 read its `examples` to see whether the change was intended. An op with
 `missing_in_candidate: true` is one production traffic still calls and the
 push removed. A `replay_error` means the counts cover only what was replayed.
+A `schema_findings` entry is a request production sent that the pushed schema
+refuses or answers differently: fix the op or the schema before it lands, or
+accept it knowingly. Neither list holds the converge; a destructive schema
+change still needs `accept_destructive` to apply.
 
 ### `forge test --from-trace` — a production failure as a test
 

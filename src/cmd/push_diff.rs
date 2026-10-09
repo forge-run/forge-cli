@@ -6,8 +6,11 @@
 //! `behaviour_diff` ([`forge_platform_wire::BehaviourDiff`]). A diff is only
 //! reported when its `desired_hash` is the status's own: a diff left over from
 //! an earlier push is about a different tree.
+//!
+//! A push that changes the schema carries OR-4's findings in the same diff:
+//! `schema_changes` and the captured requests they reach, `schema_findings`.
 
-use forge_platform_wire::{BehaviourDiff, CaptureOutcome, ReplayAnswer};
+use forge_platform_wire::{BehaviourDiff, CaptureOutcome, ReplayAnswer, SchemaFindingKind};
 
 use super::push::Reconcile;
 
@@ -76,8 +79,46 @@ pub(super) fn render(diff: Option<&BehaviourDiff>) -> Vec<String> {
             }
         }
     }
+    lines.extend(render_schema(diff));
     if let Some(err) = &diff.replay_error {
         lines.push(format!("replay error: {err}"));
+    }
+    lines
+}
+
+/// OR-4's lines: nothing when the push changes no column a capture can
+/// feel; otherwise the count, then each finding with its captures.
+fn render_schema(diff: &BehaviourDiff) -> Vec<String> {
+    if diff.schema_changes.is_empty() {
+        return Vec::new();
+    }
+    let mut lines = vec![format!(
+        "schema change replay over {} change(s): {} finding(s)",
+        diff.schema_changes.len(),
+        diff.schema_findings.len()
+    )];
+    for f in &diff.schema_findings {
+        let what = match f.kind {
+            SchemaFindingKind::DroppedColumnRead => "reads dropped column",
+            SchemaFindingKind::NarrowedTypeRead => "reads narrowed column",
+            SchemaFindingKind::NotNullWrite => "writes without new NOT NULL column",
+        };
+        let fails = f.captures.iter().filter(|c| c.fails).count();
+        lines.push(format!(
+            "{}: {what} {}.{}: {} captured request(s), {fails} would fail",
+            f.op,
+            f.table,
+            f.column,
+            f.captures.len()
+        ));
+        for c in &f.captures {
+            match &c.capture_id {
+                Some(id) => lines.push(format!("  capture {id}")),
+                None => lines.push("  capture".to_string()),
+            }
+            lines.push(format!("    input:  {}", c.input));
+            lines.push(format!("    {}", c.detail));
+        }
     }
     lines
 }
@@ -141,6 +182,7 @@ mod tests {
                 },
             ],
             replay_error: Some("replay budget of 5s ran out after 5 captures".into()),
+            ..BehaviourDiff::default()
         }
     }
 
@@ -169,6 +211,55 @@ mod tests {
                 "retired: 0 of 0 captured requests changed (op missing in the candidate; 1 not replayed)",
                 "replay error: replay budget of 5s ran out after 5 captures",
             ]
+        );
+    }
+
+    #[test]
+    fn the_report_names_each_schema_finding_and_its_captures() {
+        use forge_platform_wire::{
+            SchemaChange, SchemaChangeKind, SchemaFinding, SchemaFindingCapture,
+        };
+        let mut d = diff("b3f1");
+        d.ops.clear();
+        d.replay_error = None;
+        d.schema_changes = vec![SchemaChange {
+            kind: SchemaChangeKind::DroppedColumn,
+            table: "notes".into(),
+            column: "label".into(),
+            from: None,
+            to: None,
+        }];
+        d.schema_findings = vec![SchemaFinding {
+            kind: SchemaFindingKind::DroppedColumnRead,
+            op: "note_label".into(),
+            table: "notes".into(),
+            column: "label".into(),
+            captures: vec![SchemaFindingCapture {
+                capture_id: Some("cap-7".into()),
+                input: r#"{"id": "n1"}"#.into(),
+                fails: true,
+                detail: "the recorded rows of `notes` no longer carry `label`, and the op now \
+                         ends in an error"
+                    .into(),
+                after: None,
+            }],
+        }];
+        assert_eq!(
+            render(Some(&d)),
+            [
+                "behaviour diff over 5 captured request(s):",
+                "schema change replay over 1 change(s): 1 finding(s)",
+                "note_label: reads dropped column notes.label: 1 captured request(s), 1 would fail",
+                "  capture cap-7",
+                r#"    input:  {"id": "n1"}"#,
+                "    the recorded rows of `notes` no longer carry `label`, and the op now ends in \
+                 an error",
+            ]
+        );
+        d.schema_findings.clear();
+        assert_eq!(
+            render(Some(&d))[1],
+            "schema change replay over 1 change(s): 0 finding(s)"
         );
     }
 
