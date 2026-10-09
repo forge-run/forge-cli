@@ -18,6 +18,7 @@ pub mod new;
 pub mod pages;
 pub mod pull;
 pub mod push;
+mod push_diff;
 pub mod schema;
 pub mod sdk;
 pub mod secrets;

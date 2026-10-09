@@ -52,6 +52,7 @@ pub async fn run(args: ShipArgs, client: &ForgeClient) -> Result<()> {
         args.branch.as_deref(),
         args.no_wait,
         args.timeout,
+        false,
     )
     .await
 }

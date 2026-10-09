@@ -69,7 +69,7 @@ Under the hood that's three steps, which you can also run individually:
 | `forge wasm-build` | Compile the workspace graph to WASM Components, stamp `forge.lock`, and persist the Components to `.forge/artifacts/`. Run before commit. (Aliased as `forge build`.) |
 | `forge wasm-upload` | Stage the built Components (`.forge/artifacts/`) to the workspace's content store so a `git push` converge resolves each module by hash. Run after `wasm-build`, before pushing. |
 | `forge ship` | The whole deploy in one: `wasm-build` → `wasm-upload` → `git push` → wait for the converge. `--no-build`, `--no-wait`, `--timeout <secs>`. |
-| `forge push` | Push to the forge-git remote and block until converged, decoding the silent failure modes. `--no-wait` records without waiting; non-zero exit on stuck/error/timeout (CI-friendly). |
+| `forge push` | Push to the forge-git remote and block until converged, decoding the silent failure modes. `--no-wait` records without waiting; non-zero exit on stuck/error/timeout (CI-friendly). After the converge it prints the push's behaviour diff: per op, how many replayed captured requests answer differently on the new tree. `--json` prints the versioned `forge-push/1` envelope instead (below). |
 | `forge logs` | Tail recent request log entries. `--follow` streams new entries via SSE. |
 | `forge tokens mint --tier <user\|service\|admin>` | Mint a token for in-app use. |
 | `forge tokens list` | List active tokens for the active workspace. |
@@ -87,6 +87,54 @@ Under the hood that's three steps, which you can also run individually:
 | `forge domain {add\|list\|status\|policy\|validate}` | Claim a hostname for the active tenant, poll ACME validation, update claim policy (Strict / Open). Operator path; requires `FORGE_CP_URL` + `FORGE_ADMIN_TOKEN`. |
 
 See `forge <command> --help` for the full flag set on any subcommand.
+
+### `forge push --json` — the `forge-push/1` envelope
+
+`forge push --json` prints exactly one JSON object on stdout when it ends;
+everything else it says goes to stderr, so stdout parses as-is. A failed
+converge (stuck, `last_error`, timeout) still prints the envelope, then exits
+non-zero as without `--json`. A push that fails before the converge starts
+(dialect refusal, `git push` rejected) prints no envelope. With `--no-wait`
+the envelope is the status read right after the push, usually not yet in sync.
+Fields are additive: a new one never changes the meaning of one already here.
+
+| Field | Meaning |
+|---|---|
+| `schema` | Always `"forge-push/1"`. |
+| `git_sha` | The commit the runtime's desired state was recorded from; `null` before the first converge. |
+| `desired_hash` | The hash of the tree the push asked for; `null` before the first converge. |
+| `live_hash` | The hash of the tree serving now; equals `desired_hash` once converged. |
+| `in_sync` | `true` when the workspace serves the desired tree. |
+| `last_error` | The converge's error, verbatim (destructive schema delta, hash mismatch, route collision); `null` when none. The previous version keeps serving. |
+| `behaviour_diff` | `null`, or the runtime's `BehaviourDiff` for THIS push. `null` when the runtime reported none, or when the one it reported names a different `desired_hash` (a diff left from an earlier push). |
+
+`behaviour_diff` is the wire type `forge_platform_wire::BehaviourDiff`
+(`forge-platform-wire/src/behaviour_diff.rs`). Before the swap, the runtime
+replays its recent production captures twice: on the live tree (`before`) and
+on the tree the push stages (`after`). It reports and never holds a converge.
+
+| Field | Meaning |
+|---|---|
+| `desired_hash` | The desired hash this diff is about; equals the envelope's `desired_hash`. |
+| `live_hash` | The live hash the `before` side replayed against. |
+| `captures` | How many captures were read for the replay. |
+| `ops[]` | One entry per op some capture names, sorted by op. |
+| `ops[].op` | The op name. |
+| `ops[].replayed` | Captures of this op replayed on both trees. |
+| `ops[].changed` | Of those, how many answered differently: a different outcome, a different effect list, or a crossing the capture never recorded. `0` means the push keeps this op's recent answers. |
+| `ops[].examples[]` | The first few changed captures (the runtime caps the count). |
+| `ops[].examples[].capture_id` | The capture's id; `GET /api/v1/manage/captures/<id>` serves the full capture. May be `null`. |
+| `ops[].examples[].input` | The op input, verbatim JSON text. |
+| `ops[].examples[].before` / `.after` | The replay on the live / candidate tree: `outcome` (`{"output": "<json text>"}` or `{"error": {"kind", "message", "declared"?}}`), `effects` (every crossing the replay made, in order, as `{iface, req}`), `diverged_at` (the iface of the first crossing this replay made that the capture did not record; absent when none). |
+| `ops[].examples[].diverged_at` | The iface of the first crossing the candidate made that the capture did not record; absent when the candidate stayed within it. |
+| `ops[].missing_in_candidate` | `true` when the pushed tree no longer has this op: its captures were not replayed (`replayed` is `0`). |
+| `ops[].not_replayed` | Captures of this op not replayed: the op is gone from one tree, or the replay budget ran out first. |
+| `replay_error` | Why the diff is incomplete: a bundle that would not load, a failed capture read, the wall-time budget running out. Absent when the replay completed. |
+
+To act on it: an op with `changed > 0` answers differently after this push;
+read its `examples` to see whether the change was intended. An op with
+`missing_in_candidate: true` is one production traffic still calls and the
+push removed. A `replay_error` means the counts cover only what was replayed.
 
 ### `forge dev` — inner-loop driver
 

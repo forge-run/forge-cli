@@ -24,6 +24,7 @@ use std::process::Command;
 use std::time::{Duration, Instant};
 
 use crate::client::ForgeClient;
+use crate::cmd::push_diff;
 
 #[derive(Debug, clap::Args)]
 pub struct PushArgs {
@@ -42,6 +43,10 @@ pub struct PushArgs {
     /// Repo root (the git working tree). Defaults to the current directory.
     #[arg(long)]
     pub manifest_dir: Option<PathBuf>,
+    /// Print one `forge-push/1` envelope on stdout at the end (progress goes
+    /// to stderr): the converge state and the push's behaviour diff.
+    #[arg(long)]
+    pub json: bool,
 }
 
 pub async fn run(args: PushArgs, client: &ForgeClient) -> Result<()> {
@@ -52,6 +57,7 @@ pub async fn run(args: PushArgs, client: &ForgeClient) -> Result<()> {
         args.branch.as_deref(),
         args.no_wait,
         args.timeout,
+        args.json,
     )
     .await
 }
@@ -64,6 +70,7 @@ pub async fn push_and_poll(
     branch: Option<&str>,
     no_wait: bool,
     timeout_secs: u64,
+    json: bool,
 ) -> Result<()> {
     let dir = dir.unwrap_or_else(|| Path::new("."));
 
@@ -147,21 +154,44 @@ pub async fn push_and_poll(
             "push: recorded (--no-wait). Convergence runs in the background — \
              poll reconcile/status."
         );
+        if json {
+            let st = fetch_status(client).await.unwrap_or_default();
+            println!("{}", push_diff::envelope(&st));
+        }
         return Ok(());
     }
-    poll_until_converged(
+    let converged = poll_until_converged(
         client,
         &pushed_sha,
         &before_sha,
         Duration::from_secs(timeout_secs),
     )
-    .await?;
+    .await;
+    let st = match converged {
+        Ok(st) => st,
+        Err(e) => {
+            if json {
+                // The envelope still reports the state the converge ended in.
+                let st = fetch_status(client).await.unwrap_or_default();
+                println!("{}", push_diff::envelope(&st));
+            }
+            return Err(e);
+        }
+    };
+    if !json {
+        for line in push_diff::render(push_diff::matching_diff(&st)) {
+            println!("{line}");
+        }
+    }
 
     // Validation #59 — post-converge surface smoke gate. The deploy is live;
     // verify the declared landing hosts actually route host-first and don't
     // bounce off to another surface's host (the app→code redirect outage).
-    smoke_check_surfaces(dir).await?;
-    Ok(())
+    let smoke = smoke_check_surfaces(dir).await;
+    if json {
+        println!("{}", push_diff::envelope(&st));
+    }
+    smoke
 }
 
 /// The client-side dialect gate: run the shared `forge check` over `dir` and
@@ -305,21 +335,25 @@ fn null_string<'de, D: serde::Deserializer<'de>>(d: D) -> Result<String, D::Erro
 }
 
 #[derive(serde::Deserialize, Default, Clone)]
-struct Reconcile {
+pub(super) struct Reconcile {
     #[serde(default, deserialize_with = "null_string")]
-    git_sha: String,
+    pub(super) git_sha: String,
     #[serde(default, deserialize_with = "null_string")]
-    desired_hash: String,
+    pub(super) desired_hash: String,
     #[serde(default, deserialize_with = "null_string")]
-    live_hash: String,
+    pub(super) live_hash: String,
     #[serde(default)]
-    in_sync: bool,
+    pub(super) in_sync: bool,
     #[serde(default)]
-    last_error: Option<String>,
+    pub(super) last_error: Option<String>,
     #[serde(default)]
     stuck: bool,
     #[serde(default)]
     reconcile_loop_enabled: bool,
+    /// OR-2: what the push changes about recent answers, computed by the
+    /// runtime before the swap. Absent or null on a runtime that has none.
+    #[serde(default)]
+    pub(super) behaviour_diff: Option<forge_platform_wire::BehaviourDiff>,
 }
 
 async fn fetch_status(client: &ForgeClient) -> Result<Reconcile> {
@@ -334,7 +368,7 @@ async fn poll_until_converged(
     pushed_sha: &str,
     before_sha: &str,
     timeout: Duration,
-) -> Result<()> {
+) -> Result<Reconcile> {
     let deadline = Instant::now() + timeout;
     let short = |s: &str| s.chars().take(10).collect::<String>();
     let mut last_live = String::new();
@@ -362,7 +396,7 @@ async fn poll_until_converged(
             || before_sha.is_empty();
         if st.in_sync && st.live_hash == st.desired_hash && is_ours {
             eprintln!("push: ✅ converged @ {}", short(&st.git_sha));
-            return Ok(());
+            return Ok(st);
         }
 
         // No-progress detection.
