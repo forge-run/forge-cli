@@ -874,6 +874,7 @@ version = "0.1.0"
 dependencies = [
  "forge-lang-rt",
  "forge-lang-tree",
+ "forge-platform-wire",
  "serde",
  "serde_json",
 ]
@@ -945,6 +946,7 @@ dependencies = [
  "forge-lang-rustgen",
  "forge-lang-tree",
  "forge-lang-ts",
+ "forge-platform-wire",
  "serde_json",
 ]
 

@@ -277,7 +277,15 @@ async fn main() -> Result<()> {
             cmd::sdk::run(s, &client).await
         }
         Cmd::Check(args) => cmd::check::run(args),
-        Cmd::Test(args) => cmd::test::run(args),
+        Cmd::Test(args) => {
+            let client = if args.needs_client() {
+                let cfg = config::resolve(cli.base_url, cli.token, cli.profile)?;
+                Some(client::ForgeClient::new(cfg)?)
+            } else {
+                None
+            };
+            cmd::test::run(args, client.as_ref()).await
+        }
         Cmd::Schema(cmd) => {
             cmd::schema::run(cmd, || {
                 let cfg = config::resolve(cli.base_url, cli.token, cli.profile)?;

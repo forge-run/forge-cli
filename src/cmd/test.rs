@@ -30,6 +30,7 @@ use clap::Args;
 use forge_lang_test::coverage::{self, OpCoverage, run_domain_covered};
 use forge_lang_test::{DomainUnderTest, Outcome, Status, envelope, human, run_domain, test_files};
 
+use crate::client::ForgeClient;
 use crate::dialect;
 
 #[derive(Debug, Args)]
@@ -54,12 +55,54 @@ pub struct TestArgs {
     #[arg(long)]
     coverage: bool,
 
+    /// Write a test from a production capture whose op failed (forge-lang
+    /// OR-3), in the op's own language, instead of running the tests: a
+    /// capture id (fetched from the workspace you are logged in to) or a
+    /// file holding one capture. The test fails with the captured error
+    /// until the op is fixed. Under `--json` the report is
+    /// `forge-from-trace/1`.
+    #[arg(long, value_name = "ID|FILE")]
+    from_trace: Option<String>,
+
     /// Run only the tests whose name contains this text.
     filter: Option<String>,
 }
 
-pub fn run(args: TestArgs) -> Result<()> {
+impl TestArgs {
+    /// Whether this run needs the workspace's login: only to fetch a
+    /// capture by id.
+    pub fn needs_client(&self) -> bool {
+        self.from_trace
+            .as_deref()
+            .is_some_and(|source| !super::from_trace::is_file(source))
+    }
+}
+
+pub async fn run(args: TestArgs, client: Option<&ForgeClient>) -> Result<()> {
     let root = args.manifest_dir.unwrap_or_else(|| PathBuf::from("."));
+    if let Some(source) = &args.from_trace {
+        let written = match super::from_trace::load(source, client).await {
+            Ok(capture) => super::from_trace::write(&root, args.domain.as_deref(), &capture)
+                .map(|w| (capture, w)),
+            Err(message) => Err(message),
+        };
+        let (capture, written) = match written {
+            Ok(done) => done,
+            Err(message) => {
+                eprintln!("error: {message}");
+                std::process::exit(2);
+            }
+        };
+        if args.json {
+            println!("{}", super::from_trace::envelope(&root, &capture, &written));
+        } else {
+            eprint!("{}", super::from_trace::human(&root, &capture, &written));
+        }
+        if !written.reproduction.reproduced {
+            std::process::exit(1);
+        }
+        return Ok(());
+    }
     let mut report = args.coverage.then(Vec::new);
     let walked = collect(
         &root,
@@ -320,7 +363,9 @@ def test_forgets_the_http_answer():
             .keys()
             .map(String::as_str)
             .collect();
-        assert_eq!(fkeys, ["kind", "line", "message"]);
+        assert_eq!(fkeys, ["error", "kind", "line", "message"]);
+        // OR-3: `error` is the op error an `op_error` failure raised, else null.
+        assert!(wrong["failure"]["error"].is_null());
     }
 
     const SERVICE: &str = r#"{"operations": [{"name": "line_total",

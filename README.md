@@ -64,6 +64,7 @@ Under the hood that's three steps, which you can also run individually:
 | `forge ws use <workspace-id>` | Set the active workspace. Subsequent commands mint a per-workspace bearer on demand. |
 | `forge new --template <name>` | Scaffold a new workload from a built-in template (`echo`, `mcp-tool`, `subscription-publisher`). |
 | `forge check` | Check the workspace's authored sources without building. Today that is the annotated-Python dialect: every `domains/<d>/services/*.py` through the front end with the workspace's table schemas loaded, plus a declared-vs-defined op comparison against each domain's `service.json`. A workspace with a committed `schema.lock` is judged against that compiled snapshot (named in the output); a stale one is refused. Exit `0` accepted, `1` refused, `2` this machine could not do its job. `--format json` prints the versioned `forge-check/3` envelope (its `contract_mismatches` carries each op/service.json disagreement as a named diff). |
+| `forge test` | Run the workspace's tests: every `domains/<d>/tests/*` file, written in the op's own language against one fixture surface, run by the interpreter the platform serves with no build. `--json` prints the `forge-test/1` envelope; any failure or refusal exits non-zero. `--from-trace <id\|file>` writes a test from a production capture whose op failed instead (below). |
 | `forge schema compile` | Compile the workspace's schema snapshot (`schema.lock`, beside `forge.lock`): every authored `domains/*/schemas/*.table.json` plus the runtime-owned platform bundle (pinned by ref, embedded at CLI build time) with each archetype's system columns materialized — one deterministic, content-addressed view of what the converge applies. `--check` recompiles in memory and fails on drift (the emitted-committed pattern). |
 | `forge schema diff --live` | Compare the committed snapshot against the live workspace registry's applied schema (`/api/v1/manage/schema/introspect`). Advisory, never a gate: build-locally-deterministic is canonical, the live stack confirms. |
 | `forge wasm-build` | Compile the workspace graph to WASM Components, stamp `forge.lock`, and persist the Components to `.forge/artifacts/`. Run before commit. (Aliased as `forge build`.) |
@@ -135,6 +136,48 @@ To act on it: an op with `changed > 0` answers differently after this push;
 read its `examples` to see whether the change was intended. An op with
 `missing_in_candidate: true` is one production traffic still calls and the
 push removed. A `replay_error` means the counts cover only what was replayed.
+
+### `forge test --from-trace` — a production failure as a test
+
+`forge test --from-trace <id>` fetches one of the workspace's production
+captures (`GET /api/v1/manage/captures/<id>`, admin-tier; the id is in
+`forge push --json`'s `behaviour_diff` examples and in that route's list), or
+reads `<file>` holding one capture as that route serves it. When the captured
+op FAILED, it writes a test into `domains/<d>/tests/` of the domain whose
+`services/` define the op, in that op's language: the capture's input, the
+rows the op read as `seed`, every http, fleet-call and secret answer, and the
+instant the op read as `now`. The test runs the op and expects its output, so
+it fails with the captured error until the op is fixed; assert the answer you
+expect once it is. The capture holds customer data: a value the runtime
+redacted at capture (a `pii` column, a secret, a credential header) stays
+`"[redacted]"` in the file, and the file's header names each one. The capture
+does not record the caller, so the test runs as nobody. An existing file is
+never overwritten.
+
+The test runs once as it is written. Exit `0`: written, and it fails with the
+captured error. Exit `1`: written, but it does not reproduce the failure (the
+report says why). Exit `2`: nothing written (the capture answered its output,
+crossed something a test cannot declare, or names an op the tree lacks).
+`--json` prints one `forge-from-trace/1` object on stdout; fields are
+additive.
+
+| Field | Meaning |
+|---|---|
+| `schema` | Always `"forge-from-trace/1"`. |
+| `capture` | The capture's id; `null` for a file with none. |
+| `op`, `domain`, `lane` | The op, the domain whose test it is, and its language (`python`, `typescript`, `java`, `rust`). |
+| `file` | The test file written, relative to the workspace. |
+| `test` | The test's name as `forge test` reports it. |
+| `expected_error` | The captured error as `forge test` reports an op error: `{code, message}`, plus `status` and `details` for a declared error. |
+| `redactions[]` | `{path, at}`: the capture's path of each redacted value and where it sits in the test. |
+| `notes[]` | Where the test cannot carry the capture exactly (the clock read twice, an answer that changed between two crossings). |
+| `reproduced` | `true` when the test fails with `expected_error`. |
+| `why` | When `reproduced` is `false`, why. |
+| `failure` | The test's failure as `forge test` would report it: `{kind, message, error}`. |
+
+After the fix, `forge test --json` reports the test as passed. Its
+`forge-test/1` envelope carries, on an `op_error` failure, `failure.error`:
+the error the op raised, as a value to compare with `expected_error`.
 
 ### `forge dev` — inner-loop driver
 
