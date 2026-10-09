@@ -5,10 +5,17 @@
 //! pytest-style `def test_*()` in Python, `describe`/`it` in TypeScript,
 //! `@Test` methods in Java and `#[test] fn` in Rust, each written against one
 //! fixture surface (`input`, `seed`, `http`, `call`, `secret`, `user`, then
-//! `run` or `run_error`) and the lane's own equality assertion. The library
-//! half is `forge_lang_test`, which this command and later the platform
-//! share; this file finds the workspace's domains, hands each one over with
-//! the schema and contracts `forge check` reads, and reports.
+//! `run` or `run_error`) and the lane's own assertions. The library half is
+//! `forge_lang_test`, which this command and later the platform share; this
+//! file finds the workspace's domains, hands each one over with the schema
+//! and contracts `forge check` reads, and reports.
+//!
+//! A test that binds `for_all(seed, budget)` instead of `run` states a
+//! PROPERTY (OR-5): its assertions are checked over up to `budget` inputs
+//! generated from the op's `input_schema` and rows generated from its
+//! tables' schemas, and the first input that breaks one is shrunk to a
+//! minimal counterexample. `--json` carries it under the test's `property`,
+//! with the example test that pins it in the file's own lane.
 //!
 //! No build runs: the domain's ops are checked as the push path checks them
 //! and served from the bundle the engine would load, against an in-memory
@@ -20,6 +27,7 @@ use std::path::{Path, PathBuf};
 
 use anyhow::Result;
 use clap::Args;
+use forge_lang_test::coverage::{self, OpCoverage, run_domain_covered};
 use forge_lang_test::{DomainUnderTest, Outcome, Status, envelope, human, run_domain, test_files};
 
 use crate::dialect;
@@ -39,13 +47,27 @@ pub struct TestArgs {
     #[arg(long)]
     json: bool,
 
+    /// Also report, per op, the branches no test reached (forge-lang
+    /// OR-6): each by its source line, taken from the interpreter's own walk
+    /// with no build, a property's search counting as reached. Under
+    /// `--json` it is the envelope's `coverage` key.
+    #[arg(long)]
+    coverage: bool,
+
     /// Run only the tests whose name contains this text.
     filter: Option<String>,
 }
 
 pub fn run(args: TestArgs) -> Result<()> {
     let root = args.manifest_dir.unwrap_or_else(|| PathBuf::from("."));
-    let outcomes = match collect(&root, args.domain.as_deref(), args.filter.as_deref()) {
+    let mut report = args.coverage.then(Vec::new);
+    let walked = collect(
+        &root,
+        args.domain.as_deref(),
+        args.filter.as_deref(),
+        report.as_mut(),
+    );
+    let outcomes = match walked {
         Ok(o) => o,
         Err(message) => {
             eprintln!("error: {message}");
@@ -53,7 +75,11 @@ pub fn run(args: TestArgs) -> Result<()> {
         }
     };
     if args.json {
-        println!("{}", envelope(&outcomes));
+        let mut doc = envelope(&outcomes);
+        if let Some(report) = &report {
+            doc["coverage"] = coverage::to_json(report);
+        }
+        println!("{doc}");
     } else if outcomes.is_empty() {
         eprintln!(
             "no tests under {}/domains/*/tests/ — nothing to run",
@@ -61,6 +87,9 @@ pub fn run(args: TestArgs) -> Result<()> {
         );
     } else {
         eprint!("{}", human(&outcomes));
+        if let Some(report) = &report {
+            eprint!("{}", coverage::human(report));
+        }
     }
     if !all_passed(&outcomes) {
         std::process::exit(1);
@@ -76,11 +105,13 @@ pub(crate) fn all_passed(outcomes: &[Outcome]) -> bool {
 /// Every test of the workspace (or of one domain), run.
 ///
 /// `Err` is this machine's problem — no workspace, an unreadable schema —
-/// and never a test's: a refused or failing test is an [`Outcome`].
+/// and never a test's: a refused or failing test is an [`Outcome`]. With
+/// `coverage`, each tested domain's per-op coverage is appended to it.
 pub(crate) fn collect(
     root: &Path,
     domain: Option<&str>,
     filter: Option<&str>,
+    mut coverage: Option<&mut Vec<OpCoverage>>,
 ) -> Result<Vec<Outcome>, String> {
     if !root.join("workspace.json").exists() {
         return Err(format!(
@@ -108,17 +139,22 @@ pub(crate) fn collect(
             continue;
         }
         let inputs = dialect::input_schemas(&d).map_err(|e| e.to_string())?;
-        outcomes.extend(run_domain(
-            &DomainUnderTest {
-                name: dialect::domain_name(&d),
-                sources: dialect::sources_of(&d),
-                tests,
-                tables: tables.as_ref(),
-                contracts: &contracts,
-                inputs,
-            },
-            filter,
-        ));
+        let under = DomainUnderTest {
+            name: dialect::domain_name(&d),
+            sources: dialect::sources_of(&d),
+            tests,
+            tables: tables.as_ref(),
+            contracts: &contracts,
+            inputs,
+        };
+        match coverage.as_deref_mut() {
+            Some(report) => {
+                let (ran, covered) = run_domain_covered(&under, filter);
+                outcomes.extend(ran);
+                report.extend(covered);
+            }
+            None => outcomes.extend(run_domain(&under, filter)),
+        }
     }
     Ok(outcomes)
 }
@@ -214,7 +250,7 @@ def test_forgets_the_http_answer():
     #[test]
     fn a_domains_tests_pass_and_fail_with_the_failing_assertion() {
         let ws = billing();
-        let outcomes = collect(ws.path(), None, None).unwrap();
+        let outcomes = collect(ws.path(), None, None, None).unwrap();
         assert_eq!(outcomes.len(), 3, "{outcomes:#?}");
         assert_eq!(
             named(&outcomes, "test_sums_the_seeded_rows").status,
@@ -238,7 +274,7 @@ def test_forgets_the_http_answer():
     #[test]
     fn an_undeclared_crossing_fails_naming_it() {
         let ws = billing();
-        let outcomes = collect(ws.path(), None, Some("forgets")).unwrap();
+        let outcomes = collect(ws.path(), None, Some("forgets"), None).unwrap();
         assert_eq!(outcomes.len(), 1);
         let f = outcomes[0].failure.as_ref().unwrap();
         assert_eq!(f.kind, "undeclared_crossing");
@@ -254,7 +290,7 @@ def test_forgets_the_http_answer():
     #[test]
     fn the_json_envelope_is_stable() {
         let ws = billing();
-        let doc = envelope(&collect(ws.path(), Some("billing"), None).unwrap());
+        let doc = envelope(&collect(ws.path(), Some("billing"), None, None).unwrap());
         assert_eq!(doc["schema"], "forge-test/1");
         assert_eq!(
             doc["totals"],
@@ -267,7 +303,11 @@ def test_forgets_the_http_answer():
             .keys()
             .map(String::as_str)
             .collect();
-        assert_eq!(keys, ["domain", "failure", "file", "name", "status"]);
+        assert_eq!(
+            keys,
+            ["domain", "failure", "file", "name", "property", "status"]
+        );
+        assert!(first["property"].is_null());
         let wrong = doc["tests"]
             .as_array()
             .unwrap()
@@ -283,10 +323,133 @@ def test_forgets_the_http_answer():
         assert_eq!(fkeys, ["kind", "line", "message"]);
     }
 
+    const SERVICE: &str = r#"{"operations": [{"name": "line_total",
+"input_schema": {"type": "object", "properties": {
+  "quantity": {"type": "integer", "maximum": 1000000}, "note": {"type": "string"}},
+  "required": ["quantity"]},
+"output_schema": {"type": "object", "properties": {"total": {"type": "integer"}},
+  "required": ["total"]}}]}"#;
+
+    const LINE_TOTAL: &str = r#"from typing import Final
+
+from forge import OpContext, op
+from forge_schema.inputs.orders import LineTotalRequest, LineTotalResponse
+
+UNIT_PRICE_CENTS: Final = 250
+
+
+@op
+def line_total(ctx: OpContext, req: LineTotalRequest) -> LineTotalResponse:
+    return LineTotalResponse(total=req.quantity * UNIT_PRICE_CENTS)
+"#;
+
+    const PROPERTY: &str = r#"from forge.testing import fixture
+
+
+def test_total_is_never_negative():
+    t = fixture("line_total")
+    out = t.for_all(7, 200)
+    assert out["total"] >= 0
+"#;
+
+    /// OR-5: a property's counterexample in the `--json` envelope, shrunk
+    /// to the one field that breaks it, with the test that pins it.
+    #[test]
+    fn a_property_counterexample_is_in_the_json_envelope() {
+        let ws = workspace(&[
+            ("workspace.json", "{}"),
+            ("domains/orders/service.json", SERVICE),
+            ("domains/orders/services/line_total.py", LINE_TOTAL),
+            ("domains/orders/tests/test_orders.py", PROPERTY),
+        ]);
+        let outcomes = collect(ws.path(), None, None, None).unwrap();
+        let doc = envelope(&outcomes);
+        let test = &doc["tests"][0];
+        assert_eq!(test["status"], "fail", "{doc:#}");
+        assert_eq!(test["failure"]["kind"], "assertion");
+        assert_eq!(test["failure"]["line"], 7);
+        let p = &test["property"];
+        assert_eq!(
+            (p["seed"].as_u64(), p["budget"].as_u64()),
+            (Some(7), Some(200))
+        );
+        let c = &p["counterexample"];
+        assert_eq!(c["input"], serde_json::json!({"quantity": -1}), "{c:#}");
+        assert_eq!(c["rows"], serde_json::json!({}));
+        assert_eq!(c["result"], serde_json::json!({"total": -250}));
+        assert_eq!(c["violated"]["line"], 7);
+        assert_eq!(
+            c["violated"]["message"],
+            "result[\"total\"]: expected >= 0, got -250"
+        );
+        let keys: Vec<&str> = c.as_object().unwrap().keys().map(String::as_str).collect();
+        assert_eq!(
+            keys,
+            [
+                "found_at",
+                "input",
+                "regression",
+                "result",
+                "rows",
+                "shrink",
+                "shrunk_from",
+                "violated"
+            ]
+        );
+        assert!(
+            c["regression"]
+                .as_str()
+                .unwrap()
+                .contains("t.input({\"quantity\": -1})"),
+            "{c:#}"
+        );
+        assert_eq!(p["tried"], c["found_at"].as_u64().unwrap() + 1);
+        assert_eq!(
+            envelope(&collect(ws.path(), None, None, None).unwrap()),
+            doc
+        );
+    }
+
+    /// OR-6: `--coverage` names, per op, the source line of a branch no test
+    /// reached. The test that forgets its rows never enters the loop.
+    #[test]
+    fn coverage_names_the_line_no_test_reached() {
+        let ws = billing();
+        let mut report = Vec::new();
+        collect(ws.path(), None, Some("forgets"), Some(&mut report)).unwrap();
+        let line = OP
+            .lines()
+            .position(|l| l.trim() == "for row in rows:")
+            .unwrap()
+            + 1;
+        let mut doc = serde_json::json!({});
+        doc["coverage"] = coverage::to_json(&report);
+        let op = &doc["coverage"][0];
+        assert_eq!(op["op"], "invoice_total", "{doc:#}");
+        assert_eq!(
+            (op["branches"].as_u64(), op["covered"].as_u64()),
+            (Some(2), Some(1))
+        );
+        let missed = &op["missed"][0];
+        assert_eq!(missed["line"], line, "{doc:#}");
+        assert_eq!(missed["kind"], "loop");
+        assert_eq!(missed["message"], "the loop body never runs");
+        assert!(
+            missed["file"]
+                .as_str()
+                .unwrap()
+                .ends_with("invoice_total.py")
+        );
+        // The test that seeds rows runs the loop: nothing is left.
+        let mut report = Vec::new();
+        collect(ws.path(), None, Some("sums"), Some(&mut report)).unwrap();
+        assert!(report[0].missed.is_empty(), "{report:#?}");
+    }
+
     #[test]
     fn an_unknown_domain_is_the_callers_error() {
         let ws = billing();
-        let err = collect(ws.path(), Some("nope"), None).unwrap_err();
+        let err = collect(ws.path(), Some("nope"), None, None).unwrap_err();
         assert!(err.contains("no domain `nope`"), "{err}");
     }
 
