@@ -554,9 +554,9 @@ export const hello = op("hello", (ctx: OpContext, input: Value) => {
     #[test]
     fn forge_check_runs_the_native_rust_gate_on_the_authors_machine() {
         use std::os::unix::fs::PermissionsExt;
-        const RUST_OP: &str = "use forge::{OpContext, Value};\nuse serde::Serialize;\n\n\
+        const RUST_OP: &str = "use forge::{op, OpContext, Value};\nuse serde::Serialize;\n\n\
 #[derive(Serialize)]\npub struct Out {\n    n: i64,\n}\n\n\
-pub fn op(ctx: &OpContext, input: &Value) -> Out {\n    \
+#[op]\npub fn echo_n(ctx: &OpContext, input: &Value) -> Out {\n    \
 let n: i64 = input.get_i64(\"n\", 0);\n    Out { n: n }\n}\n";
         let ws = workspace(&[
             ("workspace.json", "{}"),
