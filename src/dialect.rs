@@ -1175,7 +1175,7 @@ public final class PlanRefund {
   @Op
   public static PlanRefundResponse planRefund(OpContext ctx, PlanRefundRequest req) {
     List<Notes.Row> rows = Notes.rows(Storage.query(Value.obj("from", "notes", "limit", 1L)));
-    if (rows.isEmpty() || Forge.nth(rows, 0L).title("").equals("")) {
+    if (rows.isEmpty() || Forge.nth(rows, 0L).title().equals("")) {
       return new PlanRefundResponse();
     }
     return new PlanRefundResponse();
