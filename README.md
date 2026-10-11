@@ -71,6 +71,7 @@ Scaffold a GitOps repo with `forge init`; watch a deploy converge at `GET /api/v
 | `forge schema diff --live` | Compare the committed snapshot against the live workspace registry's applied schema (`/api/v1/manage/schema/introspect`). Advisory, never a gate: build-locally-deterministic is canonical, the live stack confirms. |
 | `forge push` | Push to the forge-git remote and block until converged, decoding the silent failure modes. `--no-wait` records without waiting; non-zero exit on stuck/error/timeout (CI-friendly). After the converge it prints the push's behaviour diff: per op, how many replayed captured requests answer differently on the new tree. `--json` prints the versioned `forge-push/1` envelope instead (below). |
 | `forge logs` | Tail recent request log entries. `--follow` streams new entries via SSE. |
+| `forge export --out <dir>` | Write every table **your identity can read** as `<table>.jsonl`, plus a `manifest.json` (below). It reads under your own bearer and RLS, so it is not a workspace backup. |
 | `forge tokens mint --tier <user\|service\|admin>` | Mint a token for in-app use. |
 | `forge tokens list` | List active tokens for the active workspace. |
 | `forge tokens revoke <hash>` | Revoke a token by its hash prefix. |
@@ -143,6 +144,17 @@ A `schema_findings` entry is a request production sent that the pushed schema
 refuses or answers differently: fix the op or the schema before it lands, or
 accept it knowingly. Neither list holds the converge; a destructive schema
 change still needs `accept_destructive` to apply.
+
+### `forge export` — your readable data as files
+
+`forge export --out <dir>` exports **what the caller's identity can read, and nothing else.** It sends the same bearer every other command sends (an admin `fr_a_` or platform `fr_p_` bearer is refused before any request), and storage applies that identity's row-level security exactly as it does for `GET /api/v1/data/{table}`. Two users exporting the same workspace get different files; neither gets a backup.
+
+- **Tables** are every `/api/v1/data/{table}` route the live workspace's OpenAPI document lists. That document needs `platform:read`, which a portal (federated) bearer carries and a workspace-local user does not; when it refuses you, the list is the tables your config tree (`--manifest-dir`) declares, each probed through its own data route, and `tables_from` in the manifest says so (runtime-owned tables are then not covered). Each is written as `<dir>/<table>.jsonl`, one row per line, each row once.
+- **One cut.** The first page read answers the sequence it read at (`x-forge-as-of`); every later page of every table sends it back, so writes landing mid-export are not in it. A runtime that answers no sequence is refused rather than exported unpinned.
+- **`manifest.json`** (`forge-export/1`) carries `exported_at`, `as_of`, the config tree's `git_sha` (`HEAD` of `--manifest-dir`, default `.`, with a `dirty` flag), and one entry per table: `exported`, `rows`, `file`, and a `note` for a table the RLS default-deny answered empty (`rls-denied`), one whose list route refused the caller (`refused`), an `api.access: hidden` table (`hidden`), a table the tree declares that the workspace does not route (`unrouted`), the platform's `_` tables, and columns hidden from the API.
+- **Not exported:** blobs, `_` platform tables and `hidden` tables have no data route; the manifest names them rather than implying completeness.
+
+`<dir>` must be absent or empty, so two exports never mix.
 
 ### `forge test --from-trace` — a production failure as a test
 

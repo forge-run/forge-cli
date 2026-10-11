@@ -1,0 +1,31 @@
+{
+  "name": "ip4_notes",
+  "archetype": "Base",
+  "label": "Note",
+  "plural_label": "Notes",
+  "header_fields": [
+    "body"
+  ],
+  "columns": [
+    {
+      "name": "owner",
+      "type": "string",
+      "required": true
+    },
+    {
+      "name": "body",
+      "type": "string",
+      "required": true
+    }
+  ],
+  "row_security": [
+    {
+      "name": "own_rows",
+      "filter": {
+        "column": "owner",
+        "op": "eq",
+        "value": "$user_id"
+      }
+    }
+  ]
+}

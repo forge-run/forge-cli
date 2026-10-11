@@ -153,6 +153,12 @@ enum Cmd {
     /// from local commits, so `--ff` is opt-in.
     Pull(cmd::pull::PullArgs),
 
+    /// Write every table your identity can read as `<table>.jsonl`, plus a
+    /// `manifest.json` (one pinned `as_of`, row counts, the config tree's git
+    /// sha, and what was not exported). Reads under your own bearer and RLS:
+    /// it is what you can read, not a workspace backup.
+    Export(cmd::export::ExportArgs),
+
     /// Internal: imperative upload of a service manifest + compiled WASM
     /// module(s). Superseded by `git push` (GitOps) as the deploy path;
     /// kept hidden as the primitive `forge dev` shells out to for its
@@ -323,6 +329,11 @@ async fn main() -> Result<()> {
             let cfg = config::resolve(cli.base_url, cli.token, cli.profile)?;
             let client = client::ForgeClient::new(cfg)?;
             cmd::pull::run(p, &client).await
+        }
+        Cmd::Export(e) => {
+            let cfg = config::resolve(cli.base_url, cli.token, cli.profile)?;
+            let client = client::ForgeClient::new(cfg)?;
+            cmd::export::run(e, &client).await
         }
         Cmd::Deploy(d) => {
             let cfg = config::resolve(cli.base_url, cli.token, cli.profile)?;

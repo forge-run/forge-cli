@@ -179,6 +179,22 @@ impl ForgeClient {
         Ok(parsed)
     }
 
+    /// `GET <base>/<path>` with extra request headers, answering the response
+    /// headers beside the body. Used by `forge export`, whose page walk reads
+    /// `x-forge-as-of` / `x-forge-has-more` / `x-forge-rls` off each page and
+    /// sends the pin back as a request header.
+    pub async fn get_with_headers(
+        &self,
+        path: &str,
+        extra_headers: &[(String, String)],
+    ) -> Result<(reqwest::header::HeaderMap, Vec<u8>), ForgeError> {
+        let resp = self
+            .send_with_retry(Method::Get, path, None, "application/json", extra_headers)
+            .await?;
+        let headers = resp.headers().clone();
+        Ok((headers, finish(resp).await?))
+    }
+
     /// `HEAD <base>/<path>`; returns the HTTP status WITHOUT treating a
     /// non-2xx (e.g. 404) as an error, so a caller can branch on presence.
     /// Used by the W3 artifact-upload stage: 200 → already stored (dedup),

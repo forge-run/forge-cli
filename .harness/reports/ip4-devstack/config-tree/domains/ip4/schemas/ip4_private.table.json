@@ -1,0 +1,16 @@
+{
+  "name": "ip4_private",
+  "archetype": "Base",
+  "label": "Private",
+  "plural_label": "Privates",
+  "header_fields": [
+    "body"
+  ],
+  "columns": [
+    {
+      "name": "body",
+      "type": "string",
+      "required": true
+    }
+  ]
+}

@@ -1,0 +1,39 @@
+{
+  "agent": "orchestrator-inline",
+  "author": "rory",
+  "bundle_ids": [
+    "checkpoint-a3a03c09",
+    "pre-done-b76130fa"
+  ],
+  "commits": [
+    "359fb0e"
+  ],
+  "lane": "/Users/rory/Documents/forge-run/forge-cli--step-ip4",
+  "notes": "Two plan premises failed and were fixed in place. (1) The pin did not ride existing routes: forge-runtime's HTTP dispatch hardcoded Scope.as_of None and dropped PageInfo, so forge-runtime--step-ip4 adds the x-forge-as-of request/response pair and x-forge-has-more. (2) GET /api/v1/platform/openapi needs platform:read, which only SSO-federated bearers carry (forge-runtime-auth sso/authz.rs:21-23), so a workspace-local user (the identity the export is for) got 403; the CLI now falls back to the config tree's declared tables, probes each data route, and says so in manifest.tables_from. LANDING OWED and blocked: forge-runtime--step-ip4's pre-done fleet-check is red on IP-3's drift (cli-customer-commands@1, ledger-hosting-standing@2 grep the retired build alias); the fix is forge-facts--step-ip4-drift 1ee8227 + forge-platform-architecture--step-ip4-drift ece7da9, committed locally, 296/296 pins hold against them, outside the landing block so it waits on Rory. The CLI must not land without the runtime half: alone it refuses every workspace (no x-forge-as-of). Dev-stack orphans from failed evidence runs, to deprovision: ws-069bc968be1d3c94, ws-542a1e43b65f6717, ws-53ed9ad68c5a7c5b, ws-936ac8319ef413cf, ws-25c6620800cc4ff8, ws-9f94baf74ea0bb0e; ws-6f1f5f50fa9ebcda is the passing run's workspace.",
+  "repair_attempts": 0,
+  "schema": "forge-report/v1",
+  "step": "IP-4-forge-export",
+  "ts": "2026-10-11T15:27:40.062925+00:00",
+  "verdicts": [
+    {
+      "evidence": "forge-cli src/cmd/export.rs; stub tests one_as_of_pins_every_page_and_each_row_is_written_once and an_identity_refused_the_openapi_document_exports_the_config_trees_tables (job ip4-fallback-2: 5 passed, clippy -D warnings clean); live manifest .harness/reports/ip4-devstack/export/manifest.json (as_of 507, rows 130/0, config_tree.git_sha 38ac89c6, dirty false, ip4_private note rls-denied (rls_default_deny), tables_from config tree). Runtime half: forge-runtime--step-ip4 dispatch.rs, tests/http_adapter.rs",
+      "item": "forge export --out <dir> writes <table>.jsonl for every routed table and a manifest.json carrying as_of, per-table row counts, the config tree's git sha, and per-table notes for RLS-denied, hidden and unrouted tables.",
+      "verdict": "met"
+    },
+    {
+      "evidence": "cmd",
+      "item": "A forge-cli test against a stub server asserts one as_of is pinned across every page of a multi-page table, that rows are written exactly once, and that no platform or admin bearer is sent.",
+      "verdict": "met"
+    },
+    {
+      "evidence": ".harness/reports/ip4-devstack/summary.json from .harness/reports/ip4-devstack.py (rc 0, 'PASS: every exported table equals GET /api/v1/data/{table} for the same identity'): CP-minted ws-6f1f5f50fa9ebcda on the lane runtime, exported through the TLS edge https://ws-6f1f5f50fa9ebcda.forge.run:8081 as workspace-local user reader@ip4.local (fr_u_, role user granted ip4_notes:read/ip4_private:read by a declared role); ip4_notes 130 export rows == 130 GET rows, all 130 owned by the caller out of 250 seeded (owner row_security), walked in 50-row pages at one as_of 507; ip4_private 0 == 0 with GET x-forge-rls rls_default_deny",
+      "item": "On the dev stack, exporting a seeded workspace yields rows equal to what GET /api/v1/data/{table} returns for the same identity, shown in the step's evidence.",
+      "verdict": "met"
+    },
+    {
+      "evidence": "README.md command row and section 'forge export \u2014 your readable data as files' (exports what the caller's identity can read, and nothing else; neither of two users gets a backup; the platform:read fallback and tables_from)",
+      "item": "forge-cli README.md documents forge export and states plainly that it exports what the caller's identity can read.",
+      "verdict": "met"
+    }
+  ]
+}
