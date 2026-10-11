@@ -1,0 +1,73 @@
+{
+  "acceptance": [
+    "forge-runtime tests: anon WS mux and SSE subscribe to a private table are refused (WS error frame; SSE 401 + Bearer challenge, not text/event-stream).",
+    "The same tests: anon subscribe to a literal-predicate (anon-readable) table streams over both transports.",
+    "forge-portal-e2e P2.2 and the realtime-sse anon-refusal spec target a private table, fail on the dev stack before and pass after, run output in evidence."
+  ],
+  "author": "rory",
+  "events": [
+    {
+      "at": "2026-10-11T08:16:34.111356+00:00",
+      "id": "intent-recorded",
+      "revision": 1,
+      "source": "verb"
+    },
+    {
+      "at": "2026-10-11T08:16:39.172458+00:00",
+      "boundary": "intake",
+      "id": "gap-review"
+    },
+    {
+      "at": "2026-10-11T08:20:33.819336+00:00",
+      "id": "intent-recorded",
+      "revision": 2,
+      "source": "verb"
+    },
+    {
+      "at": "2026-10-11T08:20:39.075639+00:00",
+      "boundary": "intake",
+      "id": "gap-review"
+    }
+  ],
+  "gap_reviews": [
+    {
+      "boundary": "intake",
+      "gaps": [
+        {
+          "description": "Diffed the roadmap step IP-1 (title, notes, three acceptance lines) against the recorded intent statement: the intent names both transports, the refusal shape for each, and the anon-readable control case, and names the dev-stack e2e evidence",
+          "resolution": "fixed"
+        },
+        {
+          "description": "The step acceptance says WebSocket \"closed or rejected before any frame\" but multi-protocol.spec.ts:140 requires an `error` frame and no `subscribed`; the intent reads rejection as an error frame with no subscribed/event frame",
+          "note": "the mux upgrade is per-op auth by design (the spec comment says so) and the e2e that must go green asserts an error frame, so closing the socket would fail the very spec the step names",
+          "resolution": "accepted"
+        }
+      ],
+      "intent_ref": ".harness/intent/invoice-path-2026-10-ip-1-anonymous-realtime-is-refused.json"
+    },
+    {
+      "boundary": "intake",
+      "gaps": [
+        {
+          "description": "The step premise (a runtime hole) was false: forge-storage crud_emitter.rs:64-90,374-391 makes a literal-predicate select policy publicly readable, and probe_items has carried one since forge-portal-e2e b906f9b (PS-1). Amended the roadmap step: scope and lands now include forge-portal-e2e, and the fail-before criterion moved to the e2e specs, which are red today",
+          "resolution": "fixed"
+        },
+        {
+          "description": "The forge-runtime tests cannot fail before a fix, because nothing in the runtime is wrong; they pin an enforced contract that had no WS-mux anonymous coverage at all",
+          "note": "inventing a runtime defect to satisfy the original wording would ship a change that refuses anonymous reads of public tables, which the documented literal-policy design (docs row-security: serve published rows to logged-out visitors) requires",
+          "resolution": "accepted"
+        }
+      ],
+      "intent_ref": ".harness/intent/invoice-path-2026-10-ip-1-anonymous-realtime-is-refused.json"
+    }
+  ],
+  "out_of_scope": [],
+  "refs": [],
+  "revision": 2,
+  "schema": "forge-intent/v1",
+  "slug": "invoice-path-2026-10-ip-1-anonymous-realtime-is-refused",
+  "source": "verb",
+  "statement": "An anonymous realtime subscribe (WebSocket mux subscribe frame, or GET /api/v1/data/{table}/subscribe over SSE) to a table whose read policy does not admit anonymous callers is refused at subscribe time (WS: error frame, never subscribed; SSE: 401 with Bearer challenge, no event stream), while an anonymous subscribe to a table whose select policy is a literal predicate still streams, matching the REST data API. The runtime already enforces this (forge-storage crud_emitter has_public_read_policy); the forge-portal-e2e reds come from PS-1 making probe_items public, so the specs move to the private probe_locked table and forge-runtime gains tests pinning both halves over both transports.",
+  "ts": "2026-10-11T08:16:34.111356+00:00",
+  "updated_at": "2026-10-11T08:20:33.819336+00:00"
+}
