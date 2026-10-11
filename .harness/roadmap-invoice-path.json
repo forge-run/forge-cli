@@ -196,7 +196,7 @@
       "id": "IP-6-field-references-converge",
       "requires": [],
       "title": "The References page shows a converged index",
-      "status": "todo",
+      "status": "done",
       "scope": [
         "forge-runtime/",
         "forge-portal-e2e/",
@@ -213,7 +213,11 @@
         "field-references.spec.ts passes on the dev stack, with the run's output in the step's evidence.",
         "A test in the repo that held the defect fails before the fix and passes after."
       ],
-      "evidence": []
+      "evidence": [
+        "forge-control-plane (lane step-ip6, 62990bf on 6b47b1c): cause is forge-git, not the runtime. 999fa72 (FR-1, 2026-10-08) rooted the converged reference index at FORGE_REFERENCE_INDEX_DIR or a fixed /var/lib/forge-control-plane/references; the dev stack's forge-git runs unprivileged with --cp-state-file <run>/cp/cp.json and no override, so every record_converged failed on mkdir (Permission denied), was logged and swallowed, and /:ws/:repo/references answered no_converged_index. forge-runtime's forge::code::references passes the answer through, so no runtime change. Fix: the default root follows --cp-state-file's directory (set_reference_index_state_dir at forge-git boot); production's /var/lib/forge-control-plane/cp.json resolves to the same root.",
+        "test: git::reconcile::references::tests::the_index_root_sits_beside_the_cp_state_file fails on the pre-fix source (E0425 root_from, rc 101, .harness/evidence-ip6/test-before.log) and passes with the fix, 11/11 references tests (.harness/evidence-ip6/test-after.log); clippy --tests -D warnings green (.harness/evidence-ip6/clippy.log).",
+        "dev stack (job ip6-spec): field-references.spec.ts, forge-portal-e2e 314fbe0, --retries=0: before on main forge-git 1 failed (.harness/evidence-ip6/spec-before.log); after on the lane build 3 passed (21.4s) (.harness/evidence-ip6/spec-after.log). fleet-check's one red, STANDING's stale Rust line counter, re-rendered (forge-platform-architecture be057b6). Report .harness/report.json."
+      ]
     },
     {
       "id": "IP-7-customer-two-on-the-dev-stack",

@@ -403,3 +403,171 @@
    Compiling zstd-safe v7.2.4
     Checking crossbeam-queue v0.3.12
     Checking crossbeam-channel v0.5.15
+   Compiling tree-sitter v0.25.10
+    Checking http v0.2.12
+   Compiling tree-sitter-java v0.23.5
+    Checking aead v0.5.2
+    Checking arc-swap v1.9.1
+    Checking filetime v0.2.27
+    Checking objc2-core-foundation v0.3.2
+    Checking instant v0.1.13
+    Checking nonempty v0.12.0
+    Checking base64ct v1.8.3
+    Checking colorchoice v1.0.5
+    Checking anstyle v1.0.14
+    Checking vsimd v0.8.0
+    Checking is_terminal_polyfill v1.70.2
+    Checking anstyle-query v1.1.5
+    Checking outref v0.5.2
+    Checking zstd v0.13.3
+    Checking winnow v1.0.3
+    Checking gix-commitgraph v0.37.1
+    Checking password-hash v0.5.0
+    Checking oxc_parser v0.129.0
+    Checking http-body v0.4.6
+    Checking objc2-io-kit v0.3.2
+    Checking anstream v1.0.0
+    Checking notify-types v1.0.1
+    Checking base64-simd v0.8.0
+    Checking forge-storage-engine v0.1.0 (/Users/rory/Documents/forge-run/forge-storage/crates/forge-storage-engine)
+   Compiling i18n-embed v0.14.1
+    Checking toml_parser v1.1.2+spec-1.1.0
+    Checking crossbeam v0.8.4
+    Checking chacha20poly1305 v0.10.1
+    Checking ruff_python_ast v0.0.9
+    Checking opentelemetry-otlp v0.32.0
+   Compiling proc-macro-error v1.0.4
+    Checking forge-storage-tx v0.1.0 (/Users/rory/Documents/forge-run/forge-storage/crates/forge-storage-tx)
+    Checking forge-otel-wire v0.1.0 (/Users/rory/Documents/forge-run/forge-runtime/crates/forge-otel-wire)
+    Checking tracing-opentelemetry v0.33.0
+    Checking opentelemetry-appender-tracing v0.32.0
+    Checking cookie-factory v0.3.3
+    Checking salsa20 v0.10.2
+    Checking pbkdf2 v0.12.2
+    Checking hkdf v0.12.4
+    Checking gix-path v0.12.1
+    Checking webpki-roots v0.26.11
+    Checking bincode v1.3.3
+    Checking quick-xml v0.38.4
+    Checking secrecy v0.8.0
+   Compiling maybe-async v0.2.10
+    Checking blake2 v0.10.6
+    Checking core-foundation v0.9.4
+    Checking serde_spanned v1.1.1
+    Checking socket2 v0.5.10
+    Checking fsevent-sys v4.1.0
+    Checking strsim v0.11.1
+    Checking io_tee v0.1.1
+    Checking clap_lex v1.1.0
+    Checking adler2 v2.0.1
+    Checking foreign-types-shared v0.1.1
+    Checking leb128fmt v0.1.0
+    Checking streaming-iterator v0.1.9
+    Checking json-escape-simd v3.0.2
+    Checking hex v0.4.3
+    Checking toml_writer v1.1.1+spec-1.1.0
+    Checking simd-adler32 v0.3.9
+    Checking drop_bomb v0.1.5
+    Checking age-core v0.10.0
+    Checking hyper v0.14.32
+    Checking clap_builder v4.6.0
+    Checking foreign-types v0.3.2
+    Checking wasm-encoder v0.236.1
+    Checking oxc_sourcemap v6.1.1
+    Checking notify v7.0.0
+    Checking miniz_oxide v0.8.9
+    Checking security-framework v2.11.1
+    Checking oxc_semantic v0.129.0
+    Checking ruff_python_parser v0.0.9
+    Checking argon2 v0.5.3
+    Checking forge-storage-query v0.1.0 (/Users/rory/Documents/forge-run/forge-storage/crates/forge-storage-query)
+   Compiling i18n-embed-fl v0.7.0
+    Checking gix-fs v0.21.2
+    Checking scrypt v0.11.0
+    Checking tokio-rustls v0.24.1
+    Checking serde_stacker v0.1.14
+    Checking sysinfo v0.37.2
+    Checking gix-revwalk v0.33.0
+    Checking oid-registry v0.7.1
+    Checking der-parser v9.0.0
+    Checking rustls-pemfile v1.0.4
+   Compiling clap_derive v4.6.1
+    Checking forge-registry v0.1.0 (/Users/rory/Documents/forge-run/forge-storage/crates/forge-registry)
+    Checking axum-core v0.4.5
+    Checking simple_asn1 v0.6.4
+    Checking x25519-dalek v2.0.1
+    Checking quick-xml v0.32.0
+    Checking yasna v0.6.0
+    Checking aws-region v0.28.1
+   Compiling openssl-macros v0.1.1
+   Compiling forge-lang-engine v0.1.0 (/Users/rory/Documents/forge-run/forge-lang/crates/forge-lang-engine)
+    Checking toml_datetime v1.1.1+spec-1.1.0
+    Checking serde_path_to_error v0.1.20
+    Checking fs2 v0.4.3
+    Checking matchit v0.7.3
+    Checking id-arena v2.3.0
+   Compiling forge-ui v0.1.0 (/Users/rory/Documents/forge-run/forge-ui)
+    Checking md5 v0.8.0
+    Checking unicode-xid v0.2.6
+    Checking bech32 v0.9.1
+    Checking toml v1.1.2+spec-1.1.0
+    Checking forge-storage v0.1.0 (/Users/rory/Documents/forge-run/forge-storage)
+    Checking jsonwebtoken v9.3.1
+    Checking x509-parser v0.16.0
+    Checking rustls-native-certs v0.6.3
+    Checking clap v4.6.1
+    Checking gix-traverse v0.59.0
+    Checking forge-lang-java v0.1.0 (/Users/rory/Documents/forge-run/forge-lang/crates/forge-lang-java)
+    Checking wit-parser v0.236.1
+    Checking forge-lang-py v0.1.0 (/Users/rory/Documents/forge-run/forge-lang/crates/forge-lang-py)
+    Checking age v0.10.1
+    Checking axum v0.7.9
+    Checking hyper-rustls v0.24.2
+    Checking gix-tempfile v23.0.2
+    Checking oxc_codegen v0.129.0
+    Checking wasm-metadata v0.236.1
+    Checking flate2 v1.1.9
+    Checking notify-debouncer-mini v0.5.0
+    Checking fs-err v3.3.0
+    Checking forge-lang-rust v0.1.0 (/Users/rory/Documents/forge-run/forge-lang/crates/forge-lang-rust)
+    Checking forge-lang-ts v0.1.0 (/Users/rory/Documents/forge-run/forge-lang/crates/forge-lang-ts)
+    Checking forge-lang-interp v0.1.0 (/Users/rory/Documents/forge-run/forge-lang/crates/forge-lang-interp)
+    Checking gix-diff v0.65.0
+    Checking forge-manifest v0.1.0 (/Users/rory/Documents/forge-run/forge-types/crates/forge-manifest)
+    Checking xattr v1.6.1
+    Checking aws-region v0.25.5
+    Checking rustls-pemfile v2.2.0
+    Checking toml_datetime v0.7.5+spec-1.1.0
+    Checking winnow v0.7.15
+    Checking md5 v0.7.0
+    Checking tar v0.4.46
+    Checking wit-component v0.236.1
+    Checking gix-pack v0.72.0
+    Checking yasna v0.5.2
+    Checking wasi-preview1-component-adapter-provider v37.0.3
+    Checking rcgen v0.13.2
+    Checking toml v0.9.12+spec-1.1.0
+    Checking forge-lang-rustgen v0.1.0 (/Users/rory/Documents/forge-run/forge-lang/crates/forge-lang-rustgen)
+   Compiling aws-lc-rs v1.16.3
+   Compiling rustls v0.23.39
+    Checking forge-web-build v0.1.0 (/Users/rory/Documents/forge-run/forge-web/build)
+    Checking rustls-webpki v0.103.13
+    Checking rcgen v0.14.8
+    Checking tokio-rustls v0.26.4
+    Checking rustls-platform-verifier v0.7.0
+    Checking attohttpc v0.30.1
+    Checking attohttpc v0.28.5
+    Checking axum-server v0.7.3
+    Checking hyper-rustls v0.27.9
+    Checking aws-creds v0.39.1
+    Checking aws-creds v0.37.0
+    Checking reqwest v0.12.28
+    Checking instant-acme v0.8.5
+    Checking rust-s3 v0.35.1
+    Checking forge-runtime-core v0.1.0 (/Users/rory/Documents/forge-run/forge-runtime/crates/forge-runtime-core)
+    Checking rust-s3 v0.37.2
+    Checking forge-fleet v0.1.0 (/Users/rory/Documents/forge-run/forge-runtime/crates/forge-fleet)
+   Compiling openssl v0.10.81
+    Checking forge-agent v0.7.53 (/Users/rory/Documents/forge-run/forge-agent)
+    Checking forge-control-plane v0.11.80 (/Users/rory/Documents/forge-run/forge-control-plane--step-ip6)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 45.35s

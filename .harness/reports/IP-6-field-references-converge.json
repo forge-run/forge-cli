@@ -3,7 +3,7 @@
   "bundle_ids": [
     "pre-done-794c7585"
   ],
-  "bundle_note": "pre-done-794c7585 is forge-control-plane--step-ip6's bundle (fmt, cargo-check, code-structure, lint-waivers green; clippy deferred, queued in ip6-spec); this lane carries only the roadmap scope edit and the evidence",
+  "bundle_note": "pre-done-794c7585 is forge-control-plane--step-ip6's bundle (fmt, cargo-check, code-structure, lint-waivers green); clippy --tests -D warnings green in ip6-spec (.harness/evidence-ip6/clippy.log); this lane carries the roadmap edit and the evidence",
   "commits": [
     "62990bf"
   ],
@@ -11,17 +11,17 @@
   "repair_attempts": 0,
   "schema": "forge-report/v1",
   "step": "IP-6-field-references-converge",
-  "ts": "2026-10-11T17:36:00.697973+00:00",
+  "ts": "2026-10-11T17:40:26.904184+00:00",
   "verdicts": [
     {
-      "evidence": "forge-control-plane 999fa72 (FR-1, 2026-10-08) rooted the converged reference index at FORGE_REFERENCE_INDEX_DIR or a fixed /var/lib/forge-control-plane/references; dev/forge-git-start.sh sets no override and forge-git runs unprivileged, so every record_converged failed (mkdir ... Permission denied, os error 13, in dev/run/logs/git.log for ws-26da75269508fa0a and ws-7106e4f03d5b9cf3), was logged and swallowed, and GET /:ws/:repo/references answered no_converged_index; CI run 38118823816's page shows data-fr-none 'No reference index yet'. forge-runtime's forge",
+      "evidence": "forge-control-plane 999fa72 (FR-1, 2026-10-08) rooted the converged reference index at FORGE_REFERENCE_INDEX_DIR or a fixed /var/lib/forge-control-plane/references; dev/forge-git-start.sh sets no override and forge-git runs unprivileged, so every record_converged failed (mkdir ... Permission denied, os error 13: .harness/evidence-ip6/git-log-references.txt), was logged and swallowed, and GET /:ws/:repo/references answered no_converged_index; CI run 38118823816's page shows data-fr-none 'No reference index yet'. forge-runtime's forge",
       "item": "The cause is named in the report with the commit that introduced it.",
       "verdict": "met"
     },
     {
-      "evidence": "ip6-ladder never reached the spec: forge-portal-e2e main had no node_modules (ERR_MODULE_NOT_FOUND @playwright/test); ip6-spec re-runs it after npm ci, before on main forge-git 6b47b1c and after on the lane build, into .harness/evidence-ip6/spec-{before,after}.log",
+      "evidence": "job ip6-spec, forge-portal-e2e 314fbe0 vs https://app.forge.run:8081, --retries=0: BEFORE on main forge-git 6b47b1c 1 failed 2 did not run, 'never showed a converged index', Permission denied in git.log (.harness/evidence-ip6/spec-before.log); AFTER on lane forge-control-plane--step-ip6 62990bf 3 passed (21.4s), index at dev/run/cp/references/ws-a741e5b6ae820bb8/deploy-probe/<commit>/refs.references.json (.harness/evidence-ip6/spec-after.log). The run read lane 62990bf and e2e 314fbe0, both unchanged since; only this lane's report and roadmap moved",
       "item": "field-references.spec.ts passes on the dev stack, with the run's output in the step's evidence.",
-      "verdict": "not-met"
+      "verdict": "met"
     },
     {
       "evidence": "forge-control-plane git",
