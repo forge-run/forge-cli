@@ -224,7 +224,7 @@
     {
       "id": "IP-7-customer-two-on-the-dev-stack",
       "title": "One spec proves customer two end to end on the dev stack in all four dialects",
-      "status": "todo",
+      "status": "done",
       "requires": [
         "IP-2",
         "IP-3",

@@ -11,9 +11,31 @@
       "id": "intent-recorded",
       "revision": 1,
       "source": "verb"
+    },
+    {
+      "at": "2026-10-11T18:06:23.945396+00:00",
+      "boundary": "review",
+      "id": "gap-review"
     }
   ],
-  "gap_reviews": [],
+  "gap_reviews": [
+    {
+      "boundary": "review",
+      "gaps": [
+        {
+          "description": "Provisioning is the customer's self-serve create (POST /api/v1/tenants/:id/workspaces), not the operator's forge-cp provision the step notes name",
+          "note": "both are minted by the control plane; self-serve is what customer two actually does, it needs no operator credential at all, and the spec still asserts the id against CP /admin/workspaces",
+          "resolution": "accepted"
+        },
+        {
+          "description": "One fresh workspace per dialect rather than four dialects pushed into one workspace",
+          "note": "each dialect is proven from zero, as a separate customer would be, and one dialect's red cannot mask or contaminate another's; every acceptance clause holds per workspace",
+          "resolution": "accepted"
+        }
+      ],
+      "intent_ref": ".harness/intent/invoice-path-2026-10-ip-7-customer-two-on-the-dev-stack.json"
+    }
+  ],
   "out_of_scope": [],
   "refs": [
     "invoice-path-2026-10/IP-7"
