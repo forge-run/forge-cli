@@ -1,0 +1,145 @@
+{
+  "id": "invoice-path-2026-10",
+  "title": "Customer two goes from a provisioned workspace to a served op in any dialect, takes their data out, and no anonymous caller can stream a protected table",
+  "intent": "BUSINESS_KICKOFF.md section 8 names what stands between today and invoice one. Re-read on 2026-10-11: blocker 4 (idempotent provisioning, 64-bit ids) closed by PV-1; blocker 2's allowlist is gone from the interpreted route (forge-control-plane 6d666cd), but `forge new --dialect` writes the `.forge-interpret` marker only for Rust (forge-cli src/cmd/new.rs:491-493), so a Python, TypeScript or Java workspace pushes and never converges; blocker 3 stands as written: `forge build` is an alias of `wasm-build`, which runs cargo for wasm32-wasip1 (forge-cli src/main.rs:124-128); V-8 has no data export of any kind. The J1-J17 journeys pass (J2 fixed by PS-8 on 2026-09-19), but forge-portal-e2e CI on 2026-10-11 (runs 38118823816, 38115650365) has four reds, two of them auth holes: an anonymous WebSocket subscribe is accepted (multi-protocol.spec.ts:140) and an anonymous SSE subscribe to a non-anon table answers 200 text/event-stream (realtime-sse.spec.ts:72). When every step is done: those reds are green, every dialect's scaffold serves on push, the CLI hands a customer no toolchain, `forge export` writes the caller's data as files, and one spec proves customer two end to end on the dev stack in all four dialects with no operator action between provisioning and a served op. Everything runs against the local dev stack (forge-platform-operations/dev/up-full.sh), not a production deployment (Rory, 2026-10-11). The plan lands each step as it finishes (landing block), the first plan to run on landing-discipline-2026-10.",
+  "execution": "continuous",
+  "model": "claude-opus-5-5",
+  "effort": "high",
+  "budget": {
+    "max_wall_hours": 48,
+    "max_wakeups_without_evidence": 30
+  },
+  "landing": {
+    "authorized_by": "Rory, 2026-10-11 (start the invoice path plan; land everything, run against the dev stack, not a real deployment)",
+    "repos": [
+      "forge-runtime",
+      "forge-control-plane",
+      "forge-cli",
+      "forge-platform-operations",
+      "forge-portal-e2e"
+    ],
+    "build": {
+      "forge-platform-operations": "bash dev/up-full.test.sh && bash dev/build-bins-worktree.test.sh",
+      "forge-portal-e2e": "npm ci --silent && npm run typecheck"
+    }
+  },
+  "out_of_scope": [
+    "A production node: buying a server, DNS, the Cloudflare origin cert, genesis.sh, GCP KMS, R2, and the bootstrap-script fixes a real box needs. Rory, 2026-10-11: this plan runs against the dev stack, not an actual deployment.",
+    "forge-portal-web's published docs (content/docs/cli.json, deploying.json) that still teach `forge build`: that repo is not in this plan's landing block; name the pages in IP-3's report so a follow-up can land them.",
+    "Moving micro-crm-app (forge-portal-e2e fixture) off the cargo/wasm path, and putting specs behind the public forge-crm.",
+    "The three pre-diligence fixes (FORGE_RLS_ADMIN_EXEMPT_WRITE, a real KeyProvider with crypto-shred, CAS ledger row rewrite) and self-serve billing; BUSINESS_KICKOFF section 8 puts them on the raise, not invoice one.",
+    "An operator-run export that reads every row: it would be a system-tier read of customer data on a customer path, which BOUNDARIES forbids."
+  ],
+  "vision": {
+    "rows": ["Hosting and deploy", "Realtime"],
+    "claims": ["V-2", "V-8", "V-10"],
+    "moves": "A second customer goes from a provisioned workspace to a served op in any of the four dialects with no toolchain and no operator action, can take their data out as files, and cannot have a protected table streamed to an anonymous caller.",
+    "unit": "V-2 customer-side toolchains the CLI hands over: 1 today (`forge build` runs cargo for wasm32-wasip1), 0 after. V-8 customer data that exports: none today, every table the caller's identity can read after. V-10 failing specs in forge-portal-e2e CI: 4 today, 0 after, plus one spec proving customer two in all four dialects.",
+    "if_none": "Rows move (Hosting and deploy, Realtime); the customer-facing claim behind every step is that an engagement can be sold on V-2 and V-8 without an operator in the loop.",
+    "forbids_checked": "V-2: nothing here builds for the customer, and the one verb that did is retired rather than renamed. V-8: export writes plain JSONL the customer holds under their own identity, and nothing makes leaving harder. V-10: this plan asserts no ledger row in public, and each change lands with the spec that proves it."
+  },
+  "steps": [
+    {
+      "id": "IP-1-anonymous-realtime-is-refused",
+      "title": "An anonymous WebSocket or SSE subscribe to a table that does not admit anonymous reads is refused",
+      "status": "todo",
+      "scope": ["forge-runtime/"],
+      "lands": ["forge-runtime"],
+      "notes": "forge-portal-e2e CI 2026-10-11 (runs 38118823816, 38115650365): multi-protocol.spec.ts:140 (P2.2) finds an anonymous WebSocket subscribe accepted, and realtime-sse.spec.ts:72 finds an anonymous SSE subscribe on a non-anon table answering 200 text/event-stream. Both are reads of a protected table by nobody, and a customer's data must not go into a workspace while they stand. Storage runs under the caller's RLS (CLAUDE.md), so find where the realtime routes skip the auth/RLS context the HTTP data API applies, and refuse at subscribe time with the same status the data API gives an anonymous read of that table. A table that does admit anonymous reads stays subscribable anonymously.",
+      "acceptance": [
+        "A forge-runtime test subscribes anonymously over WebSocket and over SSE to a table with no anonymous read policy and is refused (WebSocket: closed or rejected before any frame; SSE: 401 with no event stream); both tests fail before the fix.",
+        "The same tests show an anonymous subscribe to a table whose policy admits anonymous reads still streams.",
+        "On the dev stack, forge-portal-e2e multi-protocol.spec.ts:140 and realtime-sse.spec.ts:72 pass, with the run's output in the step's evidence."
+      ],
+      "evidence": []
+    },
+    {
+      "id": "IP-2-every-dialect-serves-on-push",
+      "title": "A workspace scaffolded in any of the four dialects is served on its first push",
+      "status": "todo",
+      "scope": ["forge-control-plane/", "forge-cli/"],
+      "lands": ["forge-control-plane", "forge-cli"],
+      "notes": "The interpreted converge only fires for trees with `.forge-interpret` at the root (forge-control-plane src/git/reconcile/interp.rs:51, 55-64; push.rs:137). `forge new --dialect` writes the marker only for Rust (forge-cli src/cmd/new.rs:491-493), while templates/workspace-dialect/README.md:31 tells every user `git push forge main` will serve; an unmarked Python, TypeScript or Java tree with no forge.lock stops at push.rs:847 ('no committed forge.lock; desired-state not updated'). Smallest fix: write the marker for every dialect in scaffold_dialect_workspace. Also remove interp.rs:14-18's stale claim that the route still runs behind the server-build gate (it is open to every workspace since 6d666cd, PS-2).",
+      "acceptance": [
+        "A forge-cli test runs the dialect scaffold for Python, TypeScript, Java and Rust and asserts each tree carries `.forge-interpret`; it fails before the fix for the three non-Rust dialects.",
+        "interp.rs's module doc no longer says the interpreted route runs behind the server-build gate.",
+        "On the dev stack, a Python workspace made by `forge new --dialect python` and pushed with `forge push` converges and its op answers through the edge; the scripted repro and its output are in the step's evidence."
+      ],
+      "evidence": []
+    },
+    {
+      "id": "IP-3-forge-build-is-retired",
+      "title": "The customer CLI hands over no toolchain: `forge build` is gone and the wasm verbs are hidden",
+      "status": "todo",
+      "scope": ["forge-cli/", "forge-control-plane/"],
+      "lands": ["forge-control-plane", "forge-cli"],
+      "notes": "forge-cli src/main.rs:124-128 declares `wasm-build` with `alias = \"build\"`; it shells out to cargo for wasm32-wasip1 (cmd/build.rs:80). D-106 (forge-sdlc-harness DECISIONS.md:4926, follow-up at :4975-4978) names this as not done. The customer loop under D-106 is `forge new --dialect`, `forge check`, `forge test`, `forge push`. Drop the alias; mark WasmBuild, WasmUpload and Ship `hide = true` as Deploy and Static already are; they stay callable because forge dev (cmd/dev.rs:226) and dev/up-full.sh's portal ship use them. Hide or retire the four wasm `forge new` templates (WORKSPACE_TEMPLATES in cmd/new.rs). Reword forge-control-plane src/git/reconcile/push.rs:265-270, which tells a pusher to 'Run `forge build`'. Rewrite forge-cli README.md:39-79 around check/test/push. List every forge-portal-web page that still teaches `forge build` in the report; that repo is out of this plan's landing block.",
+      "acceptance": [
+        "A forge-cli test runs `forge build` and gets an unknown-subcommand error, and asserts `forge --help` lists neither wasm-build, wasm-upload, ship nor build; it fails before the change.",
+        "`forge new` offers no wasm template to a customer; a test asserts the listed templates.",
+        "forge-control-plane's refusal for an unmarked tree with no forge.lock names pushing dialect source, not `forge build`, and a test asserts the message.",
+        "forge-cli README.md describes the new/check/test/push loop and mentions no customer build.",
+        "dev/up-full.sh --release still deploys the portal (forge dev and the hidden ship path still work), shown in the step's evidence."
+      ],
+      "evidence": []
+    },
+    {
+      "id": "IP-4-forge-export",
+      "title": "`forge export` writes every table the caller can read as JSONL with a manifest, under the caller's own identity",
+      "status": "todo",
+      "scope": ["forge-cli/"],
+      "lands": ["forge-cli"],
+      "notes": "V-8 has no data export today; `forge pull` fetches only the config tree (forge-cli src/cmd/pull.rs:16-30). Rory, 2026-10-11: the export promises what the caller's identity can read. It rides existing routes, no server or wire change: table list from GET /api/v1/platform/openapi; rows from GET /api/v1/data/{table}?limit=1000&offset=n (forge-storage crates/forge-registry/src/crud_emitter.rs:356-360, limit cap :245); take `as_of` from the first page and pin every later page to it with scope.as_of (forge-storage src/api/dispatch/crud_dispatch.rs:132-168, 244-300) so the export is one consistent cut; an RLS deny-all arrives as the x-forge-rls header (forge-adapters src/http/handler/dispatch.rs:719). Use the CLI's existing bearer (src/client.rs:8-26); never an fr_a_ or fr_p_ token. Tables with api.access hidden, `_` platform tables and blobs have no route: the manifest names them as not exported rather than implying completeness. GET /api/v1/audit/me/export (forge-runtime crates/forge-adapters/src/http/auth_routes/audit/export.rs) is the precedent for exported_at and shape.",
+      "acceptance": [
+        "`forge export --out <dir>` writes <table>.jsonl for every routed table and a manifest.json carrying as_of, per-table row counts, the config tree's git sha, and per-table notes for RLS-denied, hidden and unrouted tables.",
+        "A forge-cli test against a stub server asserts one as_of is pinned across every page of a multi-page table, that rows are written exactly once, and that no platform or admin bearer is sent.",
+        "On the dev stack, exporting a seeded workspace yields rows equal to what GET /api/v1/data/{table} returns for the same identity, shown in the step's evidence.",
+        "forge-cli README.md documents `forge export` and states plainly that it exports what the caller's identity can read."
+      ],
+      "evidence": []
+    },
+    {
+      "id": "IP-5-deploy-serve-render-data",
+      "title": "deploy-serve's wasm op supplies its render data again",
+      "status": "todo",
+      "scope": ["forge-runtime/", "forge-portal-e2e/"],
+      "lands": ["forge-runtime", "forge-portal-e2e"],
+      "notes": "forge-portal-e2e deploy-serve.spec.ts:71 ('the wasm op supplied the render data') fails in CI on 2026-10-11 (runs 38118823816, 38115650365). Cause unknown at filing. Find it before fixing: a runtime regression is fixed in forge-runtime with a test there; a spec asserting retired behaviour (D-106 retired compiled serving and raw wasm push) is changed in the spec with the reason written in the commit. If the defect lives in a repo outside the landing block, stop and report rather than widen scope.",
+      "acceptance": [
+        "The cause is named in the report with the commit or change that introduced it.",
+        "deploy-serve.spec.ts passes on the dev stack, with the run's output in the step's evidence.",
+        "If the fix is in forge-runtime, a forge-runtime test that fails before it covers the defect; if the spec changed, its commit says which retired behaviour it stopped asserting."
+      ],
+      "evidence": []
+    },
+    {
+      "id": "IP-6-field-references-converge",
+      "title": "The References page shows a converged index",
+      "status": "todo",
+      "scope": ["forge-runtime/", "forge-portal-e2e/"],
+      "lands": ["forge-runtime", "forge-portal-e2e"],
+      "notes": "forge-portal-e2e field-references.spec.ts:100 fails in CI on 2026-10-11: the References page never shows a converged index. New with FR-1. Same discipline as IP-5: name the cause first, fix it where it lives with a test there, and stop and report if it lives outside the landing block (forge-portal-web is not in it).",
+      "acceptance": [
+        "The cause is named in the report with the commit that introduced it.",
+        "field-references.spec.ts passes on the dev stack, with the run's output in the step's evidence.",
+        "A test in the repo that held the defect fails before the fix and passes after."
+      ],
+      "evidence": []
+    },
+    {
+      "id": "IP-7-customer-two-on-the-dev-stack",
+      "title": "One spec proves customer two end to end on the dev stack in all four dialects",
+      "status": "todo",
+      "requires": ["IP-2", "IP-3", "IP-4"],
+      "scope": ["forge-platform-operations/", "forge-portal-e2e/"],
+      "lands": ["forge-platform-operations", "forge-portal-e2e"],
+      "notes": "The invoice path's V-10 proof. Against dev/up-full.sh: provision a fresh workspace through the control plane (forge-cp provision; the id is control-plane minted, never supplied), then for each of Python, TypeScript, Java and Rust: `forge new --dialect`, `forge push`, wait for converge, call the op through the edge, write a row, and `forge export` it back. Between provisioning and a served op there is no operator action: no allowlist edit, no env change, no restart. Any dev-stack glue the spec needs (a provisioning helper, a fixture) lands in forge-platform-operations. The spec joins the suite e2e.yml already runs.",
+      "acceptance": [
+        "A forge-portal-e2e spec provisions a fresh workspace and, for each of the four dialects, scaffolds, pushes, gets a served op answer through the edge, writes a row and finds it in `forge export`'s output.",
+        "The spec performs no operator action between provisioning and the first served op, and asserts the workspace id came back from the control plane.",
+        "The spec passes on the dev stack, with the run's output in the step's evidence, and is part of the suite e2e.yml runs."
+      ],
+      "evidence": []
+    }
+  ]
+}
