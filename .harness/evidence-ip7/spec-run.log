@@ -1,0 +1,41 @@
+forge-portal-e2e: 231753f + 0 uncommitted
+forge-cli main: e5a6ca7
+forge-runtime main: 9da61b0d
+forge-control-plane main: bd76229
+forge-edge main: 335eb7a
+forge-agent main: 5d5ee7e
+forge-lang main: 69a1425a
+forge CLI: /Users/rory/Documents/forge-run/forge-cli/target/release/forge
+2026-10-11T18:04:38Z
+
+Running 4 tests using 4 workers
+
+(node:91161) Warning: Setting the NODE_TLS_REJECT_UNAUTHORIZED environment variable to '0' makes TLS connections and HTTPS requests insecure by disabling certificate verification.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:91162) Warning: Setting the NODE_TLS_REJECT_UNAUTHORIZED environment variable to '0' makes TLS connections and HTTPS requests insecure by disabling certificate verification.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:91160) Warning: Setting the NODE_TLS_REJECT_UNAUTHORIZED environment variable to '0' makes TLS connections and HTTPS requests insecure by disabling certificate verification.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:91163) Warning: Setting the NODE_TLS_REJECT_UNAUTHORIZED environment variable to '0' makes TLS connections and HTTPS requests insecure by disabling certificate verification.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[c2 python] ws-1eb00ac9e070541f push: behaviour diff over 0 captured request(s):
+[c2 python] ws-1eb00ac9e070541f served c2py::hello → {"message":"hello, c2, from c2py"}
+[c2 python] ws-1eb00ac9e070541f exported 1 c2_notes row(s), the written one included
+  ✓  3 [lifecycle] › tests/lifecycle/customer-two.spec.ts:161:5 › customer two: provision → forge new → push → serve → write → export, every dialect › python: a fresh workspace serves its scaffold and exports the row it wrote (20.6s)
+[c2 java] ws-70b1b2959cce89ea push: behaviour diff over 0 captured request(s):
+[c2 java] ws-70b1b2959cce89ea served c2java::hello → {"message":"hello, c2, from c2java"}
+[c2 java] ws-70b1b2959cce89ea exported 1 c2_notes row(s), the written one included
+  ✓  2 [lifecycle] › tests/lifecycle/customer-two.spec.ts:161:5 › customer two: provision → forge new → push → serve → write → export, every dialect › java: a fresh workspace serves its scaffold and exports the row it wrote (21.5s)
+[c2 rust] ws-a261955561b6f8e6 push: behaviour diff over 0 captured request(s):
+[c2 rust] ws-a261955561b6f8e6 served c2rs::hello → {"message":"hello, c2, from c2rs"}
+[c2 rust] ws-a261955561b6f8e6 exported 1 c2_notes row(s), the written one included
+  ✓  1 [lifecycle] › tests/lifecycle/customer-two.spec.ts:161:5 › customer two: provision → forge new → push → serve → write → export, every dialect › rust: a fresh workspace serves its scaffold and exports the row it wrote (25.5s)
+[c2 typescript] ws-e73810f073ce43d5 push: behaviour diff over 0 captured request(s):
+[c2 typescript] ws-e73810f073ce43d5 served c2ts::hello → {"message":"hello, c2, from c2ts"}
+[c2 typescript] ws-e73810f073ce43d5 exported 1 c2_notes row(s), the written one included
+  ✓  4 [lifecycle] › tests/lifecycle/customer-two.spec.ts:161:5 › customer two: provision → forge new → push → serve → write → export, every dialect › typescript: a fresh workspace serves its scaffold and exports the row it wrote (27.4s)
+(node:91159) Warning: Setting the NODE_TLS_REJECT_UNAUTHORIZED environment variable to '0' makes TLS connections and HTTPS requests insecure by disabling certificate verification.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[sweep] users: 4/4 removed; workspaces: 4/4 removed
+
+  4 passed (27.7s)

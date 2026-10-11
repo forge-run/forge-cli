@@ -1,0 +1,64 @@
+[dev] ephemeral: wiping workspace data + obs lake (FORGE_DEV_KEEP_DATA=1 to keep)
+[dev] 0/6 dns shim :5300 (*.forge.run -> 127.0.0.1)
+[dev] 1/6 artifact store :9000 (dev s3-shim, no auth)
+[dev] 1b/6 secrets broker (mock KMS) at /tmp/fdev-474938501/secrets.sock
+[dev] 1c/6 portal DEK seeded into broker state (ws-30bb36de)
+[dev] 1d/6 observability lake (collector :8090 → /Users/rory/Documents/forge-run/forge-platform-operations/dev/run/obs-lake, query :8091, token in /Users/rory/Documents/forge-run/forge-platform-operations/dev/run/keys/obs-query.token)
+[dev] 2/6 control plane :8000
+[dev] 3/6 registering workspace ws-30bb36de
+[dev]     HTTP 201 — workspace registered
+[dev] 4/6 agent → CP (advertising 127.0.0.1:39000)
+[dev]     waiting for the workspace to come up...
+[dev] 5/6 edge :8081 (public-ingress on, TLS)
+[dev]     waiting for the routing table to reach the edge...
+[dev] 6/6 forge-git :8010 (GitOps deploy surface)
+[dev] 7/7 operator bootstrapped (operator@forge.local, password in /Users/rory/Documents/forge-run/forge-platform-operations/dev/run/keys/operator.password)
+[dev]     operator wired into platform tenant (forge-platform, owner)
+[dev]     portal converged + serving (desired==live, git_sha=4a60645b4512, authed /u/ → 200, anon → 303)
+
+  control plane  http://127.0.0.1:8000/admin/routing-table
+  edge           http://127.0.0.1:8081
+  artifact store http://127.0.0.1:9000  (bucket forge-dev)
+  forge-git      http://127.0.0.1:8010  (healthz 200)
+  workspace      ws-30bb36de  →  127.0.0.1:40000
+  routed via edge: yes
+
+  No /etc/hosts needed for curl — send the Host header, over HTTPS (the edge
+  serves TLS on this port under --public-ingress; -k because it is self-signed).
+  Every one of these was documented as http:// and returned nothing at all:
+
+    curl -k -H 'Host: app.forge.run'   https://127.0.0.1:8081/
+    curl -k -H 'Host: forge.run'       https://127.0.0.1:8081/
+    curl -k -H 'Host: ws-30bb36de.forge.run' https://127.0.0.1:8081/platform/metrics
+
+  /platform/metrics is also served, in plain HTTP, on the workspace runtime's
+  own port — the address to reach for when the edge is not what you are
+  testing. It is in dev/run/state/ports.json:
+
+    curl http://127.0.0.1:40000/platform/metrics
+
+  For a browser, add to /etc/hosts (needs sudo):
+
+    127.0.0.1  forge.run app.forge.run auth.forge.run code.forge.run status.forge.run
+
+  ...then browse to http://forge.run:8081/
+
+  The workspace is EMPTY until you deploy — until then every declarative route
+  404s from the runtime ("no route for GET /"). Routing being correct and the
+  portal rendering are separate problems. To deploy the portal:
+
+    cd /Users/rory/Documents/forge-run/forge-portal-web
+    forge build                                    # wasm + forge.lock
+    git remote add forge-local \
+      http://127.0.0.1:8010/ws-30bb36de/forge-portal-web
+    git push forge-local <branch>:main             # → derive → converge
+
+  A push needs a workspace admin bearer. Bootstrap one once (loopback only):
+
+    curl -X POST http://127.0.0.1:40000/api/v1/manage/users/bootstrap \
+      -H 'content-type: application/json' \
+      -d '{"email":"dev@forge.run","password":"…","role":"admin"}'
+
+  logs   /Users/rory/Documents/forge-run/forge-platform-operations/dev/run/logs/{s3,cp,agent,edge,git}.log
+         /Users/rory/Documents/forge-run/forge-platform-operations/dev/run/state/logs/ws-30bb36de.log
+  stop   dev/down.sh
