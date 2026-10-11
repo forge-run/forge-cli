@@ -231,14 +231,16 @@
         "IP-4"
       ],
       "scope": [
+        "forge-cli/",
         "forge-platform-operations/",
         "forge-portal-e2e/"
       ],
       "lands": [
         "forge-platform-operations",
-        "forge-portal-e2e"
+        "forge-portal-e2e",
+        "forge-cli"
       ],
-      "notes": "The invoice path's V-10 proof. Against dev/up-full.sh: provision a fresh workspace through the control plane (forge-cp provision; the id is control-plane minted, never supplied), then for each of Python, TypeScript, Java and Rust: `forge new --dialect`, `forge push`, wait for converge, call the op through the edge, write a row, and `forge export` it back. Between provisioning and a served op there is no operator action: no allowlist edit, no env change, no restart. Any dev-stack glue the spec needs (a provisioning helper, a fixture) lands in forge-platform-operations. The spec joins the suite e2e.yml already runs.",
+      "notes": "The invoice path's V-10 proof. Against dev/up-full.sh: provision a fresh workspace through the control plane (forge-cp provision; the id is control-plane minted, never supplied), then for each of Python, TypeScript, Java and Rust: `forge new --dialect`, `forge push`, wait for converge, call the op through the edge, write a row, and `forge export` it back. Between provisioning and a served op there is no operator action: no allowlist edit, no env change, no restart. Any dev-stack glue the spec needs (a provisioning helper, a fixture) lands in forge-platform-operations. The spec joins the suite e2e.yml already runs. Scope leads with forge-cli/ (2026-10-12) because the conductor cuts a step's home lane in the first scope repo and neither forge-platform-operations nor forge-portal-e2e is a harness consumer; forge-cli carries the step's bookkeeping, the work stays in the other two.",
       "acceptance": [
         "A forge-portal-e2e spec provisions a fresh workspace and, for each of the four dialects, scaffolds, pushes, gets a served op answer through the edge, writes a row and finds it in `forge export`'s output.",
         "The spec performs no operator action between provisioning and the first served op, and asserts the workspace id came back from the control plane.",
