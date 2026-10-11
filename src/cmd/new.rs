@@ -5,12 +5,15 @@
 //! `include_str!`. The customer runs:
 //!
 //! ```bash
-//! forge new --template echo my-app
+//! forge new --dialect python my-app
 //! cd my-app
-//! forge wasm-build
+//! forge check && forge test && forge push
 //! ```
 //!
-//! and gets a working crate. Substitution is text-replace of
+//! and gets a workspace the platform serves from source (D-106: no
+//! customer build). The raw wasm templates stay scaffoldable by name for
+//! the platform's own fixtures and `forge dev`, but `--list` never offers
+//! them. For those, substitution is text-replace of
 //! the template's hardcoded crate name (`forge-template-<name>`)
 //! with the customer's chosen name. Underscores vs hyphens
 //! matter: cargo crate names use hyphens; the wasm output file
@@ -28,8 +31,8 @@ use forge_lang_rustgen::{Lang, subset_skill, workspace_types};
 #[derive(Debug, Args)]
 pub struct NewArgs {
     /// Which starter template to scaffold from. Run `forge new --list`
-    /// to see every template with a one-line description. Required
-    /// unless `--list` is passed.
+    /// to see the templates offered, with a one-line description each.
+    /// Defaults to `workspace` when `--dialect` is passed.
     #[arg(long)]
     template: Option<String>,
 
@@ -43,9 +46,9 @@ pub struct NewArgs {
     list: bool,
 
     /// Write the `workspace` template's starter op in a dialect —
-    /// `python`, `typescript`, `java` or `rust` — instead of as a raw wasm
-    /// crate, with that dialect's subset skill under `.forge/skill/` for the
-    /// coding agent that writes the next op.
+    /// `python`, `typescript`, `java` or `rust` — with that dialect's subset
+    /// skill under `.forge/skill/` for the coding agent that writes the next
+    /// op. Required by `workspace`.
     #[arg(long, value_parser = parse_dialect)]
     dialect: Option<Lang>,
 }
@@ -63,35 +66,28 @@ fn parse_dialect(s: &str) -> std::result::Result<Lang, String> {
     }
 }
 
-/// One-line description per template, shown by `--list`. Keep in sync with
-/// `TEMPLATES` — the `templates_all_have_a_description` test enforces it.
-const TEMPLATE_DESCRIPTIONS: &[(&str, &str)] = &[
-    (
-        "echo",
-        "single-service crate — echoes its JSON input (imperative deploy)",
-    ),
-    (
-        "mcp-tool",
-        "single-service crate — an MCP tool op (imperative deploy)",
-    ),
-    (
-        "subscription-publisher",
-        "single-service crate — publishes to a channel (imperative deploy)",
-    ),
-    (
-        "workspace",
-        "git-native workspace (one domain + op) — the GitOps `forge ship` golden path",
-    ),
-];
+/// The templates `--list` offers a customer, with a one-line description
+/// each. D-106 retired the customer build, so this is the dialect workspace
+/// alone; every wasm template (`TEMPLATES`, `WORKSPACE_TEMPLATES`) is
+/// scaffoldable by name and never listed.
+const CUSTOMER_TEMPLATES: &[(&str, &str)] = &[(
+    DIALECT_TEMPLATE,
+    "a workspace whose starter op is dialect source (--dialect python|typescript|java|rust); \
+     push it and the platform serves it",
+)];
+
+/// The customer template's name: a workspace written in a dialect.
+const DIALECT_TEMPLATE: &str = "workspace";
 
 /// Workspace-graph templates. Unlike the single-service `TEMPLATES` (a bare
 /// crate for the imperative `forge deploy`), these scaffold a whole
-/// `workspace.json` domain/app/capability graph — the unit `forge ship`
-/// builds + pushes. Emitted paths carry a `{{domain}}` token substituted with
+/// `workspace.json` domain/app/capability graph — the unit the hidden
+/// `forge ship` builds + pushes. `wasm-workspace` is also the base every
+/// dialect scaffold writes, minus `WASM_ONLY`. Emitted paths carry a `{{domain}}` token substituted with
 /// the derived domain name; file contents carry `{{workspace_name}}`,
 /// `{{domain}}`, `{{domain_crate}}`, and the SDK-dep placeholder.
 const WORKSPACE_TEMPLATES: &[(&str, &[(&str, &str)])] = &[(
-    "workspace",
+    "wasm-workspace",
     &[
         (
             "workspace.json",
@@ -197,26 +193,20 @@ const TEMPLATES: &[(&str, &[(&str, &str)])] = &[
 
 pub async fn run(args: NewArgs) -> Result<()> {
     if args.list {
-        print_template_list();
+        print!("{}", template_list());
         return Ok(());
     }
 
-    let template = args.template.as_deref().ok_or_else(|| {
-        anyhow::anyhow!("missing --template — run `forge new --list` to see the options")
-    })?;
+    let template = resolve_template(args.template.as_deref(), args.dialect)?;
     let crate_name = args.crate_name.as_deref().ok_or_else(|| {
-        anyhow::anyhow!("missing CRATE_NAME — usage: `forge new --template <t> <crate-name>`")
+        anyhow::anyhow!(
+            "missing NAME — usage: `forge new --dialect <python|typescript|java|rust> <name>`"
+        )
     })?;
 
     validate_crate_name(crate_name)?;
 
     if let Some(lang) = args.dialect {
-        if template != "workspace" {
-            anyhow::bail!(
-                "--dialect scaffolds the `workspace` template; `{template}` is a single \
-                 wasm crate with no dialect to choose"
-            );
-        }
         return scaffold_dialect_workspace(crate_name, lang);
     }
 
@@ -234,12 +224,8 @@ pub async fn run(args: NewArgs) -> Result<()> {
         .find(|(name, _)| *name == template)
         .map(|(_, files)| files)
         .ok_or_else(|| {
-            let mut available: Vec<&str> = TEMPLATES.iter().map(|(n, _)| *n).collect();
-            available.extend(WORKSPACE_TEMPLATES.iter().map(|(n, _)| *n));
             anyhow::anyhow!(
-                "unknown template `{}` — available: {}",
-                template,
-                available.join(", "),
+                "unknown template `{template}` — run `forge new --list` to see the options"
             )
         })?;
 
@@ -309,7 +295,7 @@ pub async fn run(args: NewArgs) -> Result<()> {
     eprintln!(
         "  This template is a single-service crate. It deploys via the imperative\n  \
          path (below); the GitOps `forge ship` golden path deploys a WORKSPACE, so\n  \
-         to ride `forge ship` scaffold a workspace instead (see the README).\n"
+         to ride `forge ship` scaffold `--template wasm-workspace` instead.\n"
     );
     eprintln!("  # imperative single-service deploy:");
     eprintln!(
@@ -641,12 +627,36 @@ fn git_init_scaffold(dir: &std::path::Path) {
     }
 }
 
-fn print_template_list() {
-    println!("available starter templates:\n");
-    for (name, desc) in TEMPLATE_DESCRIPTIONS {
-        println!("  {name:<24} {desc}");
+/// What `--list` prints: the customer templates only.
+fn template_list() -> String {
+    let mut out = String::from("available starter templates:\n\n");
+    for (name, desc) in CUSTOMER_TEMPLATES {
+        out.push_str(&format!("  {name:<24} {desc}\n"));
     }
-    println!("\nusage: forge new --template <name> <crate-name>");
+    out.push_str("\nusage: forge new --dialect <python|typescript|java|rust> <name>\n");
+    out
+}
+
+/// The template a `forge new` invocation scaffolds. `--dialect` alone means
+/// the dialect workspace; the dialect workspace without one is refused rather
+/// than falling back to the raw wasm tree a customer no longer builds.
+fn resolve_template(template: Option<&str>, dialect: Option<Lang>) -> Result<&str> {
+    match (template, dialect) {
+        (None | Some(DIALECT_TEMPLATE), Some(_)) => Ok(DIALECT_TEMPLATE),
+        (Some(DIALECT_TEMPLATE), None) => anyhow::bail!(
+            "`{DIALECT_TEMPLATE}` is written in a dialect — pass \
+             --dialect python|typescript|java|rust"
+        ),
+        (Some(other), Some(_)) => anyhow::bail!(
+            "--dialect scaffolds the `{DIALECT_TEMPLATE}` template; `{other}` is a wasm \
+             template with no dialect to choose"
+        ),
+        (Some(other), None) => Ok(other),
+        (None, None) => anyhow::bail!(
+            "missing --dialect — usage: `forge new --dialect <python|typescript|java|rust> <name>` \
+             (`forge new --list` shows the options)"
+        ),
+    }
 }
 
 /// Cargo crate names: lowercase ASCII letters, digits, `-`, `_`.
@@ -698,29 +708,44 @@ mod tests {
         );
     }
 
+    /// IP-3: `forge new --list` offers a customer the dialect workspace and
+    /// nothing else — no template that hands over a cargo/wasm toolchain.
     #[test]
-    fn templates_all_have_a_description() {
-        // `--list` reads TEMPLATE_DESCRIPTIONS; a template with no description
-        // would silently vanish from the listing. Enforce 1:1 with TEMPLATES.
-        for (name, _) in TEMPLATES {
+    fn the_listing_offers_a_customer_no_wasm_template() {
+        let listing = template_list();
+        let listed: Vec<&str> = listing
+            .lines()
+            .filter(|l| l.starts_with("  "))
+            .filter_map(|l| l.split_whitespace().next())
+            .collect();
+        assert_eq!(listed, ["workspace"], "listing:\n{listing}");
+        for (name, _) in TEMPLATES.iter().chain(WORKSPACE_TEMPLATES) {
             assert!(
-                TEMPLATE_DESCRIPTIONS.iter().any(|(n, _)| n == name),
-                "template `{name}` has no entry in TEMPLATE_DESCRIPTIONS (`--list` would omit it)"
+                !listed.contains(name),
+                "wasm template `{name}` is offered to a customer:\n{listing}"
             );
         }
-        for (name, _) in WORKSPACE_TEMPLATES {
-            assert!(
-                TEMPLATE_DESCRIPTIONS.iter().any(|(n, _)| n == name),
-                "workspace template `{name}` has no TEMPLATE_DESCRIPTIONS entry"
-            );
-        }
-        for (name, _) in TEMPLATE_DESCRIPTIONS {
-            let known = TEMPLATES.iter().any(|(n, _)| n == name)
-                || WORKSPACE_TEMPLATES.iter().any(|(n, _)| n == name);
-            assert!(
-                known,
-                "TEMPLATE_DESCRIPTIONS lists `{name}` which is not a real template"
-            );
+        assert!(listing.contains("--dialect"), "listing:\n{listing}");
+    }
+
+    /// The listed template only scaffolds in a dialect; every wasm template
+    /// stays reachable by name for the platform's own fixtures.
+    #[test]
+    fn the_workspace_template_needs_a_dialect_and_wasm_templates_stay_by_name() {
+        assert_eq!(
+            resolve_template(None, Some(Lang::Python)).unwrap(),
+            "workspace"
+        );
+        assert_eq!(
+            resolve_template(Some("workspace"), Some(Lang::Java)).unwrap(),
+            "workspace"
+        );
+        let refused = resolve_template(Some("workspace"), None).unwrap_err();
+        assert!(refused.to_string().contains("--dialect"), "{refused}");
+        assert!(resolve_template(None, None).is_err());
+        assert!(resolve_template(Some("echo"), Some(Lang::Rust)).is_err());
+        for (name, _) in TEMPLATES.iter().chain(WORKSPACE_TEMPLATES) {
+            assert_eq!(resolve_template(Some(name), None).unwrap(), *name);
         }
     }
 
@@ -728,8 +753,8 @@ mod tests {
     fn workspace_template_has_ship_able_graph_shape() {
         let (_, files) = WORKSPACE_TEMPLATES
             .iter()
-            .find(|(n, _)| *n == "workspace")
-            .expect("workspace template exists");
+            .find(|(n, _)| *n == "wasm-workspace")
+            .expect("wasm-workspace template exists");
         let paths: Vec<&str> = files.iter().map(|(p, _)| *p).collect();
         // The unit `forge ship` builds is a workspace.json graph with a cargo
         // workspace + at least one wasm domain. Assert the load-bearing files.
@@ -816,7 +841,7 @@ mod tests {
     #[test]
     fn template_service_json_targets_wasip1_with_substitutable_name() {
         // service.json's wasm_path has to (a) point at
-        // wasm32-wasip1 (the target `forge build` shells out to)
+        // wasm32-wasip1 (the target `forge wasm-build` shells out to)
         // and (b) reference the artifact name in a form
         // `forge new`'s substitution can rewrite. The substitution
         // rewrites `forge_template_<name>` (underscored) → the
@@ -835,7 +860,7 @@ mod tests {
             assert!(
                 service.contains("wasm32-wasip1"),
                 "template `{name}` service.json doesn't reference wasm32-wasip1 — \
-                 forge build only emits wasip1 artifacts, so a wasip2 path is dead-on-arrival",
+                 forge wasm-build only emits wasip1 artifacts, so a wasip2 path is dead-on-arrival",
             );
             let token = format!("forge_template_{}", name.replace('-', "_"));
             assert!(

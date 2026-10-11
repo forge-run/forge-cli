@@ -2,7 +2,7 @@
 
 Command-line client for the [Forge platform](https://app.forge.run).
 
-Sign in via your browser, pick a tenant + workspace, then deploy schemas, push WASM workloads, tail logs, and manage tokens — all over HTTPS against your workspace's runtime.
+Sign in via your browser, pick a tenant + workspace, then write ops in Python, TypeScript, Java or Rust, push them, tail logs, and manage tokens — all over HTTPS against your workspace's runtime. There is nothing to build: the platform serves the source you push.
 
 ## Install
 
@@ -31,23 +31,25 @@ forge whoami                             # confirm you're authenticated
 
 After `ws use`, every other command (`logs`, `secrets`, `tokens`, …) targets the active workspace. The CLI mints a workspace-scoped bearer on demand and caches it; you generally won't need to think about tokens.
 
-## Deploy is GitOps
+## The loop: new, check, test, push
 
-Your git repo is the desired state. One command deploys and waits:
+Your git repo is the desired state, and you push source, not artifacts. The CLI hands you no toolchain: no cargo, no wasm target, no build step.
 
 ```sh
-forge ship        # wasm-build → wasm-upload → git push → wait for the converge
+forge new --dialect python my-app   # or typescript, java, rust
+cd my-app
+forge check                         # the push's verdict, locally
+forge test                          # your tests, run the way the platform serves the op
+git remote add forge https://git.forge.run/<workspace-id>/my-app
+forge push                          # push, then wait until it is live
 ```
 
-Under the hood that's three steps, which you can also run individually:
+1. **`forge new --dialect <lang>`** — scaffold a workspace whose starter op is written in your language, with the subset skill for your coding agent under `.forge/skill/`.
+2. **`forge check`** — run every op through the same front end the push runs, with your table schemas loaded. What it refuses, the push refuses.
+3. **`forge test`** — run `domains/<d>/tests/*` against the fixture surface, on the interpreter that serves the op in production.
+4. **`forge push`** (or a plain `git push`) — the server records the source tree as desired state and converges the running workspace (schema, seeds, services, pages). `forge push` then **blocks until it's actually live** and decodes the failures; a bare `git push` only records desired state and returns.
 
-1. **`forge wasm-build`** — compile the workspace graph to WebAssembly Components, stamp their content hashes into `forge.lock`, and persist the Components to `.forge/artifacts/`.
-2. **`forge wasm-upload`** — stage those Components to the workspace's content store, so the manifest the server converges resolves every module by hash.
-3. **`forge push`** (or a plain `git push`) — the server records the source tree as desired state and converges the running workspace (schema, seeds, services, pages). `forge push` then **blocks until it's actually live** and decodes the failures; a bare `git push` only records desired state and returns.
-
-`forge dev` runs this loop for you on every save during local development. There is no imperative deploy step: the old `forge schema apply` / pre-GitOps `forge ship` commands were removed, and `forge deploy` / `forge static upload` remain only as hidden primitives `forge dev` shells out to. Scaffold a GitOps repo with `forge init`; watch a deploy converge at `GET /api/v1/manage/reconcile/status`.
-
-> **Skipping `wasm-upload` is the classic silent failure.** If you `git push` without staging the Components first, the pushed manifest references bytes the content store doesn't hold, and the converge silently never applies (`in_sync` stays false, `live_hash` unmoved, no error). `forge ship` bundles the steps so this can't happen, and `forge push` reports exactly this state instead of returning success.
+Scaffold a GitOps repo with `forge init`; watch a deploy converge at `GET /api/v1/manage/reconcile/status`.
 
 ## Command reference
 
@@ -62,21 +64,17 @@ Under the hood that's three steps, which you can also run individually:
 | `forge tenant use <tenant-id>` | Set the active tenant. |
 | `forge ws list` | List workspaces visible to the active portal session, scoped to the active tenant. |
 | `forge ws use <workspace-id>` | Set the active workspace. Subsequent commands mint a per-workspace bearer on demand. |
-| `forge new --template <name>` | Scaffold a new workload from a built-in template (`echo`, `mcp-tool`, `subscription-publisher`). |
-| `forge check` | Check the workspace's authored sources without building. Today that is the annotated-Python dialect: every `domains/<d>/services/*.py` through the front end with the workspace's table schemas loaded, plus a declared-vs-defined op comparison against each domain's `service.json`. A workspace with a committed `schema.lock` is judged against that compiled snapshot (named in the output); a stale one is refused. Exit `0` accepted, `1` refused, `2` this machine could not do its job. `--format json` prints the versioned `forge-check/3` envelope (its `contract_mismatches` carries each op/service.json disagreement as a named diff). |
+| `forge new --dialect <lang> <name>` | Scaffold a workspace whose starter op is in `python`, `typescript`, `java` or `rust`. `--list` shows the templates offered. |
+| `forge check` | Check the workspace's authored sources without building. Every op under `domains/<d>/services/`, in whichever dialect it is written, goes through its front end with the workspace's table schemas loaded, plus a declared-vs-defined op comparison against each domain's `service.json`. A workspace with a committed `schema.lock` is judged against that compiled snapshot (named in the output); a stale one is refused. Exit `0` accepted, `1` refused, `2` this machine could not do its job. `--format json` prints the versioned `forge-check/3` envelope (its `contract_mismatches` carries each op/service.json disagreement as a named diff). |
 | `forge test` | Run the workspace's tests: every `domains/<d>/tests/*` file, written in the op's own language against one fixture surface, run by the interpreter the platform serves with no build. `--json` prints the `forge-test/1` envelope; any failure or refusal exits non-zero. `--from-trace <id\|file>` writes a test from a production capture whose op failed instead (below). |
 | `forge schema compile` | Compile the workspace's schema snapshot (`schema.lock`, beside `forge.lock`): every authored `domains/*/schemas/*.table.json` plus the runtime-owned platform bundle (pinned by ref, embedded at CLI build time) with each archetype's system columns materialized — one deterministic, content-addressed view of what the converge applies. `--check` recompiles in memory and fails on drift (the emitted-committed pattern). |
 | `forge schema diff --live` | Compare the committed snapshot against the live workspace registry's applied schema (`/api/v1/manage/schema/introspect`). Advisory, never a gate: build-locally-deterministic is canonical, the live stack confirms. |
-| `forge wasm-build` | Compile the workspace graph to WASM Components, stamp `forge.lock`, and persist the Components to `.forge/artifacts/`. Run before commit. (Aliased as `forge build`.) |
-| `forge wasm-upload` | Stage the built Components (`.forge/artifacts/`) to the workspace's content store so a `git push` converge resolves each module by hash. Run after `wasm-build`, before pushing. |
-| `forge ship` | The whole deploy in one: `wasm-build` → `wasm-upload` → `git push` → wait for the converge. `--no-build`, `--no-wait`, `--timeout <secs>`. |
 | `forge push` | Push to the forge-git remote and block until converged, decoding the silent failure modes. `--no-wait` records without waiting; non-zero exit on stuck/error/timeout (CI-friendly). After the converge it prints the push's behaviour diff: per op, how many replayed captured requests answer differently on the new tree. `--json` prints the versioned `forge-push/1` envelope instead (below). |
 | `forge logs` | Tail recent request log entries. `--follow` streams new entries via SSE. |
 | `forge tokens mint --tier <user\|service\|admin>` | Mint a token for in-app use. |
 | `forge tokens list` | List active tokens for the active workspace. |
 | `forge tokens revoke <hash>` | Revoke a token by its hash prefix. |
 | `forge update` | Self-update from GitHub releases. `--check` reports availability without applying; `--force` re-installs the current version. |
-| `forge dev` | Watch the project tree and re-run `forge wasm-build` + `forge deploy` (+ `forge static upload`) on every save. Inner-loop driver for the agent + human authoring path. |
 | `forge pages` | List `pages/**/*.page.json` artifacts in a routing table — auth tier, capabilities, rendering shape, sibling-file flags. `--json` for machine-readable output. |
 | `forge components` | List `components/**/*.component.json` artifacts with prop counts (total + required), slot counts, behavior triggers, sibling-file flags. `--json` supported. |
 | `forge brand` | Print app-local branding overrides from `app.json` plus the emitted `:root { --brand-*: …; }` CSS-variable block. `--css-only` for piping into a stylesheet; `--json` for tooling. |
@@ -88,6 +86,8 @@ Under the hood that's three steps, which you can also run individually:
 | `forge domain {add\|list\|status\|policy\|validate}` | Claim a hostname for the active tenant, poll ACME validation, update claim policy (Strict / Open). Operator path; requires `FORGE_CP_URL` + `FORGE_ADMIN_TOKEN`. |
 
 See `forge <command> --help` for the full flag set on any subcommand.
+
+`forge --help` lists no build verb. A few hidden verbs remain for the platform's own wasm trees, not for a customer workspace: `forge dev`'s inner loop and the portal's ship (`forge-portal-web/scripts/ship.sh`, `dev/up-full.sh`) still call them.
 
 ### `forge push --json` — the `forge-push/1` envelope
 

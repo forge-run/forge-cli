@@ -4,7 +4,7 @@
 //! Phase G.1 of the v0.10 substrate. The agent-author loop wants
 //! a single foreground process that rebuilds + redeploys when a
 //! template, page.json, component.css, or `.rs` file changes —
-//! without retyping `forge build && forge deploy` after every
+//! without retyping `forge wasm-build && forge deploy` after every
 //! edit. This is the third leg of the inner-loop stool
 //! (cargo-watch for Rust, vite for JS, `forge dev` for forge
 //! workspaces).
@@ -15,7 +15,7 @@
 //!   and `service.json`.
 //! - Debounce 500ms (file-saves often arrive in bursts when
 //!   multi-file edits land via editor "save all").
-//! - On debounce fire: shell out to `forge build`, then
+//! - On debounce fire: shell out to `forge wasm-build`, then
 //!   `forge deploy --manifest service.json [--app-manifest app.json]
 //!   --wasm target/wasm32-wasip1/release/<crate>.wasm`, then
 //!   `forge static upload static`.
@@ -207,7 +207,7 @@ fn resolve(root: &Path, p: PathBuf) -> PathBuf {
     if p.is_absolute() { p } else { root.join(p) }
 }
 
-/// Shell out to `forge build` + `forge deploy` + `forge static
+/// Shell out to `forge wasm-build` + `forge deploy` + `forge static
 /// upload`. Each step is best-effort: we surface failures with
 /// the underlying stderr but don't abort the watcher — the next
 /// save attempts the full pipeline again.
@@ -217,21 +217,21 @@ fn build_and_deploy(
     app_manifest: Option<&Path>,
     wasm: Option<&Path>,
 ) -> Result<()> {
-    // 1. `forge build` — only when the project actually has Rust
+    // 1. `forge wasm-build` — only when the project actually has Rust
     //    sources. Pure-declarative apps skip this entirely.
     let cargo_toml = project_dir.join("Cargo.toml");
     if cargo_toml.exists() {
-        eprintln!("  $ forge build");
+        eprintln!("  $ forge wasm-build");
         let status = Command::new(forge_bin()?)
-            .arg("build")
+            .arg("wasm-build")
             .arg("--manifest-dir")
             .arg(project_dir)
             .stdout(Stdio::inherit())
             .stderr(Stdio::inherit())
             .status()
-            .context("spawning `forge build`")?;
+            .context("spawning `forge wasm-build`")?;
         if !status.success() {
-            anyhow::bail!("forge build failed (exit {status})");
+            anyhow::bail!("forge wasm-build failed (exit {status})");
         }
     }
 

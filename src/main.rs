@@ -121,20 +121,26 @@ enum Cmd {
     #[command(subcommand)]
     Schema(cmd::schema::SchemaCmd),
 
-    /// Compile the workspace graph to WebAssembly Components, stamp their
-    /// blake3 hashes into `forge.lock`, and persist the Components to
-    /// `.forge/artifacts/` for `forge wasm-upload` to stage. (Was `forge build`.)
-    #[command(name = "wasm-build", alias = "build")]
+    /// Internal: compile the workspace graph to WebAssembly Components, stamp
+    /// their blake3 hashes into `forge.lock`, and persist the Components to
+    /// `.forge/artifacts/` for `forge wasm-upload` to stage. D-106 retired the
+    /// customer build (and the `forge build` alias); kept hidden for `forge
+    /// dev` and the platform's own wasm trees (the portal's ship).
+    #[command(name = "wasm-build", hide = true)]
     WasmBuild(cmd::build::BuildArgs),
 
     /// Stage the built WebAssembly Components (from `.forge/artifacts/`) to the
     /// workspace's content store so a `git push` (GitOps) converge resolves each
-    /// module by hash. Run after `forge wasm-build`, before pushing.
-    #[command(name = "wasm-upload")]
+    /// module by hash. Run after `forge wasm-build`, before pushing. Internal,
+    /// like `wasm-build`.
+    #[command(name = "wasm-upload", hide = true)]
     WasmUpload(cmd::wasm_upload::WasmUploadArgs),
 
     /// Deploy in one command: wasm-build → wasm-upload → git push → wait for
-    /// the converge. The complete GitOps deploy; guarantees the step ordering.
+    /// the converge. The complete GitOps deploy of a wasm tree; internal, kept
+    /// hidden for the portal's ship (forge-portal-web scripts/ship.sh,
+    /// dev/up-full.sh).
+    #[command(hide = true)]
     Ship(cmd::ship::ShipArgs),
 
     /// Push to the forge-git remote and block until the converge finishes,
@@ -204,7 +210,7 @@ enum Cmd {
     Units(cmd::units::UnitsCmd),
 
     /// Phase G.1 — watch the project tree and redeploy on change.
-    /// Foreground process; runs `forge build` + `forge deploy`
+    /// Foreground process; runs `forge wasm-build` + `forge deploy`
     /// (+ `forge static upload`) when a `.page.json`, `.component.css`,
     /// template, or `.rs` file is saved. Ctrl-C to exit.
     Dev(cmd::dev::DevArgs),

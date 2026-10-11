@@ -1,0 +1,34 @@
+{
+  "acceptance": [
+    "A forge-cli test runs forge build and gets an unknown-subcommand error, and asserts forge --help lists neither wasm-build, wasm-upload, ship nor build; it fails before the change.",
+    "forge new offers no wasm template to a customer; a test asserts the listed templates.",
+    "forge-control-plane's refusal for an unmarked tree with no forge.lock names pushing dialect source, not forge build, and a test asserts the message.",
+    "forge-cli README.md describes the new/check/test/push loop and mentions no customer build.",
+    "dev/up-full.sh --release still deploys the portal (forge dev and the hidden ship path still work), shown in the step's evidence."
+  ],
+  "author": "rory",
+  "events": [
+    {
+      "at": "2026-10-11T12:03:40.763074+00:00",
+      "id": "intent-recorded",
+      "revision": 1,
+      "source": "verb"
+    }
+  ],
+  "gap_reviews": [],
+  "out_of_scope": [
+    "forge-portal-web docs that still teach forge build (named in the report)",
+    "forge-platform-operations/dev/up-full.sh's printed manual-deploy hint (line 1275) still says forge build"
+  ],
+  "refs": [
+    "invoice-path-2026-10 IP-3",
+    "D-106"
+  ],
+  "revision": 1,
+  "schema": "forge-intent/v1",
+  "slug": "invoice-path-2026-10-ip-3-forge-build-is-retired",
+  "source": "verb",
+  "statement": "The customer CLI hands over no toolchain (D-106): forge build is not a verb, forge --help lists no wasm verb (wasm-build, wasm-upload and ship stay callable, hidden, for forge dev and the portal's ship), forge new --list offers only the dialect workspace, the control plane's refusal of an unmarked tree with no forge.lock names pushing dialect source under .forge-interpret instead of forge build, and the forge-cli README teaches new/check/test/push.",
+  "ts": "2026-10-11T12:03:40.763074+00:00",
+  "updated_at": "2026-10-11T12:03:40.763074+00:00"
+}
