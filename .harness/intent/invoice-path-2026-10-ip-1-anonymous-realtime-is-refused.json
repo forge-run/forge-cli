@@ -27,6 +27,11 @@
       "at": "2026-10-11T08:20:39.075639+00:00",
       "boundary": "intake",
       "id": "gap-review"
+    },
+    {
+      "at": "2026-10-11T08:43:10.759906+00:00",
+      "boundary": "plan",
+      "id": "gap-review"
     }
   ],
   "gap_reviews": [
@@ -56,6 +61,16 @@
           "description": "The forge-runtime tests cannot fail before a fix, because nothing in the runtime is wrong; they pin an enforced contract that had no WS-mux anonymous coverage at all",
           "note": "inventing a runtime defect to satisfy the original wording would ship a change that refuses anonymous reads of public tables, which the documented literal-policy design (docs row-security: serve published rows to logged-out visitors) requires",
           "resolution": "accepted"
+        }
+      ],
+      "intent_ref": ".harness/intent/invoice-path-2026-10-ip-1-anonymous-realtime-is-refused.json"
+    },
+    {
+      "boundary": "plan",
+      "gaps": [
+        {
+          "description": "Diffed the plan (retarget the e2e specs to probe_locked; add tests/realtime_anon_subscribe.rs) against intent revision 2. Its second criterion, an anonymous subscribe to a literal-policy table streams over BOTH transports, is not met by the tree: ip1-rt-tests ran 3 pass and 1 fail. anon_ws_subscribe_to_a_public_table_streams gets subscribed and then no event, because the WS mux poll task (crates/forge-adapters/src/websocket/mux/poll.rs:28-37) dispatches _platform::subscriptions::poll as the subscriber (anonymous, no platform:read), where SSE drains with drain_identity (sse.rs:496-505). The plan now carries a forge-runtime fix: the mux by-id poll, resume and close use the same drain identity, confined to subscription ids this socket opened, and that test fails before the fix",
+          "resolution": "fixed"
         }
       ],
       "intent_ref": ".harness/intent/invoice-path-2026-10-ip-1-anonymous-realtime-is-refused.json"
