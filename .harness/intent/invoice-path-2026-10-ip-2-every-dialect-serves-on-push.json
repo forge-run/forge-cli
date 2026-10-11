@@ -1,0 +1,48 @@
+{
+  "acceptance": [
+    "forge-cli test: the dialect scaffold for all four dialects writes .forge-interpret; red before the fix for Python, TypeScript and Java.",
+    "interp.rs module doc no longer says the interpreted route runs behind the server-build gate.",
+    "Dev stack: forge new --dialect python, forge push, converges and the op answers through the edge; scripted repro and output in evidence."
+  ],
+  "author": "rory",
+  "events": [
+    {
+      "at": "2026-10-11T09:24:39.402160+00:00",
+      "id": "intent-recorded",
+      "revision": 1,
+      "source": "verb"
+    },
+    {
+      "at": "2026-10-11T09:24:39.479034+00:00",
+      "boundary": "intake",
+      "id": "gap-review"
+    }
+  ],
+  "gap_reviews": [
+    {
+      "boundary": "intake",
+      "gaps": [
+        {
+          "description": "none found",
+          "note": "Diffed the IP-2 intent statement against the tree: forge-cli src/cmd/new.rs:491-493 writes .forge-interpret only for Lang::Rust; forge-control-plane src/git/reconcile/push.rs:136 gates A0 on interp_enabled() && tree_is_marked alone; push.rs:847 stops an unmarked lockless tree; interp.rs:14-18 still claims the server-build gate, stale since 6d666cd (PS-2). templates/workspace-dialect/README.md promises git push serves. forge push exists (main.rs:143). Statement matches the tree; no gap.",
+          "resolution": "accepted"
+        }
+      ],
+      "intent_ref": ".harness/intent/invoice-path-2026-10-ip-2-every-dialect-serves-on-push.json"
+    }
+  ],
+  "out_of_scope": [
+    "Already-scaffolded unmarked workspaces (no CP-side inference of the marker).",
+    "forge build / wasm-build retirement (IP-3)."
+  ],
+  "refs": [
+    "invoice-path-2026-10/IP-2-every-dialect-serves-on-push"
+  ],
+  "revision": 1,
+  "schema": "forge-intent/v1",
+  "slug": "invoice-path-2026-10-ip-2-every-dialect-serves-on-push",
+  "source": "verb",
+  "statement": "A workspace made by forge new --dialect in any of Python, TypeScript, Java or Rust carries .forge-interpret at its root, so its first git push takes the interpreted converge (push.rs A0) and serves, instead of stopping at mode_workspace_derive for want of a forge.lock; interp.rs no longer claims the route sits behind the server-build gate it left at 6d666cd.",
+  "ts": "2026-10-11T09:24:39.402160+00:00",
+  "updated_at": "2026-10-11T09:24:39.402160+00:00"
+}

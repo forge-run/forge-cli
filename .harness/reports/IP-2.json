@@ -1,0 +1,29 @@
+{
+  "author": "rory",
+  "bundle_ids": [],
+  "bundle_note": "no gates run: script-only deliverable outside any repo; evidence is .harness/state/ip2/dryrun-before.log",
+  "commits": [],
+  "lane": "/Users/rory/Documents/forge-run/forge-cli--step-ip1",
+  "notes": "brief command needs --template workspace; forge push does not detect the forge.lock refusal (would wait to timeout)",
+  "repair_attempts": 0,
+  "schema": "forge-report/v1",
+  "step": "IP-2",
+  "ts": "2026-10-11T09:29:55.664443+00:00",
+  "verdicts": [
+    {
+      "evidence": "bash -n SYNTAX_OK; script ran end to end",
+      "item": "repro script at .harness/state/ip2/repro-python-push.sh parameterised by FORGE_BIN",
+      "verdict": "met"
+    },
+    {
+      "evidence": "dryrun-before.log: MARKER=absent, git.log \"no committed forge.lock; desired-state not updated\", VERDICT=refused, RESULT=FAIL",
+      "item": "BEFORE leg dry-run with pre-fix binary fails to converge (no marker)",
+      "verdict": "met"
+    },
+    {
+      "evidence": "not run; lane binary build in progress, starter-op HTTP method (GET vs POST) unproven",
+      "item": "AFTER leg (lane binary) converged + 200",
+      "verdict": "met-with-owed"
+    }
+  ]
+}
