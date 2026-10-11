@@ -1,0 +1,31 @@
+{
+  "acceptance": [
+    "The cause is named in the report with the commit or change that introduced it.",
+    "deploy-serve.spec.ts passes on the dev stack, with the run's output in the step's evidence.",
+    "The spec's commit says which retired behaviour it stopped asserting (D-106 compiled serving)."
+  ],
+  "author": "rory",
+  "events": [
+    {
+      "at": "2026-10-11T16:56:04.154843+00:00",
+      "id": "intent-recorded",
+      "revision": 1,
+      "source": "verb"
+    }
+  ],
+  "gap_reviews": [],
+  "out_of_scope": [
+    "forge-runtime changes: CI's served HTML already carries the op's data, so no runtime defect exists"
+  ],
+  "refs": [
+    "invoice-path-2026-10/IP-5-deploy-serve-render-data",
+    "D-106"
+  ],
+  "revision": 1,
+  "schema": "forge-intent/v1",
+  "slug": "invoice-path-2026-10-ip-5-deploy-serve-render-data",
+  "source": "verb",
+  "statement": "deploy-serve.spec.ts passes on the dev stack: its render-data assertion checks the via line the interpreted python deploy-probe op emits since PS-1 (b906f9b), not the retired compiled fixture's 'via forge-sdk-v2 workspace template'.",
+  "ts": "2026-10-11T16:56:04.154843+00:00",
+  "updated_at": "2026-10-11T16:56:04.154843+00:00"
+}
