@@ -59,7 +59,7 @@
     },
     {
       "path": ".github/workflows/harness-gates.yml",
-      "sha256": "039439d793d8d0347417917b1c3a0e4145e6fdf08d0a74cb46281c07f67a15b8"
+      "sha256": "c4eb3cbe1116e14c5b402bf77257153bb17bef3f7ebea68ee507ea5acd040c09"
     },
     {
       "path": ".gitignore#rules",
@@ -223,7 +223,7 @@
       "params": {
         "facts_root": "../forge-facts"
       },
-      "sha256": "39553e2b393793160acf6f0f2a7b1c2d13abb7db426374c590ca9244c8281ce7",
+      "sha256": "46d4bd1fc74c957ec244a096b9cd786971a81fdea32b4f9d183a67777be7fc63",
       "source": "../../core/gates/fact-pins"
     },
     {
@@ -325,8 +325,8 @@
   "harness_dir": "harnesses/hybrid",
   "source": {
     "kind": "commit",
-    "ref": "47c110f",
-    "sha": "47c110f47325a0d6918da635bccede225d4d8964"
+    "ref": "86dfc1a",
+    "sha": "86dfc1a3a507082b536e12f0d8d2498f9ea2b60e"
   },
   "targets": [
     "claude-code",
