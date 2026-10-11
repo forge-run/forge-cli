@@ -10,13 +10,15 @@
     "max_wakeups_without_evidence": 30
   },
   "landing": {
-    "authorized_by": "Rory, 2026-10-11 (start the invoice path plan; land everything, run against the dev stack, not a real deployment)",
+    "authorized_by": "Rory, 2026-10-11 (start the invoice path plan; land everything, run against the dev stack, not a real deployment); forge-facts and forge-platform-architecture added by Rory 2026-10-12 (IP-3 moved two atoms; the plan re-anchors them itself)",
     "repos": [
       "forge-runtime",
       "forge-control-plane",
       "forge-cli",
       "forge-platform-operations",
-      "forge-portal-e2e"
+      "forge-portal-e2e",
+      "forge-facts",
+      "forge-platform-architecture"
     ],
     "build": {
       "forge-platform-operations": "bash dev/up-full.test.sh && bash dev/build-bins-worktree.test.sh",
