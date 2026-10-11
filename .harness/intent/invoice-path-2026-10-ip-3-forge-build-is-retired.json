@@ -28,6 +28,11 @@
       "at": "2026-10-11T12:20:31.374234+00:00",
       "boundary": "verify",
       "id": "gap-review"
+    },
+    {
+      "at": "2026-10-11T12:20:53.864948+00:00",
+      "boundary": "align",
+      "id": "gap-review"
     }
   ],
   "gap_reviews": [
@@ -89,6 +94,17 @@
         {
           "description": "forge init, which also scaffolds a workspace, was not reviewed for toolchain hand-off",
           "note": "the intent and acceptance name forge build, the --help verbs, forge new's templates, the CP refusal and the README; forge init is not among them and widening the step would inherit IP-4's scheduling",
+          "resolution": "accepted"
+        }
+      ],
+      "intent_ref": ".harness/intent/invoice-path-2026-10-ip-3-forge-build-is-retired.json"
+    },
+    {
+      "boundary": "align",
+      "gaps": [
+        {
+          "description": "none found",
+          "note": "aligned both lanes against origin/main after a fetch: forge-cli--step-ip3 and forge-control-plane--step-ip3 are 0 commits behind and merge-tree clean; the CP lane's one commit (6b47b1c) carries push.rs at its 1109-line baseline and the tests.rs assertion; diffed against the IP-3 intent statement (no forge build verb, wasm verbs hidden but callable, forge new --list offers only the dialect workspace, the CP refusal names pushing dialect source under .forge-interpret, README teaches new/check/test/push) with no new gap beyond the three accepted at verify",
           "resolution": "accepted"
         }
       ],
