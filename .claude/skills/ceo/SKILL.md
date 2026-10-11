@@ -181,6 +181,12 @@ refusing to move on until each has a concrete answer:
    the customer-facing claim this substrate or harness work serves.
 6. **Which forbids did you check?** For each cited claim, the forbids
    line, and one sentence on how the plan stays clear of it.
+7. **Why is this one plan?** Only when it has more than 35 steps: the
+   one thing that makes it one plan and not two or three, in
+   `one_plan`. A plan that size cannot land as it goes, and
+   conformance-2026-09 at 107 steps took two catch-up landings. "The
+   steps are related" is not a reason; a cut that would leave main
+   broken between the halves is.
 
 Write the answers into the roadmap as a top-level `vision` object:
 
@@ -196,7 +202,8 @@ Write the answers into the roadmap as a top-level `vision` object:
 ```
 
 `rows` and `claims` are arrays; the rest are one-sentence strings.
-`if_none` is required and non-empty only when `rows` is empty. Cite only
+`if_none` is required and non-empty only when `rows` is empty.
+`one_plan` is optional below 36 steps and judged above it. Cite only
 claim numbers the canon defines: a number the file does not carry fails
 the harness suite.
 

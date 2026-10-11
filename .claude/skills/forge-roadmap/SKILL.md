@@ -8,7 +8,7 @@ description: File a roadmap the harness driver accepts: the template in the skil
 name: forge-roadmap
 description: File a roadmap the harness driver accepts. Use when writing or editing any *roadmap*.json, before `plan start` or run-plan.sh — the template below IS the schema, and the roadmap-valid gate refuses anything else at the Write.
 ---
-<!-- last-confirmed: 2026-09-05 -->
+<!-- last-confirmed: 2026-10-11 -->
 
 # Filing a roadmap
 
@@ -25,7 +25,8 @@ python3 $ROOT/.harness/dispatch.py plan validate <file>
 ## The shape
 
 Copy this and fill it in. Every key shown on a step is REQUIRED except
-`notes`, `phase`, `scope`, `blocked_on`, `evidence`.
+`notes`, `phase`, `scope`, `lands`, `blocked_on`, `evidence` — and `lands`
+is required on a step whose `scope` names more than one repo.
 
 ```json
 {
@@ -58,6 +59,17 @@ Copy this and fill it in. Every key shown on a step is REQUIRED except
         "Another one. Vague acceptance produces a vague verdict."
       ],
       "evidence": []
+    },
+    {
+      "id": "E-2-cross-repo-slug",
+      "title": "A step whose scope names two repos says which reaches main first",
+      "status": "todo",
+      "scope": ["forge-platform-wire/src/", "forge-runtime/crates/"],
+      "lands": ["forge-platform-wire", "forge-runtime"],
+      "acceptance": [
+        "The hub's change is on main before the dependent that reads it."
+      ],
+      "evidence": []
     }
   ]
 }
@@ -83,14 +95,30 @@ Copy this and fill it in. Every key shown on a step is REQUIRED except
   whether it is one of `done`, `landed`, `landed_v0`.
 - `blocked_on`, when present, is `null`, `user`, `ci` or `budget`.
 - `scope`, when present, is a non-empty array of path prefixes.
+- `lands` is the order a step's repos reach main in, hubs first: an array
+  naming every repo its `scope` names, once each, and no other (RS-1). A
+  step whose scope names more than one repo MUST carry it. The repo is the
+  first path component, a lane suffix (`forge-lang--py2`) folded onto its
+  repo; a root file like `CLAUDE.md` is no repo. A step's work is not done
+  until it is on main in every repo it touched, and a step that never said
+  which goes first is how conformance-2026-09 needed two catch-up landing
+  steps. Like `vision`, a missing `lands` is asked for only until the
+  plan's first step is done; a `lands` that is present is always checked.
 - `evidence`, when present, is an array.
+- `drift`, when present, is `{max_unlanded_hours?, max_ahead_commits?}`: a
+  number of hours > 0 and an integer >= 1, no other key (DR-1). The loop
+  halts, naming each branch, when a done step's branch has been off
+  origin/main longer than the first (default 24) or the plan's lane is
+  more commits ahead of main than the second (default 150). Leave it out
+  for the defaults; set it only with a reason in `intent`.
 - `vision` is required until the plan's first step is done: an object with
   `rows` and `claims` (arrays of strings, either may be empty) and the
   non-empty strings `moves`, `unit`, `if_none`, `forbids_checked`. The
   validator checks presence and type; what the block SAYS is the judge's
   business. A plan already part-done is not asked for one at the Write,
   because the driver rewrites its own roadmap at every landed step — it
-  meets the judge at its next `plan start` instead.
+  meets the judge at its next `plan start` instead. `vision.one_plan`,
+  when present, is a non-empty string (see sizing a plan, below).
 
 ## Where it goes
 
@@ -117,6 +145,15 @@ all still todo, because the alternative is what happened to the
 evangelist plan on 2026-09-13: filed without a block, driven to 16 of 20
 steps, and then held at a restart by a requirement nobody could satisfy
 without stopping to answer six questions mid-recovery.
+
+## Sizing a plan
+
+A plan of more than 35 steps carries `vision.one_plan`: the one thing that
+makes it one plan and not two or three — a cut that would leave main broken
+between the halves, one migration that lands whole. The CEO's judge refuses
+it at `plan start` without one, or with a reason that would hold for any
+plan ("the steps are related"). conformance-2026-09 grew to 107 steps; a
+plan that size cannot land as it goes.
 
 ## Sizing a step
 
