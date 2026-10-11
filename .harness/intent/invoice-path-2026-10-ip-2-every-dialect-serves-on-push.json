@@ -1,0 +1,43 @@
+{
+  "acceptance": [
+    "A forge-cli test scaffolds all four dialects and asserts each tree carries .forge-interpret; it fails on the three non-Rust dialects before the fix (new.rs:491-493 gates the marker on Lang::Rust).",
+    "forge-control-plane interp.rs module doc no longer says the interpreted route runs behind the server-build gate (main line 14 does today).",
+    "On the dev stack (forge-platform-operations/dev/up-full.sh), a Python workspace made by forge new --dialect python and pushed with forge push converges and its op answers through the edge; the scripted repro and its output are in the step evidence."
+  ],
+  "author": "rory",
+  "events": [
+    {
+      "at": "2026-10-11T11:05:50.575865+00:00",
+      "id": "intent-recorded",
+      "revision": 1,
+      "source": "verb"
+    },
+    {
+      "at": "2026-10-11T11:05:50.638734+00:00",
+      "boundary": "intake",
+      "id": "gap-review"
+    }
+  ],
+  "gap_reviews": [
+    {
+      "boundary": "intake",
+      "gaps": [
+        {
+          "description": "none found",
+          "note": "Diffed the IP-2 step acceptance and the plan intent (blocker 2: non-Rust dialects push and never converge) against the recorded intent statement and the tree: new.rs:491-493 writes .forge-interpret only for Lang::Rust; forge-control-plane main interp.rs:14 still says the route runs behind the server-build gate. All three acceptance bullets map one-to-one onto recorded acceptance; nothing in the intent is left uncovered.",
+          "resolution": "accepted"
+        }
+      ],
+      "intent_ref": ".harness/intent/invoice-path-2026-10-ip-2-every-dialect-serves-on-push.json"
+    }
+  ],
+  "out_of_scope": [],
+  "refs": [],
+  "revision": 1,
+  "schema": "forge-intent/v1",
+  "slug": "invoice-path-2026-10-ip-2-every-dialect-serves-on-push",
+  "source": "verb",
+  "statement": "A workspace scaffolded by forge new --dialect in any of Python, TypeScript, Java or Rust carries the .forge-interpret marker, so its first git push takes the interpreted reconcile route and converges with no operator action; forge-control-plane src/git/reconcile/interp.rs module doc describes the route as it is (no server-build gate, FORGE_GIT_INTERPRET kill switch only).",
+  "ts": "2026-10-11T11:05:50.575865+00:00",
+  "updated_at": "2026-10-11T11:05:50.575865+00:00"
+}
