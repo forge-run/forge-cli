@@ -1,0 +1,20 @@
+[scratch] /Users/rory/.cache/forge-harness-runs (disk)
+   Compiling forge-control-plane v0.11.80 (/Users/rory/Documents/forge-run/forge-control-plane--step-ip6)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 9.85s
+     Running unittests src/lib.rs (target/debug/deps/forge_control_plane-4af737837e02674a)
+
+running 11 tests
+test git::reconcile::references::tests::a_change_to_a_column_no_op_reads_is_accepted ... ok
+test git::reconcile::references::tests::a_column_made_nullable_names_its_reads ... ok
+test git::reconcile::references::tests::a_converged_workspace_refuses_a_later_drop_naming_both_ops ... ok
+test git::reconcile::references::tests::a_dropped_column_names_every_op_and_line_that_reads_it ... ok
+test git::reconcile::references::tests::a_renamed_column_names_its_sites_and_every_op_that_may_read_it ... ok
+test git::reconcile::references::tests::no_pointer_is_no_view ... ok
+test git::reconcile::references::tests::recording_a_converge_moves_the_pointer_and_prunes_older_commits ... ok
+test git::reconcile::references::tests::serving_after_converge_does_no_index_work_and_the_bytes_are_unchanged ... ok
+test git::reconcile::references::tests::the_converged_view_merges_the_domains_and_carries_the_lock_columns ... ok
+test git::reconcile::references::tests::the_diff_reads_drops_renames_and_nullability ... ok
+test git::reconcile::references::tests::the_index_root_sits_beside_the_cp_state_file ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 401 filtered out; finished in 1.68s
+

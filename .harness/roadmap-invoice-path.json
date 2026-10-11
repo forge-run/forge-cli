@@ -68,10 +68,10 @@
         "forge-portal-e2e multi-protocol.spec.ts P2.2 and realtime-sse.spec.ts 'anon subscribe on a non-anon table is refused' target a table that is in fact private, fail on the dev stack before that change and pass after, with the run's output in the step's evidence."
       ],
       "evidence": [
-        "forge-runtime f8fa258f (lane step-ip1): tests/realtime_anon_subscribe.rs pins both halves over both transports on notes_locked (no select policy) and notes_public (literal-predicate select). Before the WS mux fix (ip1-before, 2026-10-11 21:46): 'test result: FAILED. 3 passed; 2 failed' \u2014 anon_ws_subscribe_to_a_public_table_streams ('the anonymous subscriber receives the written row') and ws_resume_of_a_subscription_this_socket_did_not_open_is_refused.",
+        "forge-runtime f8fa258f (lane step-ip1): tests/realtime_anon_subscribe.rs pins both halves over both transports on notes_locked (no select policy) and notes_public (literal-predicate select). Before the WS mux fix (ip1-before, 2026-10-11 21:46): 'test result: FAILED. 3 passed; 2 failed' — anon_ws_subscribe_to_a_public_table_streams ('the anonymous subscriber receives the written row') and ws_resume_of_a_subscription_this_socket_did_not_open_is_refused.",
         "After (ip1-after2, 21:49, fmt + clippy -D warnings + tests): realtime_anon_subscribe 'ok. 5 passed; 0 failed' (anon_ws_subscribe_to_a_private_table_is_refused: error frame UNAUTHENTICATED; anon_sse_subscribe_to_a_private_table_is_401_with_no_stream: 401 + RFC 6750 Bearer challenge, not text/event-stream; anon_ws/sse_subscribe_to_a_public_table_streams; ws_resume_of_a_subscription_this_socket_did_not_open_is_refused: NOT_FOUND); sse_adapter_auth 'ok. 8 passed'; websocket_adapter 'ok. 15 passed'; websocket_adapter_auth 'ok. 7 passed'.",
         "The runtime defect found on the way: the WS mux poll/resume/close dispatched _platform::subscriptions as the subscriber, so an anon subscriber to an anon-readable table got 'subscribed' then POLL_FAILED (no platform:read). They now drain as SSE's drain_identity(); subscribe and command keep the caller's identity, and resume is confined to ids this socket opened (NOT_FOUND otherwise, no dispatch).",
-        "forge-portal-e2e edde8ae (lane step-ip1): P2.2 and the SSE anon-refusal spec target probe_locked (probe_items is anon-readable since PS-1 b906f9b). Dev stack (up-full.sh), run ip1-e2e-ba2 2026-10-11 21:58. BEFORE (main 3917e43): '\u2718 multi-protocol.spec.ts:140:3 \u2026 P2.2 an unauthenticated subscribe is refused' \u2014 'Expected: \"error\" Received: \"subscribed\"'; '\u2718 realtime-sse.spec.ts:72:3 \u2026 anon subscribe on a non-anon table is refused' \u2014 'anon subscribe must be refused, not an open stream (status 200, ct text/event-stream)'; '2 failed'. AFTER (lane): '\u2713 multi-protocol.spec.ts:140:3 \u2026 P2.2' , '\u2713 realtime-sse.spec.ts:76:3 \u2026 anon subscribe on a non-anon table is refused', '2 passed (1.0m)'. npm run typecheck clean.",
+        "forge-portal-e2e edde8ae (lane step-ip1): P2.2 and the SSE anon-refusal spec target probe_locked (probe_items is anon-readable since PS-1 b906f9b). Dev stack (up-full.sh), run ip1-e2e-ba2 2026-10-11 21:58. BEFORE (main 3917e43): '✘ multi-protocol.spec.ts:140:3 … P2.2 an unauthenticated subscribe is refused' — 'Expected: \"error\" Received: \"subscribed\"'; '✘ realtime-sse.spec.ts:72:3 … anon subscribe on a non-anon table is refused' — 'anon subscribe must be refused, not an open stream (status 200, ct text/event-stream)'; '2 failed'. AFTER (lane): '✓ multi-protocol.spec.ts:140:3 … P2.2' , '✓ realtime-sse.spec.ts:76:3 … anon subscribe on a non-anon table is refused', '2 passed (1.0m)'. npm run typecheck clean.",
         "implementer report: .harness/report.json (3 verdicts met; gate bundle pre-done-d0b17a85 on forge-runtime f8fa258f)",
         "Landed by hand 2026-10-12 (operator): forge-runtime main e9ed576f..08d3c3ac (origin/main + lane step-ip1 at ab17752a, excluding wip cd807e9e which carried unrelated ingest.rs work the reopened driver wrote after the step was done); landing tree clippy --workspace --all-targets --features adapters -D warnings clean, realtime_anon_subscribe 5, sse_adapter_auth 8, websocket_adapter 15, websocket_adapter_auth 7 passed. forge-portal-e2e main 3917e43..edde8ae, typecheck clean."
       ],
@@ -199,11 +199,13 @@
       "status": "todo",
       "scope": [
         "forge-runtime/",
-        "forge-portal-e2e/"
+        "forge-portal-e2e/",
+        "forge-control-plane/"
       ],
       "lands": [
         "forge-runtime",
-        "forge-portal-e2e"
+        "forge-portal-e2e",
+        "forge-control-plane"
       ],
       "notes": "forge-portal-e2e field-references.spec.ts:100 fails in CI on 2026-10-11: the References page never shows a converged index. New with FR-1. Same discipline as IP-5: name the cause first, fix it where it lives with a test there, and stop and report if it lives outside the landing block (forge-portal-web is not in it).",
       "acceptance": [

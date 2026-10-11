@@ -1,0 +1,88 @@
+diff --git a/src/bin/forge-git.rs b/src/bin/forge-git.rs
+index 65a32fd..90afa7c 100644
+--- a/src/bin/forge-git.rs
++++ b/src/bin/forge-git.rs
+@@ -22,7 +22,8 @@ use forge_control_plane::git::auth::{
+ };
+ use forge_control_plane::git::gc::{self, GcOptions};
+ use forge_control_plane::git::reconcile::{
+-    HttpReconcileTrigger, ReconcileTrigger, spawn_drift_ticker, spawn_live_drift_sweep,
++    HttpReconcileTrigger, ReconcileTrigger, set_reference_index_state_dir, spawn_drift_ticker,
++    spawn_live_drift_sweep,
+ };
+ use forge_control_plane::git::{GitState, RefStore, git_router, resolve_object_store};
+ use forge_control_plane::platform_sign::PlatformSigner;
+@@ -192,6 +193,11 @@ async fn main() -> Result<()> {
+     // from env (FORGE_GIT_EDGE_PORT / FORGE_GIT_EDGE_HOST_SUFFIX). Wrapped in
+     // a short-TTL cache so the `info/refs` + pack hops of one git op share a
+     // single upstream validation.
++    // FR-1: the converged reference indexes live beside `cp.json`, wherever
++    // this process was told it is, not at a fixed system path.
++    if let Some(dir) = cli.cp_state_file.parent() {
++        set_reference_index_state_dir(dir);
++    }
+     let cp_store = Store::open(&cli.cp_state_file)
+         .await
+         .with_context(|| format!("open CP state `{}`", cli.cp_state_file.display()))?;
+diff --git a/src/git/reconcile/mod.rs b/src/git/reconcile/mod.rs
+index 02c4f5d..0edf1bc 100644
+--- a/src/git/reconcile/mod.rs
++++ b/src/git/reconcile/mod.rs
+@@ -124,6 +124,7 @@ mod tests;
+ pub use converge::{HttpReconcileTrigger, ReconcileTrigger};
+ pub use drift::{spawn_drift_ticker, spawn_live_drift_sweep};
+ pub use mock::MockReconcileTrigger;
++pub use references::set_state_dir as set_reference_index_state_dir;
+ 
+ pub(crate) use converge::{agent_admin_base_for_workspace, resolve_or_wake_base_with_bearer};
+ pub(crate) use push::{predict_derive_block, reconcile_pushed_tip};
+diff --git a/src/git/reconcile/references.rs b/src/git/reconcile/references.rs
+index 6c5a864..4189cfd 100644
+--- a/src/git/reconcile/references.rs
++++ b/src/git/reconcile/references.rs
+@@ -278,16 +278,36 @@ pub(crate) type Indexes = Vec<(String, ReferenceIndex)>;
+ /// The file under a repo's directory naming the commit it last converged.
+ pub(crate) const CONVERGED: &str = "CONVERGED";
+ 
+-/// `FORGE_REFERENCE_INDEX_DIR`: where the converged indexes live, default
+-/// `/var/lib/forge-control-plane/references`, beside `cp.json`.
+-fn index_root() -> PathBuf {
+-    std::env::var("FORGE_REFERENCE_INDEX_DIR")
+-        .ok()
+-        .filter(|v| !v.trim().is_empty())
+-        .map_or_else(
++/// The directory of the `cp.json` this process was started with, set once
++/// at boot by [`set_state_dir`]; the converged indexes live beside it.
++static STATE_DIR: std::sync::OnceLock<PathBuf> = std::sync::OnceLock::new();
++
++/// forge-git's `--cp-state-file` directory: the index root's default is
++/// `<dir>/references`. Production's `/var/lib/forge-control-plane/cp.json`
++/// keeps `/var/lib/forge-control-plane/references`; the dev stack's run
++/// directory gets an index root its unprivileged process can write.
++pub fn set_state_dir(dir: &Path) {
++    let _ = STATE_DIR.set(dir.to_path_buf());
++}
++
++/// `FORGE_REFERENCE_INDEX_DIR` when set, else `references` beside the
++/// state file's directory, else `/var/lib/forge-control-plane/references`.
++fn root_from(env: Option<String>, state_dir: Option<&Path>) -> PathBuf {
++    match env.filter(|v| !v.trim().is_empty()) {
++        Some(v) => PathBuf::from(v),
++        None => state_dir.map_or_else(
+             || PathBuf::from("/var/lib/forge-control-plane/references"),
+-            PathBuf::from,
+-        )
++            |d| d.join("references"),
++        ),
++    }
++}
++
++/// Where the converged indexes live: see [`root_from`].
++fn index_root() -> PathBuf {
++    root_from(
++        std::env::var("FORGE_REFERENCE_INDEX_DIR").ok(),
++        STATE_DIR.get().map(PathBuf::as_path),
++    )
+ }
+ 
+ /// One repo's directory: `<root>/<workspace>/<repo>`.
