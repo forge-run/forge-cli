@@ -16,6 +16,16 @@
       "at": "2026-10-11T11:05:50.638734+00:00",
       "boundary": "intake",
       "id": "gap-review"
+    },
+    {
+      "at": "2026-10-11T11:06:54.065728+00:00",
+      "boundary": "plan",
+      "id": "gap-review"
+    },
+    {
+      "at": "2026-10-11T11:24:18.042808+00:00",
+      "boundary": "plan",
+      "id": "gap-review"
     }
   ],
   "gap_reviews": [
@@ -26,6 +36,31 @@
           "description": "none found",
           "note": "Diffed the IP-2 step acceptance and the plan intent (blocker 2: non-Rust dialects push and never converge) against the recorded intent statement and the tree: new.rs:491-493 writes .forge-interpret only for Lang::Rust; forge-control-plane main interp.rs:14 still says the route runs behind the server-build gate. All three acceptance bullets map one-to-one onto recorded acceptance; nothing in the intent is left uncovered.",
           "resolution": "accepted"
+        }
+      ],
+      "intent_ref": ".harness/intent/invoice-path-2026-10-ip-2-every-dialect-serves-on-push.json"
+    },
+    {
+      "boundary": "plan",
+      "gaps": [
+        {
+          "description": "Plan (brief forge-cli--step-ip2/.harness/briefs/IP-2.md) diffed against the intent statement: the step lands in two repos but the run had only a forge-cli lane, so the interp.rs doc fix had nowhere to land; opened forge-control-plane--step-ip2 and named both lanes in the brief.",
+          "resolution": "fixed"
+        },
+        {
+          "description": "Brief also asks for a sweep of forge-cli docs/templates for other text claiming only Rust trees get the marker, beyond the intent statement",
+          "note": "the README already promises push-serves for every dialect, and a stale claim elsewhere would re-mislead the same customer the fix is for; it is a grep, not scope creep.",
+          "resolution": "accepted"
+        }
+      ],
+      "intent_ref": ".harness/intent/invoice-path-2026-10-ip-2-every-dialect-serves-on-push.json"
+    },
+    {
+      "boundary": "plan",
+      "gaps": [
+        {
+          "description": "Implementer repro showed the marked Python tree converges on the CP but the runtime refuses the app-less bundle (validate_app_bundle requires app_manifest, which the CP omits since R-8 a818087); the intent \"served on its first push\" is unmet without it, so the step now lands in forge-runtime too (lane forge-runtime--step-ip2, brief IP-2b-runtime.md).",
+          "resolution": "fixed"
         }
       ],
       "intent_ref": ".harness/intent/invoice-path-2026-10-ip-2-every-dialect-serves-on-push.json"

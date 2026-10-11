@@ -1,0 +1,31 @@
+{
+  "author": "rory",
+  "bundle_ids": [],
+  "bundle_note": "evidence is flat log files under forge-cli--step-ip2/.harness/evidence (ip2-test-red.log, ip2-test-green.log, ip2-cli-ladder.log, ip2-dev-stack-repro.log) and forge-control-plane--step-ip2/.harness/evidence/ip2-cargo-check.log; no gate run directories",
+  "commits": [
+    "9599539"
+  ],
+  "lane": "/Users/rory/Documents/forge-run/forge-cli--step-ip2",
+  "notes": "forge-control-plane lane commit 666b23a. Dev stack left up (ws-3af355605a30f8d1); it replaced the stale IP-1 stack.",
+  "repair_attempts": 0,
+  "schema": "forge-report/v1",
+  "step": "IP-2",
+  "ts": "2026-10-11T11:22:36.208293+00:00",
+  "verdicts": [
+    {
+      "evidence": "every_dialect_scaffold_pushes_the_interpret_marker red on Python/TypeScript/Java before (ip2-test-red.log), green after; full forge-cli fmt+clippy+test ladder green (ip2-cli-ladder.log)",
+      "item": "forge-cli test scaffolds all four dialects, asserts .forge-interpret, fails on the three non-Rust dialects before the fix",
+      "verdict": "met"
+    },
+    {
+      "evidence": "forge-control-plane--step-ip2 666b23a, cargo check green (ip2-cargo-check.log)",
+      "item": "forge-control-plane interp.rs module doc no longer claims the server-build gate",
+      "verdict": "met"
+    },
+    {
+      "evidence": "blocked outside this step: the interpreted converge now starts and updates desired-state, but the runtime refuses the bundle (app_bundle validation failed) - CP omits app_manifest for an app-less tree, forge-runtime validate_app_bundle requires it (ip2-dev-stack-repro.log)",
+      "item": "dev-stack: forge new --dialect python + forge push converges and the op answers through the edge",
+      "verdict": "not-met"
+    }
+  ]
+}
