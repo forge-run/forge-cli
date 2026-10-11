@@ -486,11 +486,11 @@ pub(crate) fn write_dialect_tree(
     files.push(("README.md", &readme));
     files.push(("domains/{{domain}}/service.json", DIALECT_SERVICE));
     files.push((&op_path, op_body));
-    // The Rust dialect shares `.rs` with raw wasm Rust; the marker is the
-    // workspace's ruling that its `.rs` sources are dialect (`dialect.rs`).
-    if lang == Lang::Rust {
-        files.push((".forge-interpret", ""));
-    }
+    // The marker is the dialect tree's opt-in to the interpreted converge,
+    // for all four dialects: without it a push with no `forge.lock` never
+    // converges. For Rust it is also the ruling that the tree's `.rs`
+    // sources are dialect, not raw wasm Rust (`dialect.rs`).
+    files.push((".forge-interpret", ""));
     write_workspace_tree(target_dir, crate_name, domain, "", &files)?;
 
     subset_skill::write(target_dir, lang).with_context(|| {
@@ -1094,5 +1094,30 @@ mod tests {
             let pushed = git(&dir, &["ls-files"]);
             assert!(!pushed.contains(".forge/"), "the push carries the skill");
         }
+    }
+
+    /// invoice-path IP-2: every dialect tree carries `.forge-interpret` and
+    /// pushes it, so its first `git push` takes the interpreted converge
+    /// instead of stopping for want of a `forge.lock`.
+    #[test]
+    fn every_dialect_scaffold_pushes_the_interpret_marker() {
+        let mut missing = Vec::new();
+        for lang in [Lang::Python, Lang::TypeScript, Lang::Java, Lang::Rust] {
+            let tmp = tempfile::tempdir().unwrap();
+            let dir = tmp.path().join("acme");
+            write_dialect_tree(&dir, "acme", "acme", lang).unwrap();
+
+            if !dir.join(".forge-interpret").is_file() {
+                missing.push(format!("{lang:?}: no .forge-interpret scaffolded"));
+                continue;
+            }
+            git(&dir, &["init", "-q", "-b", "main"]);
+            git(&dir, &["add", "-A"]);
+            let pushed = git(&dir, &["ls-files"]);
+            if !pushed.lines().any(|l| l == ".forge-interpret") {
+                missing.push(format!("{lang:?}: .forge-interpret is not pushed"));
+            }
+        }
+        assert!(missing.is_empty(), "{}", missing.join("\n"));
     }
 }
