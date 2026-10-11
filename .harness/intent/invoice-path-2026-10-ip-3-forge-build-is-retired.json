@@ -13,9 +13,38 @@
       "id": "intent-recorded",
       "revision": 1,
       "source": "verb"
+    },
+    {
+      "at": "2026-10-11T12:14:18.519372+00:00",
+      "boundary": "scaffold",
+      "id": "gap-review"
     }
   ],
-  "gap_reviews": [],
+  "gap_reviews": [
+    {
+      "boundary": "scaffold",
+      "gaps": [
+        {
+          "description": "forge dev shelled out to the removed 'build' alias (dev.rs:226); it now calls wasm-build, so dropping the alias does not break forge dev",
+          "resolution": "fixed"
+        },
+        {
+          "description": "forge new --template workspace without --dialect still scaffolded the raw wasm workspace; it now refuses and the wasm tree is the unlisted 'wasm-workspace'",
+          "resolution": "fixed"
+        },
+        {
+          "description": "the CP refusal reword grew src/git/reconcile/push.rs past its code-structure baseline (1112 > 1109); message reflowed to three lines, file back at 1109",
+          "resolution": "fixed"
+        },
+        {
+          "description": "a cold up-full.sh --release ship of the portal is refused by the harness commit fence: the build regenerates four forge-lang-generated crates in forge-portal-web (domains/billing/src/lib.rs, three jgen/mod.rs, last committed 2026-10-08) because forge-lang codegen moved since, so the ship-stamp is not lock-only",
+          "note": "the drift predates IP-3 and is in forge-portal-web, outside this plan's landing block; evidence is a base-CLI vs lane-CLI build of the same portal tree producing the same regeneration, plus a warm up-full.sh --release converging the portal with the lane CLI; it is named in the report for a forge-portal-web follow-up",
+          "resolution": "accepted"
+        }
+      ],
+      "intent_ref": ".harness/intent/invoice-path-2026-10-ip-3-forge-build-is-retired.json"
+    }
+  ],
   "out_of_scope": [
     "forge-portal-web docs that still teach forge build (named in the report)",
     "forge-platform-operations/dev/up-full.sh's printed manual-deploy hint (line 1275) still says forge build"
