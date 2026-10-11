@@ -31,8 +31,15 @@
     "An operator-run export that reads every row: it would be a system-tier read of customer data on a customer path, which BOUNDARIES forbids."
   ],
   "vision": {
-    "rows": ["Hosting and deploy", "Realtime"],
-    "claims": ["V-2", "V-8", "V-10"],
+    "rows": [
+      "Hosting and deploy",
+      "Realtime"
+    ],
+    "claims": [
+      "V-2",
+      "V-8",
+      "V-10"
+    ],
     "moves": "A second customer goes from a provisioned workspace to a served op in any of the four dialects with no toolchain and no operator action, can take their data out as files, and cannot have a protected table streamed to an anonymous caller.",
     "unit": "V-2 customer-side toolchains the CLI hands over: 1 today (`forge build` runs cargo for wasm32-wasip1), 0 after. V-8 customer data that exports: none today, every table the caller's identity can read after. V-10 failing specs in forge-portal-e2e CI: 4 today, 0 after, plus one spec proving customer two in all four dialects.",
     "if_none": "Rows move (Hosting and deploy, Realtime); the customer-facing claim behind every step is that an engagement can be sold on V-2 and V-8 without an operator in the loop.",
@@ -41,26 +48,45 @@
   "steps": [
     {
       "id": "IP-1-anonymous-realtime-is-refused",
-      "requires": [],
       "title": "An anonymous WebSocket or SSE subscribe to a table that does not admit anonymous reads is refused",
-      "status": "todo",
-      "scope": ["forge-runtime/"],
-      "lands": ["forge-runtime"],
-      "notes": "forge-portal-e2e CI 2026-10-11 (runs 38118823816, 38115650365): multi-protocol.spec.ts:140 (P2.2) finds an anonymous WebSocket subscribe accepted, and realtime-sse.spec.ts:72 finds an anonymous SSE subscribe on a non-anon table answering 200 text/event-stream. Both are reads of a protected table by nobody, and a customer's data must not go into a workspace while they stand. Storage runs under the caller's RLS (CLAUDE.md), so find where the realtime routes skip the auth/RLS context the HTTP data API applies, and refuse at subscribe time with the same status the data API gives an anonymous read of that table. A table that does admit anonymous reads stays subscribable anonymously.",
-      "acceptance": [
-        "A forge-runtime test subscribes anonymously over WebSocket and over SSE to a table with no anonymous read policy and is refused (WebSocket: closed or rejected before any frame; SSE: 401 with no event stream); both tests fail before the fix.",
-        "The same tests show an anonymous subscribe to a table whose policy admits anonymous reads still streams.",
-        "On the dev stack, forge-portal-e2e multi-protocol.spec.ts:140 and realtime-sse.spec.ts:72 pass, with the run's output in the step's evidence."
+      "status": "done",
+      "scope": [
+        "forge-runtime/",
+        "forge-portal-e2e/"
       ],
-      "evidence": []
+      "lands": [
+        "forge-runtime",
+        "forge-portal-e2e"
+      ],
+      "notes": "forge-portal-e2e CI 2026-10-11 (runs 38118823816, 38115650365): multi-protocol.spec.ts:140 (P2.2) finds an anonymous WebSocket subscribe accepted, and realtime-sse.spec.ts:72 finds an anonymous SSE subscribe on a non-anon table answering 200 text/event-stream. Both are reads of a protected table by nobody, and a customer's data must not go into a workspace while they stand. Storage runs under the caller's RLS (CLAUDE.md), so find where the realtime routes skip the auth/RLS context the HTTP data API applies, and refuse at subscribe time with the same status the data API gives an anonymous read of that table. A table that does admit anonymous reads stays subscribable anonymously. Re-read at intake 2026-10-11: no runtime hole. probe_items' select policy `title neq \"__never__\"` (added by forge-portal-e2e b906f9b, PS-1, 2026-09-19) is a literal predicate, which forge-storage crud_emitter.rs has_public_read_policy treats as publicly readable: get/list/query/subscribe are all AuthLevel::Anonymous, and an anonymous REST list of probe_items answers 200 too. The two specs' premise (probe_items is non-anon) went false with PS-1. probe_locked (no select policy) is the only private probe table. The fix is the specs' target table; forge-runtime gains the missing coverage (no test subscribed anonymously over the WS mux at all) pinning both halves of the contract.",
+      "acceptance": [
+        "forge-runtime tests subscribe anonymously over the WebSocket mux and over SSE to a table with no anonymous read policy and are refused (WebSocket: an error frame, never subscribed or event; SSE: 401 with a Bearer challenge, not text/event-stream).",
+        "The same tests show an anonymous subscribe to a table whose select policy is a literal predicate (anon-readable) still streams, over both transports.",
+        "forge-portal-e2e multi-protocol.spec.ts P2.2 and realtime-sse.spec.ts 'anon subscribe on a non-anon table is refused' target a table that is in fact private, fail on the dev stack before that change and pass after, with the run's output in the step's evidence."
+      ],
+      "evidence": [
+        "forge-runtime f8fa258f (lane step-ip1): tests/realtime_anon_subscribe.rs pins both halves over both transports on notes_locked (no select policy) and notes_public (literal-predicate select). Before the WS mux fix (ip1-before, 2026-10-11 21:46): 'test result: FAILED. 3 passed; 2 failed' — anon_ws_subscribe_to_a_public_table_streams ('the anonymous subscriber receives the written row') and ws_resume_of_a_subscription_this_socket_did_not_open_is_refused.",
+        "After (ip1-after2, 21:49, fmt + clippy -D warnings + tests): realtime_anon_subscribe 'ok. 5 passed; 0 failed' (anon_ws_subscribe_to_a_private_table_is_refused: error frame UNAUTHENTICATED; anon_sse_subscribe_to_a_private_table_is_401_with_no_stream: 401 + RFC 6750 Bearer challenge, not text/event-stream; anon_ws/sse_subscribe_to_a_public_table_streams; ws_resume_of_a_subscription_this_socket_did_not_open_is_refused: NOT_FOUND); sse_adapter_auth 'ok. 8 passed'; websocket_adapter 'ok. 15 passed'; websocket_adapter_auth 'ok. 7 passed'.",
+        "The runtime defect found on the way: the WS mux poll/resume/close dispatched _platform::subscriptions as the subscriber, so an anon subscriber to an anon-readable table got 'subscribed' then POLL_FAILED (no platform:read). They now drain as SSE's drain_identity(); subscribe and command keep the caller's identity, and resume is confined to ids this socket opened (NOT_FOUND otherwise, no dispatch).",
+        "forge-portal-e2e edde8ae (lane step-ip1): P2.2 and the SSE anon-refusal spec target probe_locked (probe_items is anon-readable since PS-1 b906f9b). Dev stack (up-full.sh), run ip1-e2e-ba2 2026-10-11 21:58. BEFORE (main 3917e43): '✘ multi-protocol.spec.ts:140:3 … P2.2 an unauthenticated subscribe is refused' — 'Expected: \"error\" Received: \"subscribed\"'; '✘ realtime-sse.spec.ts:72:3 … anon subscribe on a non-anon table is refused' — 'anon subscribe must be refused, not an open stream (status 200, ct text/event-stream)'; '2 failed'. AFTER (lane): '✓ multi-protocol.spec.ts:140:3 … P2.2' , '✓ realtime-sse.spec.ts:76:3 … anon subscribe on a non-anon table is refused', '2 passed (1.0m)'. npm run typecheck clean.",
+        "implementer report: .harness/report.json (3 verdicts met; gate bundle pre-done-d0b17a85 on forge-runtime f8fa258f)",
+        "Landed by hand 2026-10-12 (operator): forge-runtime main e9ed576f..08d3c3ac (origin/main + lane step-ip1 at ab17752a, excluding wip cd807e9e which carried unrelated ingest.rs work the reopened driver wrote after the step was done); landing tree clippy --workspace --all-targets --features adapters -D warnings clean, realtime_anon_subscribe 5, sse_adapter_auth 8, websocket_adapter 15, websocket_adapter_auth 7 passed. forge-portal-e2e main 3917e43..edde8ae, typecheck clean."
+      ],
+      "requires": []
     },
     {
       "id": "IP-2-every-dialect-serves-on-push",
       "requires": [],
       "title": "A workspace scaffolded in any of the four dialects is served on its first push",
       "status": "todo",
-      "scope": ["forge-control-plane/", "forge-cli/"],
-      "lands": ["forge-control-plane", "forge-cli"],
+      "scope": [
+        "forge-control-plane/",
+        "forge-cli/"
+      ],
+      "lands": [
+        "forge-control-plane",
+        "forge-cli"
+      ],
       "notes": "The interpreted converge only fires for trees with `.forge-interpret` at the root (forge-control-plane src/git/reconcile/interp.rs:51, 55-64; push.rs:137). `forge new --dialect` writes the marker only for Rust (forge-cli src/cmd/new.rs:491-493), while templates/workspace-dialect/README.md:31 tells every user `git push forge main` will serve; an unmarked Python, TypeScript or Java tree with no forge.lock stops at push.rs:847 ('no committed forge.lock; desired-state not updated'). Smallest fix: write the marker for every dialect in scaffold_dialect_workspace. Also remove interp.rs:14-18's stale claim that the route still runs behind the server-build gate (it is open to every workspace since 6d666cd, PS-2).",
       "acceptance": [
         "A forge-cli test runs the dialect scaffold for Python, TypeScript, Java and Rust and asserts each tree carries `.forge-interpret`; it fails before the fix for the three non-Rust dialects.",
@@ -71,11 +97,19 @@
     },
     {
       "id": "IP-3-forge-build-is-retired",
-      "requires": ["IP-2"],
+      "requires": [
+        "IP-2"
+      ],
       "title": "The customer CLI hands over no toolchain: `forge build` is gone and the wasm verbs are hidden",
       "status": "todo",
-      "scope": ["forge-cli/", "forge-control-plane/"],
-      "lands": ["forge-control-plane", "forge-cli"],
+      "scope": [
+        "forge-cli/",
+        "forge-control-plane/"
+      ],
+      "lands": [
+        "forge-control-plane",
+        "forge-cli"
+      ],
       "notes": "forge-cli src/main.rs:124-128 declares `wasm-build` with `alias = \"build\"`; it shells out to cargo for wasm32-wasip1 (cmd/build.rs:80). D-106 (forge-sdlc-harness DECISIONS.md:4926, follow-up at :4975-4978) names this as not done. The customer loop under D-106 is `forge new --dialect`, `forge check`, `forge test`, `forge push`. Drop the alias; mark WasmBuild, WasmUpload and Ship `hide = true` as Deploy and Static already are; they stay callable because forge dev (cmd/dev.rs:226) and dev/up-full.sh's portal ship use them. Hide or retire the four wasm `forge new` templates (WORKSPACE_TEMPLATES in cmd/new.rs). Reword forge-control-plane src/git/reconcile/push.rs:265-270, which tells a pusher to 'Run `forge build`'. Rewrite forge-cli README.md:39-79 around check/test/push. List every forge-portal-web page that still teaches `forge build` in the report; that repo is out of this plan's landing block.",
       "acceptance": [
         "A forge-cli test runs `forge build` and gets an unknown-subcommand error, and asserts `forge --help` lists neither wasm-build, wasm-upload, ship nor build; it fails before the change.",
@@ -91,8 +125,12 @@
       "requires": [],
       "title": "`forge export` writes every table the caller can read as JSONL with a manifest, under the caller's own identity",
       "status": "todo",
-      "scope": ["forge-cli/"],
-      "lands": ["forge-cli"],
+      "scope": [
+        "forge-cli/"
+      ],
+      "lands": [
+        "forge-cli"
+      ],
       "notes": "V-8 has no data export today; `forge pull` fetches only the config tree (forge-cli src/cmd/pull.rs:16-30). Rory, 2026-10-11: the export promises what the caller's identity can read. It rides existing routes, no server or wire change: table list from GET /api/v1/platform/openapi; rows from GET /api/v1/data/{table}?limit=1000&offset=n (forge-storage crates/forge-registry/src/crud_emitter.rs:356-360, limit cap :245); take `as_of` from the first page and pin every later page to it with scope.as_of (forge-storage src/api/dispatch/crud_dispatch.rs:132-168, 244-300) so the export is one consistent cut; an RLS deny-all arrives as the x-forge-rls header (forge-adapters src/http/handler/dispatch.rs:719). Use the CLI's existing bearer (src/client.rs:8-26); never an fr_a_ or fr_p_ token. Tables with api.access hidden, `_` platform tables and blobs have no route: the manifest names them as not exported rather than implying completeness. GET /api/v1/audit/me/export (forge-runtime crates/forge-adapters/src/http/auth_routes/audit/export.rs) is the precedent for exported_at and shape.",
       "acceptance": [
         "`forge export --out <dir>` writes <table>.jsonl for every routed table and a manifest.json carrying as_of, per-table row counts, the config tree's git sha, and per-table notes for RLS-denied, hidden and unrouted tables.",
@@ -107,8 +145,14 @@
       "requires": [],
       "title": "deploy-serve's wasm op supplies its render data again",
       "status": "todo",
-      "scope": ["forge-runtime/", "forge-portal-e2e/"],
-      "lands": ["forge-runtime", "forge-portal-e2e"],
+      "scope": [
+        "forge-runtime/",
+        "forge-portal-e2e/"
+      ],
+      "lands": [
+        "forge-runtime",
+        "forge-portal-e2e"
+      ],
       "notes": "forge-portal-e2e deploy-serve.spec.ts:71 ('the wasm op supplied the render data') fails in CI on 2026-10-11 (runs 38118823816, 38115650365). Cause unknown at filing. Find it before fixing: a runtime regression is fixed in forge-runtime with a test there; a spec asserting retired behaviour (D-106 retired compiled serving and raw wasm push) is changed in the spec with the reason written in the commit. If the defect lives in a repo outside the landing block, stop and report rather than widen scope.",
       "acceptance": [
         "The cause is named in the report with the commit or change that introduced it.",
@@ -122,8 +166,14 @@
       "requires": [],
       "title": "The References page shows a converged index",
       "status": "todo",
-      "scope": ["forge-runtime/", "forge-portal-e2e/"],
-      "lands": ["forge-runtime", "forge-portal-e2e"],
+      "scope": [
+        "forge-runtime/",
+        "forge-portal-e2e/"
+      ],
+      "lands": [
+        "forge-runtime",
+        "forge-portal-e2e"
+      ],
       "notes": "forge-portal-e2e field-references.spec.ts:100 fails in CI on 2026-10-11: the References page never shows a converged index. New with FR-1. Same discipline as IP-5: name the cause first, fix it where it lives with a test there, and stop and report if it lives outside the landing block (forge-portal-web is not in it).",
       "acceptance": [
         "The cause is named in the report with the commit that introduced it.",
@@ -136,9 +186,19 @@
       "id": "IP-7-customer-two-on-the-dev-stack",
       "title": "One spec proves customer two end to end on the dev stack in all four dialects",
       "status": "todo",
-      "requires": ["IP-2", "IP-3", "IP-4"],
-      "scope": ["forge-platform-operations/", "forge-portal-e2e/"],
-      "lands": ["forge-platform-operations", "forge-portal-e2e"],
+      "requires": [
+        "IP-2",
+        "IP-3",
+        "IP-4"
+      ],
+      "scope": [
+        "forge-platform-operations/",
+        "forge-portal-e2e/"
+      ],
+      "lands": [
+        "forge-platform-operations",
+        "forge-portal-e2e"
+      ],
       "notes": "The invoice path's V-10 proof. Against dev/up-full.sh: provision a fresh workspace through the control plane (forge-cp provision; the id is control-plane minted, never supplied), then for each of Python, TypeScript, Java and Rust: `forge new --dialect`, `forge push`, wait for converge, call the op through the edge, write a row, and `forge export` it back. Between provisioning and a served op there is no operator action: no allowlist edit, no env change, no restart. Any dev-stack glue the spec needs (a provisioning helper, a fixture) lands in forge-platform-operations. The spec joins the suite e2e.yml already runs.",
       "acceptance": [
         "A forge-portal-e2e spec provisions a fresh workspace and, for each of the four dialects, scaffolds, pushes, gets a served op answer through the edge, writes a row and finds it in `forge export`'s output.",
