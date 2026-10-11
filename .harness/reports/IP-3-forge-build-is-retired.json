@@ -1,0 +1,41 @@
+{
+  "author": "rory",
+  "bundle_ids": [
+    "pre-done-394a4a26"
+  ],
+  "commits": [
+    "27853be"
+  ],
+  "lane": "/Users/rory/Documents/forge-run/forge-cli--step-ip3",
+  "repair_attempts": 0,
+  "schema": "forge-report/v1",
+  "step": "IP-3-forge-build-is-retired",
+  "ts": "2026-10-11T12:19:07.625321+00:00",
+  "verdicts": [
+    {
+      "evidence": "tests/no_customer_build.rs; on pre-change main 3bcab8e (lane ip3-base, ip3-ladder rung 1, forge-cli--step-ip3/.harness/evidence/ip3/base-red.log) 'test result: FAILED. 1 passed; 2 failed' (forge_build_is_an_unknown_subcommand, help_lists_no_build_verb); on the lane all 3 pass (ip3-ladder rung 2); the release binary answers 'error: unrecognized subcommand build' (forge-cli--step-ip3/.harness/evidence/ip3/forge-build.out)",
+      "item": "A forge-cli test runs forge build and gets an unknown-subcommand error, and asserts forge --help lists neither wasm-build, wasm-upload, ship nor build; it fails before the change.",
+      "verdict": "met"
+    },
+    {
+      "evidence": "new.rs CUSTOMER_TEMPLATES lists only the dialect 'workspace'; the_listing_offers_a_customer_no_wasm_template asserts the listed names == [workspace] and that no TEMPLATES/WORKSPACE_TEMPLATES entry is listed; the_workspace_template_needs_a_dialect_and_wasm_templates_stay_by_name; forge new --list output in forge-cli--step-ip3/.harness/evidence/ip3/forge-new-list.out; forge-cli tests 170 passed 1 ignored + 3 + 1 (ip3-ladder rung 2, forge-cli--step-ip3/.harness/evidence/ip3/cli-tests.log)",
+      "item": "forge new offers no wasm template to a customer; a test asserts the listed templates.",
+      "verdict": "met"
+    },
+    {
+      "evidence": "push.rs predict_derive_block: 'A workspace pushes its dialect source: commit an empty .forge-interpret at the root (forge new --dialect <lang> scaffolds one)'; predict_derive_block_flags_workspace_without_lock asserts those phrases and that neither 'forge build' nor 'forge ship' appears; ip3-ladder rung 3: fmt, clippy --tests -D warnings, test ok (forge-cli--step-ip3/.harness/evidence/ip3/cp-tests.log)",
+      "item": "forge-control-plane's refusal for an unmarked tree with no forge.lock names pushing dialect source, not forge build, and a test asserts the message.",
+      "verdict": "met"
+    },
+    {
+      "evidence": "README section 'The loop: new, check, test, push' replaces 'Deploy is GitOps'; the wasm-build, wasm-upload, ship and dev rows are gone from the command table; the forge new row is --dialect; a closing note says the hidden verbs serve the platform's own wasm trees",
+      "item": "forge-cli README.md describes the new/check/test/push loop and mentions no customer build.",
+      "verdict": "met"
+    },
+    {
+      "evidence": "warm up-full.sh --release with FORGE_DEV_CLI_BIN=lane CLI: 'portal converged + serving (desired==live, git_sha=4a60645b4512, authed /u/ -> 200)' (forge-cli--step-ip3/.harness/evidence/ip3/up-full-warm.log, ip3-portal rung 6). On a cold bring-up the hidden ship ran build, upload and lock stamp with the lane CLI (forge-cli--step-ip3/.harness/evidence/ip3/up-full.log) and was refused only by the harness commit fence, because the build regenerates forge-lang-generated crates in forge-portal-web; the pre-IP-3 CLI regenerates byte-identically (ip3-portal rung 5, 500-line diff, forge-cli--step-ip3/.harness/evidence/ip3/portal-diff-base.patch vs portal-diff-lane.patch), so the drift predates this step. forge dev calls wasm-build by name (dev.rs:226), and the_hidden_wasm_verbs_stay_callable covers wasm-build, wasm-upload and ship. OWED (outside the landing block): forge-portal-web commits its regenerated jgen and billing crates so a cold ship's lock-only stamp is admitted; forge-portal-web docs still teaching forge build: content/docs/cli.json:73,78, content/docs/deploying.json:25, content/internal/declarative-config-kinds.json:76,240, their copies in domains/content/seeds/cms_documents.json, and GITOPS_GUIDE.md; forge-platform-operations dev/up-full.sh:1275 prints forge build in its manual-deploy hint",
+      "item": "dev/up-full.sh --release still deploys the portal (forge dev and the hidden ship path still work), shown in the step's evidence.",
+      "verdict": "met-with-owed"
+    }
+  ]
+}

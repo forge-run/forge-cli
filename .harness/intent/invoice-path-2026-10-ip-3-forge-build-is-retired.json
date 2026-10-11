@@ -18,6 +18,11 @@
       "at": "2026-10-11T12:14:18.519372+00:00",
       "boundary": "scaffold",
       "id": "gap-review"
+    },
+    {
+      "at": "2026-10-11T12:19:12.983187+00:00",
+      "boundary": "build",
+      "id": "gap-review"
     }
   ],
   "gap_reviews": [
@@ -39,6 +44,26 @@
         {
           "description": "a cold up-full.sh --release ship of the portal is refused by the harness commit fence: the build regenerates four forge-lang-generated crates in forge-portal-web (domains/billing/src/lib.rs, three jgen/mod.rs, last committed 2026-10-08) because forge-lang codegen moved since, so the ship-stamp is not lock-only",
           "note": "the drift predates IP-3 and is in forge-portal-web, outside this plan's landing block; evidence is a base-CLI vs lane-CLI build of the same portal tree producing the same regeneration, plus a warm up-full.sh --release converging the portal with the lane CLI; it is named in the report for a forge-portal-web follow-up",
+          "resolution": "accepted"
+        }
+      ],
+      "intent_ref": ".harness/intent/invoice-path-2026-10-ip-3-forge-build-is-retired.json"
+    },
+    {
+      "boundary": "build",
+      "gaps": [
+        {
+          "description": "the scaffold-time review was diffed again against the IP-3 intent statement after the ladder: README, --help, forge new --list and the CP refusal all match it, and the base lane used for the red proof is retired",
+          "resolution": "fixed"
+        },
+        {
+          "description": "the cold ship of the portal stops at the harness commit fence over forge-lang-generated drift in forge-portal-web, so the hidden ship path is shown working only through build, upload and stamp, and the deploy itself through the warm re-push",
+          "note": "the pre-IP-3 CLI regenerates the same 500-line diff (ip3-portal rung 5), so this step neither caused nor can fix it; forge-portal-web is outside the landing block and the regeneration commit is named as owed in the report",
+          "resolution": "accepted"
+        },
+        {
+          "description": "forge-portal-web docs and up-full.sh's printed manual-deploy hint still teach forge build",
+          "note": "the plan's out_of_scope names the portal docs as a follow-up and forge-platform-operations is outside this step's scope; every page and line is listed in the report",
           "resolution": "accepted"
         }
       ],
