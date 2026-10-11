@@ -4,9 +4,12 @@
     "pre-done-394a4a26"
   ],
   "commits": [
-    "27853be"
+    "27853be",
+    "572e761"
   ],
   "lane": "/Users/rory/Documents/forge-run/forge-cli--step-ip3",
+  "refresh_note": "re-stamped by the driver at verify (2026-10-11T12:20:15.299359+00:00): the report at 2026-10-11T12:19:07.625321+00:00 predated commit 572e761; verdicts are as the implementer wrote them and may understate the tree",
+  "refreshed_at": "2026-10-11T12:20:15.299359+00:00",
   "repair_attempts": 0,
   "schema": "forge-report/v1",
   "step": "IP-3-forge-build-is-retired",

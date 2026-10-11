@@ -23,6 +23,11 @@
       "at": "2026-10-11T12:19:12.983187+00:00",
       "boundary": "build",
       "id": "gap-review"
+    },
+    {
+      "at": "2026-10-11T12:20:31.374234+00:00",
+      "boundary": "verify",
+      "id": "gap-review"
     }
   ],
   "gap_reviews": [
@@ -64,6 +69,26 @@
         {
           "description": "forge-portal-web docs and up-full.sh's printed manual-deploy hint still teach forge build",
           "note": "the plan's out_of_scope names the portal docs as a follow-up and forge-platform-operations is outside this step's scope; every page and line is listed in the report",
+          "resolution": "accepted"
+        }
+      ],
+      "intent_ref": ".harness/intent/invoice-path-2026-10-ip-3-forge-build-is-retired.json"
+    },
+    {
+      "boundary": "verify",
+      "gaps": [
+        {
+          "description": "re-diffed origin/main..HEAD (README.md, src/main.rs, src/cmd/dev.rs, src/cmd/new.rs, tests/no_customer_build.rs; forge-control-plane push.rs and tests.rs) against the IP-3 intent statement: build alias dropped, three verbs hidden but callable, forge dev calls wasm-build by name, --list offers only the dialect workspace, the refusal names .forge-interpret and dialect source, the README teaches new/check/test/push; ip3-warm re-ran the forge build refusal and the warm portal deploy on this exact tree",
+          "resolution": "fixed"
+        },
+        {
+          "description": "the cold-path portal ship stops at the harness commit fence because forge-lang codegen drifted from forge-portal-web's committed generated crates; the deploy is shown through the warm re-push (ip3-warm, on the final lane tree: portal converged + serving at 4a60645b4512, checkout left clean)",
+          "note": "the pre-IP-3 CLI produces the identical regeneration (ip3-portal rung 5), the repo is outside the landing block, and the regeneration commit is owed by name in report.json",
+          "resolution": "accepted"
+        },
+        {
+          "description": "forge init, which also scaffolds a workspace, was not reviewed for toolchain hand-off",
+          "note": "the intent and acceptance name forge build, the --help verbs, forge new's templates, the CP refusal and the README; forge init is not among them and widening the step would inherit IP-4's scheduling",
           "resolution": "accepted"
         }
       ],
