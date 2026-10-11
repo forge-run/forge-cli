@@ -1,0 +1,31 @@
+{
+  "acceptance": [
+    "forge export --out <dir> writes <table>.jsonl for every routed table and a manifest.json carrying as_of, per-table row counts, the config tree's git sha, and per-table notes for RLS-denied, hidden and unrouted tables.",
+    "A forge-cli test against a stub server asserts one as_of is pinned across every page of a multi-page table, that rows are written exactly once, and that no platform or admin bearer is sent.",
+    "On the dev stack, exporting a seeded workspace yields rows equal to what GET /api/v1/data/{table} returns for the same identity, shown in the step's evidence.",
+    "forge-cli README.md documents forge export and states plainly that it exports what the caller's identity can read."
+  ],
+  "author": "rory",
+  "events": [
+    {
+      "at": "2026-10-11T12:24:45.967730+00:00",
+      "id": "intent-recorded",
+      "revision": 1,
+      "source": "verb"
+    }
+  ],
+  "gap_reviews": [],
+  "out_of_scope": [
+    "server or wire changes; blob export; platform _ tables"
+  ],
+  "refs": [
+    "invoice-path-2026-10/IP-4-forge-export"
+  ],
+  "revision": 1,
+  "schema": "forge-intent/v1",
+  "slug": "invoice-path-2026-10-ip-4-forge-export",
+  "source": "verb",
+  "statement": "forge export --out <dir> writes every table the caller's own identity can read as <table>.jsonl plus a manifest.json (as_of, per-table row counts, config tree git sha, notes for RLS-denied, hidden and unrouted tables), riding existing routes with the CLI's own bearer and one as_of pinned across every page",
+  "ts": "2026-10-11T12:24:45.967730+00:00",
+  "updated_at": "2026-10-11T12:24:45.967730+00:00"
+}

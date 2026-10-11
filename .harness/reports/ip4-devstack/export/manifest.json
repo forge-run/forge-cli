@@ -1,0 +1,29 @@
+{
+  "format": "forge-export/1",
+  "exported_at": "2026-10-11T15:26:48Z",
+  "workspace_url": "https://ws-6f1f5f50fa9ebcda.forge.run:8081",
+  "scope": "the rows the caller's identity can read, under its own RLS; not a workspace backup",
+  "as_of": 507,
+  "config_tree": {
+    "path": "/Users/rory/Documents/forge-run/forge-cli--step-ip4/.harness/reports/ip4-devstack/config-tree",
+    "git_sha": "38ac89c67f0b092e8062cd616106a3de7dc54a9d",
+    "dirty": false
+  },
+  "tables_from": "config tree: the OpenAPI document refused this identity ({\"details\":{\"granted\":[\"ip4_notes:read\",\"ip4_private:read\"],\"missing\":[\"platform:read\"],\"required\":[\"platform:read\"]},\"error\":\"PERMISSION_DENIED\",\"message\":\"missing permission 'platform:read'\",\"path\":\"\",\"request_id\":\"01a12b92-e271-7c91-88a6-5331291ec99e\"}), so the list is the tables /Users/rory/Documents/forge-run/forge-cli--step-ip4/.harness/reports/ip4-devstack/config-tree declares; runtime-owned tables are not covered",
+  "tables": [
+    {
+      "name": "ip4_notes",
+      "exported": true,
+      "file": "ip4_notes.jsonl",
+      "rows": 130
+    },
+    {
+      "name": "ip4_private",
+      "exported": true,
+      "file": "ip4_private.jsonl",
+      "rows": 0,
+      "note": "rls-denied (rls_default_deny): this identity can read no rows of this table"
+    }
+  ],
+  "blobs": "not exported: blobs have no data route"
+}

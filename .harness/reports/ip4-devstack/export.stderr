@@ -1,0 +1,4 @@
+forge: WARNING — FORGE_INSECURE_TLS=1, certificate verification disabled
+export: ✅ 2 table(s), 130 row(s) as of sequence 507 → /Users/rory/Documents/forge-run/forge-cli--step-ip4/.harness/reports/ip4-devstack/export
+  ip4_private: rls-denied (rls_default_deny): this identity can read no rows of this table
+export: the rows are what this identity can read — not a workspace backup
