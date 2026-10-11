@@ -1,0 +1,11 @@
+[build] forge-runtime: at main 9da61b0d
+[build] forge-runtime: cargo build --release --bin forge-runtime --locked --features adapters
+[scratch] /Users/rory/.cache/forge-harness-runs (disk)
+   Compiling forge-blob-store v0.1.0 (/Users/rory/Documents/forge-run/forge-runtime--devbuild/crates/forge-blob-store)
+   Compiling forge-lang-tree v0.1.0 (/Users/rory/Documents/forge-run/forge-lang/crates/forge-lang-tree)
+   Compiling forge-lang-rt v0.1.0 (/Users/rory/Documents/forge-run/forge-lang/crates/forge-lang-rt)
+   Compiling forge-runtime v0.33.196 (/Users/rory/Documents/forge-run/forge-runtime--devbuild)
+   Compiling forge-runtime-auth v0.1.0 (/Users/rory/Documents/forge-run/forge-runtime--devbuild/crates/forge-runtime-auth)
+   Compiling forge-quota v0.1.0 (/Users/rory/Documents/forge-run/forge-runtime--devbuild/crates/forge-quota)
+   Compiling forge-runtime-host v0.1.0 (/Users/rory/Documents/forge-run/forge-runtime--devbuild/crates/forge-runtime-host)
+   Compiling forge-lang-interp v0.1.0 (/Users/rory/Documents/forge-run/forge-lang/crates/forge-lang-interp)
