@@ -32,6 +32,11 @@
       "at": "2026-10-11T08:43:10.759906+00:00",
       "boundary": "plan",
       "id": "gap-review"
+    },
+    {
+      "at": "2026-10-11T09:01:13.675462+00:00",
+      "boundary": "scaffold",
+      "id": "gap-review"
     }
   ],
   "gap_reviews": [
@@ -71,6 +76,17 @@
         {
           "description": "Diffed the plan (retarget the e2e specs to probe_locked; add tests/realtime_anon_subscribe.rs) against intent revision 2. Its second criterion, an anonymous subscribe to a literal-policy table streams over BOTH transports, is not met by the tree: ip1-rt-tests ran 3 pass and 1 fail. anon_ws_subscribe_to_a_public_table_streams gets subscribed and then no event, because the WS mux poll task (crates/forge-adapters/src/websocket/mux/poll.rs:28-37) dispatches _platform::subscriptions::poll as the subscriber (anonymous, no platform:read), where SSE drains with drain_identity (sse.rs:496-505). The plan now carries a forge-runtime fix: the mux by-id poll, resume and close use the same drain identity, confined to subscription ids this socket opened, and that test fails before the fix",
           "resolution": "fixed"
+        }
+      ],
+      "intent_ref": ".harness/intent/invoice-path-2026-10-ip-1-anonymous-realtime-is-refused.json"
+    },
+    {
+      "boundary": "scaffold",
+      "gaps": [
+        {
+          "description": "none found",
+          "note": "Diffed the scaffolded tree (forge-runtime f8fa258f: tests/realtime_anon_subscribe.rs, 5 tests on notes_locked/notes_public over WS mux and SSE, plus the mux drain-identity fix and resume confinement; forge-portal-e2e edde8ae: P2.2 and the SSE anon-refusal spec retargeted to probe_locked, pinning UNAUTHENTICATED and 401) against intent revision 1 and its three acceptance criteria. Private-table refusal over both transports (WS error frame UNAUTHENTICATED never subscribed; SSE 401 + Bearer challenge, not text/event-stream): covered and green. Anon-readable literal-predicate table streams over both transports: covered and green (WS half needed the drain-identity fix the plan-boundary review already recorded as fixed). e2e specs target a private table, red before on the dev stack (subscribed; 200 text/event-stream) and green after, output verbatim in the step evidence. Subscribe and command keep the caller identity; no gap found.",
+          "resolution": "accepted"
         }
       ],
       "intent_ref": ".harness/intent/invoice-path-2026-10-ip-1-anonymous-realtime-is-refused.json"
