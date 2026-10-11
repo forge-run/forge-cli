@@ -33,6 +33,11 @@
       "at": "2026-10-11T12:20:53.864948+00:00",
       "boundary": "align",
       "id": "gap-review"
+    },
+    {
+      "at": "2026-10-11T12:21:20.369932+00:00",
+      "boundary": "review",
+      "id": "gap-review"
     }
   ],
   "gap_reviews": [
@@ -105,6 +110,17 @@
         {
           "description": "none found",
           "note": "aligned both lanes against origin/main after a fetch: forge-cli--step-ip3 and forge-control-plane--step-ip3 are 0 commits behind and merge-tree clean; the CP lane's one commit (6b47b1c) carries push.rs at its 1109-line baseline and the tests.rs assertion; diffed against the IP-3 intent statement (no forge build verb, wasm verbs hidden but callable, forge new --list offers only the dialect workspace, the CP refusal names pushing dialect source under .forge-interpret, README teaches new/check/test/push) with no new gap beyond the three accepted at verify",
+          "resolution": "accepted"
+        }
+      ],
+      "intent_ref": ".harness/intent/invoice-path-2026-10-ip-3-forge-build-is-retired.json"
+    },
+    {
+      "boundary": "review",
+      "gaps": [
+        {
+          "description": "none found",
+          "note": "pre-review exit 0 on forge-cli--step-ip3 (diff from 3bcab8e) and forge-control-plane--step-ip3 (diff from 3364862); read the final diff (README.md, src/main.rs, src/cmd/dev.rs, src/cmd/new.rs, tests/no_customer_build.rs; push.rs, reconcile/tests.rs) against the IP-3 intent statement and the five acceptance items in report.json: four met, the portal item met-with-owed on the three gaps already accepted at verify, nothing new",
           "resolution": "accepted"
         }
       ],
