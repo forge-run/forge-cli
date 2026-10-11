@@ -486,11 +486,11 @@ pub(crate) fn write_dialect_tree(
     files.push(("README.md", &readme));
     files.push(("domains/{{domain}}/service.json", DIALECT_SERVICE));
     files.push((&op_path, op_body));
-    // The Rust dialect shares `.rs` with raw wasm Rust; the marker is the
-    // workspace's ruling that its `.rs` sources are dialect (`dialect.rs`).
-    if lang == Lang::Rust {
-        files.push((".forge-interpret", ""));
-    }
+    // The marker opts the tree into the interpreted converge: without it a
+    // push carries no forge.lock and the control plane never serves it. For
+    // Rust it is also the ruling that `.rs` sources are dialect, not raw
+    // wasm Rust (`dialect.rs`).
+    files.push((".forge-interpret", ""));
     write_workspace_tree(target_dir, crate_name, domain, "", &files)?;
 
     subset_skill::write(target_dir, lang).with_context(|| {
@@ -1042,6 +1042,26 @@ mod tests {
             git(&dir, &["write-tree"]),
             tree,
             "regenerated types moved the tree"
+        );
+    }
+
+    /// invoice-path IP-2: every dialect's scaffold carries `.forge-interpret`,
+    /// the marker the control plane's interpreted converge keys on, so a
+    /// first push serves in any dialect rather than only in Rust.
+    #[test]
+    fn every_dialect_scaffold_carries_the_interpret_marker() {
+        let unmarked: Vec<Lang> = [Lang::Python, Lang::TypeScript, Lang::Java, Lang::Rust]
+            .into_iter()
+            .filter(|&lang| {
+                let tmp = tempfile::tempdir().unwrap();
+                let dir = tmp.path().join("acme");
+                write_dialect_tree(&dir, "acme", "acme", lang).unwrap();
+                !dir.join(".forge-interpret").is_file()
+            })
+            .collect();
+        assert!(
+            unmarked.is_empty(),
+            "no .forge-interpret, so the push never converges: {unmarked:?}"
         );
     }
 

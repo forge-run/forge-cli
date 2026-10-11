@@ -1,0 +1,54 @@
+{
+  "acceptance": [
+    "forge-cli test: the dialect scaffold for all four dialects writes .forge-interpret; red before the fix for Python, TypeScript and Java.",
+    "forge-runtime test: validate_app_bundle and ingest_app_bundle accept a bundle with no app_manifest (API-only) and still refuse an undecodable or invalid one; red before the fix.",
+    "interp.rs module doc no longer says the interpreted route runs behind the server-build gate.",
+    "Dev stack: forge new --dialect python, forge push, converges and the op answers through the edge; scripted repro (.harness/state/ip2/repro-python-push.sh) and its before/after output in evidence."
+  ],
+  "author": "rory",
+  "events": [
+    {
+      "at": "2026-10-11T10:52:40.605380+00:00",
+      "id": "intent-recorded",
+      "revision": 1,
+      "source": "verb"
+    },
+    {
+      "at": "2026-10-11T10:52:40.670354+00:00",
+      "boundary": "intake",
+      "id": "gap-review"
+    }
+  ],
+  "gap_reviews": [
+    {
+      "boundary": "intake",
+      "gaps": [
+        {
+          "description": "Diffed the roadmap's IP-2 statement ('smallest fix: write the marker') against a dev-stack run of the marker fix (.harness/state/ip2/after.log, ws-da937bbe844a704a): the marked Python tree takes the interpreted converge and then fails closed 'app_bundle validation failed' (runtime log 09:30:58, reconcile/cycle.rs). Cause: workspace_derive.rs:679-781 omits app_manifest for an app-less workspace since R-8 a818087, while forge-runtime ingest.rs:645-647 (validate_app_bundle) and :87-89 (ingest_app_bundle) require it; R-8 checked reconcile_declared_triggers but not the deploy validator. Every dialect scaffold is app-less, so the marker alone serves no dialect. Closed in the intent: statement and acceptance now cover the runtime admitting an app-less bundle, and the step's scope widens to forge-runtime.",
+          "resolution": "fixed"
+        },
+        {
+          "description": "CP-side alternative of synthesizing a default app_manifest",
+          "note": "R-8 a818087 deliberately omits the key so nothing deserializes a default app; the runtime is the consumer whose contract R-8 claimed and missed, so the fix goes there.",
+          "resolution": "accepted"
+        }
+      ],
+      "intent_ref": ".harness/intent/invoice-path-2026-10-ip-2-every-dialect-serves-on-push.json"
+    }
+  ],
+  "out_of_scope": [
+    "Already-scaffolded unmarked workspaces (no CP-side inference of the marker).",
+    "forge build / wasm-build retirement (IP-3).",
+    "Domain workflows/webhooks of an app-less workspace (the CP merges them into app_manifest only when an app exists, workspace_derive.rs:683); recorded, not fixed here."
+  ],
+  "refs": [
+    "invoice-path-2026-10/IP-2-every-dialect-serves-on-push"
+  ],
+  "revision": 1,
+  "schema": "forge-intent/v1",
+  "slug": "invoice-path-2026-10-ip-2-every-dialect-serves-on-push",
+  "source": "verb",
+  "statement": "A workspace made by forge new --dialect in any of Python, TypeScript, Java or Rust carries .forge-interpret at its root, so its first git push takes the interpreted converge (push.rs A0) instead of stopping for want of a forge.lock; and the runtime admits the app-less bundle that converge produces (no app_manifest, omitted by the CP since R-8 a818087) as an API-only deploy instead of failing closed with 'app_bundle validation failed', so the pushed op serves through the edge. interp.rs no longer claims the route sits behind the server-build gate it left at 6d666cd.",
+  "ts": "2026-10-11T10:52:40.605380+00:00",
+  "updated_at": "2026-10-11T10:52:40.605380+00:00"
+}

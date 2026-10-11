@@ -63,11 +63,12 @@
       "id": "IP-2-every-dialect-serves-on-push",
       "title": "A workspace scaffolded in any of the four dialects is served on its first push",
       "status": "todo",
-      "scope": ["forge-control-plane/", "forge-cli/"],
-      "lands": ["forge-control-plane", "forge-cli"],
-      "notes": "The interpreted converge only fires for trees with `.forge-interpret` at the root (forge-control-plane src/git/reconcile/interp.rs:51, 55-64; push.rs:137). `forge new --dialect` writes the marker only for Rust (forge-cli src/cmd/new.rs:491-493), while templates/workspace-dialect/README.md:31 tells every user `git push forge main` will serve; an unmarked Python, TypeScript or Java tree with no forge.lock stops at push.rs:847 ('no committed forge.lock; desired-state not updated'). Smallest fix: write the marker for every dialect in scaffold_dialect_workspace. Also remove interp.rs:14-18's stale claim that the route still runs behind the server-build gate (it is open to every workspace since 6d666cd, PS-2).",
+      "scope": ["forge-control-plane/", "forge-cli/", "forge-runtime/"],
+      "lands": ["forge-control-plane", "forge-cli", "forge-runtime"],
+      "notes": "The interpreted converge only fires for trees with `.forge-interpret` at the root (forge-control-plane src/git/reconcile/interp.rs:51, 55-64; push.rs:137). `forge new --dialect` writes the marker only for Rust (forge-cli src/cmd/new.rs:491-493), while templates/workspace-dialect/README.md:31 tells every user `git push forge main` will serve; an unmarked Python, TypeScript or Java tree with no forge.lock stops at push.rs:847 ('no committed forge.lock; desired-state not updated'). Smallest fix: write the marker for every dialect in scaffold_dialect_workspace. Also remove interp.rs:14-18's stale claim that the route still runs behind the server-build gate (it is open to every workspace since 6d666cd, PS-2). Intake 2026-10-11 (dev-stack run of the marker fix, ws-da937bbe844a704a): the marked tree converges interpreted, then the runtime fails it closed 'app_bundle validation failed' — the CP omits app_manifest for an app-less workspace since R-8 a818087 and forge-runtime validate_app_bundle/ingest_app_bundle (deploy/ingest.rs:645, :87) still require it. Every dialect scaffold is app-less, so scope widens to forge-runtime: an absent app_manifest is an API-only deploy.",
       "acceptance": [
         "A forge-cli test runs the dialect scaffold for Python, TypeScript, Java and Rust and asserts each tree carries `.forge-interpret`; it fails before the fix for the three non-Rust dialects.",
+        "forge-runtime: validate_app_bundle and ingest_app_bundle accept a bundle with no app_manifest (API-only) and still refuse an undecodable or invalid one; the test is red before the fix.",
         "interp.rs's module doc no longer says the interpreted route runs behind the server-build gate.",
         "On the dev stack, a Python workspace made by `forge new --dialect python` and pushed with `forge push` converges and its op answers through the edge; the scripted repro and its output are in the step's evidence."
       ],
