@@ -1,0 +1,28 @@
+{
+  "author": "rory",
+  "bundle_ids": [],
+  "bundle_note": "the change is one Playwright spec in forge-portal-e2e (314fbe0), a repo with no cargo gates; the lane's forge-cli bundles cover no file this step touched, and the gate that matters is the spec run on the dev stack (job ip5-deploy-serve-3, in flight)",
+  "commits": [],
+  "lane": "/Users/rory/Documents/forge-run/forge-cli--step-ip5",
+  "repair_attempts": 0,
+  "schema": "forge-report/v1",
+  "step": "IP-5-deploy-serve-render-data",
+  "ts": "2026-10-11T16:57:27.062470+00:00",
+  "verdicts": [
+    {
+      "evidence": "b906f9b (forge-portal-e2e, PS-1, 2026-09-19) made deploy-probe-app a python dialect tree; its hello op emits via='forge-lang python dialect' (hello.py:20) while deploy-serve.spec.ts:152 still expected the retired compiled fixture's 'via forge-sdk-v2 workspace template'; PS-6 f7f80ef fixed surface-validation.spec.ts only. CI run 38118823816's served HTML carries data-probe-via>via forge-lang python dialect, so the op did supply its data and the runtime has no defect",
+      "item": "The cause is named in the report with the commit or change that introduced it.",
+      "verdict": "met"
+    },
+    {
+      "evidence": "run ip5-deploy-serve-3 in flight against dev/up-full.sh; first run never reached a test (lane node_modules symlinked to an empty shared dir, ERR_MODULE_NOT_FOUND @playwright/test)",
+      "item": "deploy-serve.spec.ts passes on the dev stack, with the run's output in the step's evidence.",
+      "verdict": "not-met"
+    },
+    {
+      "evidence": "forge-portal-e2e 314fbe0 says it stopped asserting D-106 compiled serving output; no forge-runtime change, so no runtime test owed",
+      "item": "If the fix is in forge-runtime, a forge-runtime test that fails before it covers the defect; if the spec changed, its commit says which retired behaviour it stopped asserting.",
+      "verdict": "met"
+    }
+  ]
+}
