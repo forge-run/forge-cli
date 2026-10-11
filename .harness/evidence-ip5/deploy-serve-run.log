@@ -1,5 +1,16 @@
+forge-portal-e2e HEAD: 314fbe04aad3f7c2d97026be541a49379e294df1
+date: 2026-10-11T16:57:56Z
+dev stack: 303 from https://app.forge.run:8081/
 
 Running 1 test using 1 worker
 
-(node:55314) Warning: Setting the NODE_TLS_REJECT_UNAUTHORIZED environment variable to '0' makes TLS connections and HTTPS requests insecure by disabling certificate verification.
+(node:58203) Warning: Setting the NODE_TLS_REJECT_UNAUTHORIZED environment variable to '0' makes TLS connections and HTTPS requests insecure by disabling certificate verification.
 (Use `node --trace-warnings ...` to show where the warning was created)
+
+  ✓  1 [lifecycle] › tests/lifecycle/deploy-serve.spec.ts:71:3 › fresh workspace deploys + serves (wasm + SSR) › a fresh ws serves a deployed wasm op through an SSR page (23.0s)
+(node:58202) Warning: Setting the NODE_TLS_REJECT_UNAUTHORIZED environment variable to '0' makes TLS connections and HTTPS requests insecure by disabling certificate verification.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[sweep] users: 1/1 removed; workspaces: 1/1 removed
+
+  1 passed (23.2s)
+exit: 0
