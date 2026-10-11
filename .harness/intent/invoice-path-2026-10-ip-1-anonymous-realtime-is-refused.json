@@ -47,6 +47,11 @@
       "at": "2026-10-11T09:06:09.911088+00:00",
       "boundary": "verify",
       "id": "gap-review"
+    },
+    {
+      "at": "2026-10-11T09:07:29.447355+00:00",
+      "boundary": "align",
+      "id": "gap-review"
     }
   ],
   "gap_reviews": [
@@ -118,6 +123,17 @@
         {
           "description": "The post-commit verify of forge-runtime caa4699e went red on fleet-check only: STANDING.md rendered block platform/rust-line-count-main-repos was stale (1290721 -> 1290877 lines, forge-lang tests 2872 -> 2876), fleet drift unrelated to IP-1 code. Re-rendered with scripts/render-docs.sh and committed forge-platform-architecture 91f51ba (STANDING.md only, as 6fd32f6 did); fleet-check re-run: stale 0, findings 0, ok. Verified against intent revision 1: each acceptance criterion has a green run on the committed tree (realtime_anon_subscribe 5/5, sse_adapter_auth 8/8, websocket_adapter 15/15, websocket_adapter_auth 7/7, clippy -D warnings; e2e ip1-e2e-ba2 2 failed before / 2 passed after on the dev stack), and the report verdicts match that evidence.",
           "resolution": "fixed"
+        }
+      ],
+      "intent_ref": ".harness/intent/invoice-path-2026-10-ip-1-anonymous-realtime-is-refused.json"
+    },
+    {
+      "boundary": "align",
+      "gaps": [
+        {
+          "description": "none found",
+          "note": "Read the forge-runtime f8fa258f source diff (sse.rs drain_identity pub(crate); mux poll.rs, handlers.rs handle_unsubscribe/handle_resume, socket.rs teardown close now dispatch as drain_identity; handle_resume checks this socket subs map first and answers NOT_FOUND without dispatching) and forge-portal-e2e edde8ae against intent revision 1 statement: refuse anon subscribe on a non-anon table at subscribe time, keep anon-readable tables subscribable, retarget the specs to the private probe_locked. Aligned: open_subscription_in_storage and the command frame still run as the caller, so the subscribe-time auth gate (UNAUTHENTICATED / SSE 401 Bearer) is untouched; the system identity only drains ids this socket opened, mirroring SSE G1 where the caller RLS filter is captured at subscribe. Cross-socket resume is now NOT_FOUND; it was not a working path before (teardown closes the subscription in storage on socket exit, the reconnect path is subscribe with since, reconnect_with_since_skips_earlier_events still green) and no client in forge-portal-e2e, forge-ui or forge-web sends a resume frame. No gap.",
+          "resolution": "accepted"
         }
       ],
       "intent_ref": ".harness/intent/invoice-path-2026-10-ip-1-anonymous-realtime-is-refused.json"
