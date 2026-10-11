@@ -8,9 +8,12 @@
   "bundle_note": "pre-done-d0b17a85 is forge-runtime--step-ip1 gate bundle for commit f8fa258f (cargo-check focused forge-adapters+forge-runtime, cargo-fmt, emitted-committed, fact-pins all pass); checkpoint-d35014cc is this lane. forge-portal-e2e has no cargo gates; its check is npm run typecheck (clean) and the dev-stack run ip1-e2e-ba2.",
   "commits": [
     "f8fa258f",
-    "edde8ae"
+    "edde8ae",
+    "9d450b8"
   ],
   "lane": "/Users/rory/Documents/forge-run/forge-cli--step-ip1",
+  "refresh_note": "re-stamped by the driver at verify (2026-10-11T09:05:58.501915+00:00): the report at 2026-10-11T09:01:57.834198+00:00 predated commit 9d450b8; verdicts are as the implementer wrote them and may understate the tree",
+  "refreshed_at": "2026-10-11T09:05:58.501915+00:00",
   "repair_attempts": 0,
   "schema": "forge-report/v1",
   "step": "IP-1-anonymous-realtime-is-refused",

@@ -42,6 +42,11 @@
       "at": "2026-10-11T09:01:34.386499+00:00",
       "boundary": "build",
       "id": "gap-review"
+    },
+    {
+      "at": "2026-10-11T09:06:09.911088+00:00",
+      "boundary": "verify",
+      "id": "gap-review"
     }
   ],
   "gap_reviews": [
@@ -103,6 +108,16 @@
           "description": "none found",
           "note": "Diffed the built lanes (forge-runtime step-ip1 f8fa258f vs its base 10195fb0: sse.rs drain_identity made pub(crate), mux poll.rs/handlers.rs/socket.rs drain as it, resume map check, tests/realtime_anon_subscribe.rs; forge-portal-e2e step-ip1 edde8ae vs main 3917e43: two specs on probe_locked) against intent revision 1 statement and its acceptance. Every criterion has a passing test or run on the built tree (ip1-after2 green after the last source edit; ip1-e2e-ba2 red-before/green-after on the dev stack). Subscribe stays caller-identity so the auth gate is untouched; command frame identity unchanged; no source edits since the green runs. No gap.",
           "resolution": "accepted"
+        }
+      ],
+      "intent_ref": ".harness/intent/invoice-path-2026-10-ip-1-anonymous-realtime-is-refused.json"
+    },
+    {
+      "boundary": "verify",
+      "gaps": [
+        {
+          "description": "The post-commit verify of forge-runtime caa4699e went red on fleet-check only: STANDING.md rendered block platform/rust-line-count-main-repos was stale (1290721 -> 1290877 lines, forge-lang tests 2872 -> 2876), fleet drift unrelated to IP-1 code. Re-rendered with scripts/render-docs.sh and committed forge-platform-architecture 91f51ba (STANDING.md only, as 6fd32f6 did); fleet-check re-run: stale 0, findings 0, ok. Verified against intent revision 1: each acceptance criterion has a green run on the committed tree (realtime_anon_subscribe 5/5, sse_adapter_auth 8/8, websocket_adapter 15/15, websocket_adapter_auth 7/7, clippy -D warnings; e2e ip1-e2e-ba2 2 failed before / 2 passed after on the dev stack), and the report verdicts match that evidence.",
+          "resolution": "fixed"
         }
       ],
       "intent_ref": ".harness/intent/invoice-path-2026-10-ip-1-anonymous-realtime-is-refused.json"
