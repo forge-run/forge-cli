@@ -59,7 +59,7 @@
     },
     {
       "path": ".github/workflows/harness-gates.yml",
-      "sha256": "58456b843da5197b6a2f540fc34872bbfaf28d721d22178011587fd40ae1af4b"
+      "sha256": "039439d793d8d0347417917b1c3a0e4145e6fdf08d0a74cb46281c07f67a15b8"
     },
     {
       "path": ".gitignore#rules",
@@ -325,8 +325,8 @@
   "harness_dir": "harnesses/hybrid",
   "source": {
     "kind": "commit",
-    "ref": "40b814f",
-    "sha": "40b814f8afcd286e04e58a272c7a9743c0657dd7"
+    "ref": "47c110f",
+    "sha": "47c110f47325a0d6918da635bccede225d4d8964"
   },
   "targets": [
     "claude-code",
