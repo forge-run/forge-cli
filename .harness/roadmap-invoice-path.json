@@ -20,7 +20,8 @@
     ],
     "build": {
       "forge-platform-operations": "bash dev/up-full.test.sh && bash dev/build-bins-worktree.test.sh",
-      "forge-portal-e2e": "npm ci --silent && npm run typecheck"
+      "forge-portal-e2e": "npm ci --silent && npm run typecheck",
+      "forge-runtime": "cargo check --workspace --all-targets --locked --features adapters"
     }
   },
   "out_of_scope": [
@@ -78,7 +79,7 @@
       "id": "IP-2-every-dialect-serves-on-push",
       "requires": [],
       "title": "A workspace scaffolded in any of the four dialects is served on its first push",
-      "status": "todo",
+      "status": "done",
       "scope": [
         "forge-control-plane/",
         "forge-cli/",
@@ -95,7 +96,14 @@
         "interp.rs's module doc no longer says the interpreted route runs behind the server-build gate.",
         "On the dev stack, a Python workspace made by `forge new --dialect python` and pushed with `forge push` converges and its op answers through the edge; the scripted repro and its output are in the step's evidence."
       ],
-      "evidence": []
+      "evidence": [
+        "forge-cli 9599539 (lane step-ip2): write_dialect_tree writes .forge-interpret for every dialect, not only Rust. New test every_dialect_scaffold_pushes_the_interpret_marker scaffolds Python, TypeScript, Java and Rust and asserts the marker is a file and in git ls-files. Before (redtest, 2026-10-11): 'Python: no .forge-interpret scaffolded / TypeScript: ... / Java: ...', 'test result: FAILED. 0 passed; 1 failed'. After (ip2-cli-ladder2): fmt --check, clippy --tests -D warnings and the full forge-cli tests, exit 0 (169 passed, 1 ignored).",
+        "forge-control-plane 666b23a (lane step-ip2): interp.rs module doc drops 'the route still runs behind the same server-build gate'; it now says the route is open to every workspace since 6d666cd (PS-2) behind only interp_enabled() (FORGE_GIT_INTERPRET, a node-wide kill switch), checked against push.rs:134-140; the cargo-running background compile keeps server_build::background_compile_gate.",
+        "forge-control-plane a5ee447: the post-commit verify of 666b23a was red on three reconcile tests whose fixtures predate forge-lang FL3836 (#[op] required, LG-1) and FL2934 (no default on a NOT NULL read); fixtures updated, assertions unchanged. ip2-cp-tests (cargo test --locked -- --test-threads=1) exit 0; ip2-cp-clippy (--tests -D warnings) exit 0.",
+        "forge-runtime a3b20531 (lane step-ip2), found by the dev-stack repro: the marked Python tree converged on the CP but the runtime refused it, 'converge FAILED CLOSED: app_bundle validation failed'. The scaffold declares no app, the CP omits app_manifest for an app-less tree since R-8 (forge-control-plane a818087), and validate_app_bundle / ingest_app_bundle still required it. Both now share decode_app_manifest: absent = nothing declared, present-but-broken still refused. Red (ip2b-red2): 'FAILED. 3 passed; 2 failed' (app_bundle missing `app_manifest`); green: 5 passed, workspace fmt, clippy --features adapters -D warnings and cargo test --workspace (1992 passed).",
+        "Dev stack (forge-cli--step-ip2/scripts/repro-ip2-python-push.sh, run ip2-repro3 on the forge-runtime lane build): up-full.sh --release, provision, forge new --template workspace --dialect python ip2py, forge push -> 'converged @ f542c969f2' (interpreted, no FORGE_GIT_SERVER_BUILD, no allowlist), then GET https://ws-5c1c0b5ca68d6d11.forge.run:8081/api/domains/ip2py/ip2py/v1/hello -> 200 {\"message\":\"hello, ip2, from ip2py\"}; 'PASS: ... served ip2py::hello from a forge-new Python tree after one forge push'. Log: forge-cli--step-ip2/.harness/evidence/ip2-dev-stack-repro-2.log; reports: forge-runtime--step-ip2/.harness/report.json.",
+        "Left open, by name: run.rs:57 still drops the validator's reason from the converge failure message (a return-type change); an app-less push over a workspace serving a named app clears its branding and surface config, as an app.json without those fields already does. The repro boots with the IP-1 engine-template cache (FORGE_ENGINE_TEMPLATE_DIR), since a fresh up-full.sh builds the template in the main forge-lang checkout, which substrate-build-isolation refuses."
+      ]
     },
     {
       "id": "IP-3-forge-build-is-retired",
