@@ -11,9 +11,30 @@
       "id": "intent-recorded",
       "revision": 1,
       "source": "verb"
+    },
+    {
+      "at": "2026-10-11T17:23:38.471449+00:00",
+      "boundary": "land",
+      "id": "gap-review"
     }
   ],
-  "gap_reviews": [],
+  "gap_reviews": [
+    {
+      "boundary": "land",
+      "gaps": [
+        {
+          "description": "the step's fix (forge-portal-e2e 314fbe0, the deploy-serve.spec.ts via-line assertion) sat in forge-portal-e2e--step-ip5, which the plan record's touched repos omit, so plan land would have landed everything but the fix; the land is run with --lane for all three lanes, and the dry run built forge-cli, forge-portal-e2e and forge-runtime green",
+          "resolution": "fixed"
+        },
+        {
+          "description": "forge-runtime 9da61b0d changes a forge-blob-store test helper the IP-5 intent never named (retry Bucket",
+          "note": "new on the macOS trust-store errSecIO)::it is test-only and changes no runtime behaviour; it was the only way to clear the lane's post-commit verify, which was red on that flake (green on 9da61b0d, rc 0); and per D-042 a small fix should not wait for a larger exercise",
+          "resolution": "accepted"
+        }
+      ],
+      "intent_ref": ".harness/intent/invoice-path-2026-10-ip-5-deploy-serve-render-data.json"
+    }
+  ],
   "out_of_scope": [
     "forge-runtime changes: CI's served HTML already carries the op's data, so no runtime defect exists"
   ],
