@@ -1,21 +1,242 @@
 forge-portal-e2e HEAD: 314fbe04aad3f7c2d97026be541a49379e294df1
-2026-10-11T17:31:32Z
-Error: Cannot find package '@playwright/test' imported from /Users/rory/Documents/forge-run/forge-portal-e2e/playwright.config.ts
-    at Object.getPackageJSONURL (node:internal/modules/package_json_reader:314:9)
-    at packageResolve (node:internal/modules/esm/resolve:768:81)
-    at moduleResolve (node:internal/modules/esm/resolve:855:18)
-    at defaultResolve (node:internal/modules/esm/resolve:985:11)
-    at ModuleLoader.#cachedDefaultResolve (node:internal/modules/esm/loader:747:20)
-    at ModuleLoader.#resolveAndMaybeBlockOnLoaderThread (node:internal/modules/esm/loader:783:38)
-    at nextStep (node:internal/modules/customization_hooks:189:26)
-    at resolve (/Users/rory/.npm/_npx/e41f203b7505f1fb/node_modules/playwright/lib/common/index.js:829:19)
-    at nextStep (node:internal/modules/customization_hooks:189:26)
-    at resolveWithHooks (node:internal/modules/customization_hooks:417:10)
-    at ModuleLoader.resolveSync (node:internal/modules/esm/loader:803:14)
-    at ModuleLoader.resolve (node:internal/modules/esm/loader:719:19)
-    at ModuleLoader.getModuleJobForImport (node:internal/modules/esm/loader:320:38)
-    at ModuleJob._link (node:internal/modules/esm/module_job:182:49)
-    at processTicksAndRejections (node:internal/process/task_queues:103:5) {
-  code: 'ERR_MODULE_NOT_FOUND'
-}
+forge-git: /Users/rory/Documents/forge-run/forge-control-plane/target/release/forge-git (main checkout, pre-fix)
+2026-10-11T17:36:24Z
+
+Running 3 tests using 1 worker
+
+(node:61657) Warning: Setting the NODE_TLS_REJECT_UNAUTHORIZED environment variable to '0' makes TLS connections and HTTPS requests insecure by disabling certificate verification.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+  ✘  1 [lifecycle] › tests/lifecycle/field-references.spec.ts:100:3 › field references: field -> references, unreferenced, op -> columns › a field lists its references, each linked to its source line (0ms)
+  -  2 [lifecycle] › tests/lifecycle/field-references.spec.ts:118:3 › field references: field -> references, unreferenced, op -> columns › a column no op names is listed as unreferenced
+  -  3 [lifecycle] › tests/lifecycle/field-references.spec.ts:123:3 › field references: field -> references, unreferenced, op -> columns › an op with unresolved reads shows the count beside its columns
+(node:61650) Warning: Setting the NODE_TLS_REJECT_UNAUTHORIZED environment variable to '0' makes TLS connections and HTTPS requests insecure by disabling certificate verification.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[sweep] users: 1/1 removed; workspaces: 1/1 removed
+
+
+  1) [lifecycle] › tests/lifecycle/field-references.spec.ts:100:3 › field references: field -> references, unreferenced, op -> columns › a field lists its references, each linked to its source line 
+
+    Error: the References page never showed a converged index
+
+    expect(received).toContain(expected) // indexOf
+
+    Expected substring: "data-fr-fields"
+    Received string:    "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>References — code.forge.run</title><style>:root{--brand-primary:#e8894a;--brand-secondary:#a78bfa;--brand-accent:#f4a574;--brand-surface:#161920;--brand-surface-alt:#1c2028;--brand-foreground:#ebe7df;--brand-foreground-muted:#8e93a1;--brand-border:#262a34;--brand-border-strong:#353a47;--brand-danger:#e8736a;--brand-success:#6cc9a3;--brand-warning:#e8894a;--brand-font-family:'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;--brand-font-family-mono:'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;--brand-font-size-base:14px;--brand-line-height-base:1.5;--brand-spacing-base:4px;--brand-radius-sm:4px;--brand-radius-md:6px;--brand-radius-lg:8px;--brand-shadow-md:0 8px 28px rgba(0, 0, 0, 0.45);--brand-background:#0c0d10;--brand-bg-elev-1:#121419;--brand-duration-fast:120ms;--brand-duration-normal:220ms;--brand-duration-slow:320ms;--brand-ease-out:cubic-bezier(0.22, 1, 0.36, 1);--brand-ember-glow:rgba(232, 137, 74, 0.32);--brand-ember-soft:rgba(232, 137, 74, 0.10);--brand-foreground-faint:#838997;--brand-hairline:rgba(255, 255, 255, 0.05);--brand-sidebar-width:240px;--brand-signal-current:#7aa7ff;--brand-signal-current-glow:rgba(122, 167, 255, 0.32);--brand-signal-down:#e8736a;--brand-signal-enterprise:#b39ddb;--brand-signal-frozen:#7d8290;--brand-signal-pending:#e8894a;--brand-signal-role-admin:#a78bfa;--brand-signal-role-glow:rgba(167, 139, 250, 0.32);--brand-signal-up:#6cc9a3;--brand-surface-3:#232732;--brand-topbar-height:64px;}</style><!-- Forge Portal — custom <head> metadata appended by forge-cli's
+         build_head_extras_from_asset_manifest (substrate v0.14+).
+         Order matters: preconnect first for font handshake parallelism,
+         then meta tags, then critical-path stylesheet (which is the
+         Google Fonts CSS — keeps the @import out of the bundled CSS
+         so the font fetch can race the bundle fetch).
+    -->
+    <!-- Fonts are self-hosted (@font-face in the bundled CSS); no Google Fonts
+         handshake on the critical path. Preload only the render-critical weights —
+         the serif headline + sans body/UI — so they fetch in parallel with the CSS
+         instead of waiting for it to parse. Plex Mono (code) is below the fold. -->
+    <link rel=\"preload\" href=\"/static/fonts/instrument-serif-400.woff2\" as=\"font\" type=\"font/woff2\" crossorigin>
+    <link rel=\"preload\" href=\"/static/fonts/plex-sans-400.woff2\" as=\"font\" type=\"font/woff2\" crossorigin>
+    <link rel=\"preload\" href=\"/static/fonts/plex-sans-600.woff2\" as=\"font\" type=\"font/woff2\" crossorigin>
+    <meta name=\"color-scheme\" content=\"light dark\">
+    <meta name=\"theme-color\" content=\"#f5f7fa\">
+    <meta name=\"description\" content=\"Build your whole app with the AI coding tool you already use. Forge runs the whole stack: the interface, the data, the security, the hosting, with row-level security on every call.\">
+    <!-- Indexing is governed per host at the edge (see caddy/Caddyfile):
+         forge.run serves the public marketing + docs surface and is fully
+         crawlable; app.forge.run returns `Disallow: /` from /robots.txt, so
+         the authed console stays out of the index. No global noindex meta —
+         it would suppress the public docs we want ranked. -->
+    <meta property=\"og:type\" content=\"website\">
+    <meta property=\"og:site_name\" content=\"Forge\">
+    <meta property=\"og:title\" content=\"Forge — your whole app, already running\">
+    <meta property=\"og:description\" content=\"Build it with the AI coding tool you already use. Forge runs the whole stack, secured on every call. Bring your own AI; keep your own bill.\">
+    <meta property=\"og:url\" content=\"https://forge.run/\">
+    <meta property=\"og:image\" content=\"https://forge.run/static/og/forge-card.png?v=2026-06-06\">
+    <meta property=\"og:image:width\" content=\"1200\">
+    <meta property=\"og:image:height\" content=\"630\">
+    <meta property=\"og:image:alt\" content=\"Forge — your whole app, already running, built with the AI you already use.\">
+    <meta name=\"twitter:card\" content=\"summary_large_image\">
+    <meta name=\"twitter:image\" content=\"https://forge.run/static/og/forge-card.png?v=2026-06-06\">
+    <meta name=\"twitter:title\" content=\"Forge — your whole app, already running\">
+    <meta name=\"twitter:description\" content=\"Build it with the AI coding tool you already use. Forge runs the whole stack, secured on every call. Bring your own AI; keep your own bill.\">
+    <!-- htmx is injected from static/vendor/manifest.toml (head = true), resolved
+         by the deploy pipeline — no hardcoded <script> here. See SUBSTRATE_GAPS §8. -->
+    <script>
+      // HTMX-boost left-pane persistence: when navigating between anon
+      // surfaces (login ↔ signup ↔ forgot ↔ device ↔ ...) the canvas
+      // and live-strip stay mounted, only #form-pane + #brand-hero
+      // swap. Two consequences the swap doesn't handle automatically,
+      // both fixed here:
+      //
+      //   1) hx-select skips the default <title> swap AND the runtime
+      //      returns a body-only fragment for HX-Request, so the
+      //      response carries no <title>. Map URL → declared page
+      //      title locally.
+      //   2) The substrate scopes every `*.page.css` block to
+      //      `[data-page=\"<slug>\"]` on the <forge-page> wrapper. That
+      //      wrapper sits OUTSIDE the swap target (#form-pane), so
+      //      after a swap the slug still reads the prior page's name
+      //      — every page-scoped rule misses, leaving SVGs/icons at
+      //      UA-default size and grid layouts at their fallbacks
+      //      (e.g., signup first/last names go full-width, the
+      //      Stripe-note lock SVG renders giant). Re-stamp data-page
+      //      from the URL after every swap so the scope tracks.
+      (function () {
+        var TITLES = {
+          '/login': 'Sign in — FORGE.',
+          '/signup': 'Start your trial — FORGE.',
+          '/forgot': 'Reset password — FORGE.',
+          '/mfa': 'Verify your identity — FORGE.',
+          '/accept-invite': 'Accept invite — FORGE.',
+          '/device': 'Approve device — FORGE.',
+          '/device/success': 'Authorised — FORGE.'
+        };
+        var PAGES = {
+          '/login': 'login_form',
+          '/signup': 'signup_form',
+          '/forgot': 'forgot_form',
+          '/mfa': 'mfa_form',
+          '/accept-invite': 'accept_invite_form',
+          '/device': 'device_form',
+          '/device/success': 'device_success'
+        };
+        // Conditional-UI lifecycle (Phase 2A passkey rollout).
+        //
+        // On /login we issue a long-running
+        // `navigator.credentials.get({ mediation: 'conditional' })` so the
+        // OS autofill popover surfaces matching passkeys on email-field
+        // focus. The promise lives until the user selects a credential or
+        // the page is unloaded; we must abort it explicitly on any swap
+        // AWAY from /login, else the next page inherits a phantom
+        // conditional listener bound to a stale DOM.
+        //
+        // Backend (`/api/v1/auth/webauthn/authenticate/begin`) does not
+        // exist yet — Phase 1E wires it. Until then the conditional fetch
+        // 404s, logs to console, no UI breakage.
+        function startConditional() {
+          if (!window.ForgeWebauthn || !window.SimpleWebAuthnBrowser) return;
+          // Cancel any prior in-flight ceremony before issuing a fresh one.
+          try { window.SimpleWebAuthnBrowser.WebAuthnAbortService.cancelCeremony(); } catch (_) {}
+          var ctrl = new AbortController();
+          window.__forgeWebauthnConditional = ctrl;
+          window.ForgeWebauthn.startAuthentication({
+            optionsUrl: '/api/v1/auth/webauthn/authenticate/begin',
+            finishUrl: '/api/v1/auth/webauthn/authenticate/finish',
+            conditional: true,
+          }).then(function (result) {
+            if (ctrl.signal.aborted) return;
+            // Server returns a redirect target on success; let it land.
+            if (result && result.redirect) location.assign(result.redirect);
+            else location.reload();
+          }).catch(function (err) {
+            if (ctrl.signal.aborted) return;
+            // NotAllowedError (user cancelled) + 404 (backend not yet
+            // wired) are expected; log everything else without breaking
+            // the rest of the page.
+            console.debug('[forge-webauthn] conditional auth ended:', err);
+          });
+        }
+        function stopConditional() {
+          var ctrl = window.__forgeWebauthnConditional;
+          if (ctrl) { try { ctrl.abort(); } catch (_) {} }
+          window.__forgeWebauthnConditional = null;
+          try {
+            if (window.SimpleWebAuthnBrowser) {
+              window.SimpleWebAuthnBrowser.WebAuthnAbortService.cancelCeremony();
+            }
+          } catch (_) {}
+        }
+        function syncConditional(path) {
+          if (path === '/login') startConditional();
+          else stopConditional();
+        }·
+        document.addEventListener('htmx:afterSwap', function (e) {
+          var path = location.pathname;
+          if (TITLES[path]) document.title = TITLES[path];
+          if (PAGES[path]) {
+            var fp = document.querySelector('forge-page[data-page]');
+            if (fp) fp.setAttribute('data-page', PAGES[path]);
+          }
+          syncConditional(path);
+        });
+        // First-load bootstrap: htmx:afterSwap only fires on swaps, not on
+        // a cold landing at /login. Defer until DOM ready so
+        // SimpleWebAuthnBrowser (loaded via the deferred vendor script)
+        // is on the window.
+        document.addEventListener('DOMContentLoaded', function () {
+          syncConditional(location.pathname);
+        });
+      })();
+    </script>
+    <link rel=\"icon\" type=\"image/svg+xml\" href=\"/static/favicon.svg\">
+    <link rel=\"stylesheet\" href=\"/static/app.5f0a1df730e8.css\">
+    <script src=\"/static/vendor/htmx-2.0.10.min.js\" defer></script><script src=\"/_forge/forge.53c65b792b219ec8.js\"></script><script src=\"/_forge/behaviors.2b894e6194f12e1b.js\" defer></script></head><body><main id=\"page-content\"><forge-page data-page=\"code_references\"><div data-component=\"code_references\" style=\"display:contents\">····
+    <div data-component=\"code_shell\" style=\"display:contents\">
+    <script>
+    (function () {
+      try {
+        var t = localStorage.getItem('forge-app-theme');
+        if (t === 'dark' || t === 'light') { document.documentElement.dataset.theme = t; }
+      } catch (e) {}
+    })();
+    </script>··
+    <div class=\"cs-app\" data-component=\"code_shell\">
+      <header class=\"cs-topbar\">
+        <a class=\"cs-wordmark\" href=\"/\" aria-label=\"code.forge.run — home\">FORGE<span class=\"cs-wordmark__p\">.</span></a>·
+          <span class=\"cs-ctx\" title=\"Tenant\">e2e-portal-1791740185728-ki223x</span>
+            <span class=\"cs-tsep\" aria-hidden=\"true\">›</span>
+            <span class=\"cs-hasdrop\">
+              <button class=\"cs-switcher\" type=\"button\" aria-haspopup=\"true\" title=\"Workspace — the repo + converge + host\">
+                Field References E2E
+              </button>
+            </span>·
+    <span class=\"cs-refsel\" title=\"Read-only — only main exists until preview branches land\"><span class=\"cs-refsel__g\" aria-hidden=\"true\">⑃</span> <span class=\"cs-refsel__b\">main</span></span>
+        <div class=\"cs-sp\"></div>·
+          <span class=\"cs-kbd\" aria-hidden=\"true\">⌘K</span>
+          <span class=\"cs-lamp\" data-pill=\"ok\">
+            <span class=\"cs-lamp__dot\" aria-hidden=\"true\"></span>
+            <span class=\"cs-lamp__st\">Live</span> <code>main@3050738</code> · In sync
+          </span>·
+        <a class=\"cs-avatar\" href=\"https://app.forge.run/u/\" title=\"Your account on app.forge.run\">E</a>
+      </header>·
+      <div class=\"cs-body\">
+        <nav class=\"cs-navrail\" aria-label=\"Workspace lenses\">
+          <a class=\"cs-navitem\" href=\"/t/01a12c09-8ca3-7cf0-864c-09d6bcd2808e/w/ws-4149e88afe989247/\"><span class=\"cs-navitem__ic\" aria-hidden=\"true\">◫</span> Overview</a>
+          <a class=\"cs-navitem\" href=\"/t/01a12c09-8ca3-7cf0-864c-09d6bcd2808e/w/ws-4149e88afe989247/changes\"><span class=\"cs-navitem__ic\" aria-hidden=\"true\">⇄</span> Changes</a>
+          <a class=\"cs-navitem on\" href=\"/t/01a12c09-8ca3-7cf0-864c-09d6bcd2808e/w/ws-4149e88afe989247/references\" aria-current=\"page\"><span class=\"cs-navitem__ic\" aria-hidden=\"true\">⌗</span> References</a>
+          <a class=\"cs-navitem\" href=\"/t/01a12c09-8ca3-7cf0-864c-09d6bcd2808e/w/ws-4149e88afe989247/history\"><span class=\"cs-navitem__ic\" aria-hidden=\"true\">◷</span> History</a>
+          <a class=\"cs-navitem\" href=\"/t/01a12c09-8ca3-7cf0-864c-09d6bcd2808e/w/ws-4149e88afe989247/agent\"><span class=\"cs-navitem__ic\" aria-hidden=\"true\">✦</span> Agent</a>
+          <div class=\"cs-navfoot\">
+            <div class=\"cs-navfoot__f\" data-pill=\"ok\"><span class=\"cs-navfoot__dot\" aria-hidden=\"true\"></span> Live · <code>3050738</code> · In sync</div>
+          </div>
+        </nav>·
+        <main class=\"cs-main\">
+          <div class=\"cs-main__inner\">·········
+      <div class=\"cs-phead reveal\">
+        <span class=\"cs-phead__crumb\">References</span>
+        <div class=\"cs-phead__sp\"></div>
+      </div>·
+        <div class=\"code-state reveal\" data-fr-none>
+          <h4>No reference index yet</h4>
+          <p>The index is computed when a push converges. This workspace's repo has not converged since references were recorded, so there is nothing to show; push to <code class=\"rc-code\">main</code> and it fills in.</p>
+        </div>···
+          </div>
+        </main>
+      </div>
+    </div></div></div></forge-page></main></body></html>"
+
+      87 |       await new Promise((res) => setTimeout(res, 3000));
+      88 |     }
+    > 89 |     expect(html, 'the References page never showed a converged index').toContain('data-fr-fields');
+         |                                                                        ^
+      90 |     commit = /data-fr-src href="[^"]*?ref=([0-9a-f]{40})/.exec(html)?.[1] ?? '';
+      91 |     expect(commit, 'a site link names the converged commit').toMatch(/^[0-9a-f]{40}$/);
+      92 |   });
+        at /Users/rory/Documents/forge-run/forge-portal-e2e/tests/lifecycle/field-references.spec.ts:89:72
+
+    Error Context: test-results/lifecycle-field-references-5e2f9-h-linked-to-its-source-line-lifecycle/error-context.md
+
+    Error Context: test-results/lifecycle-field-references-5e2f9-h-linked-to-its-source-line-lifecycle/error-context.md
+
+  1 failed
+    [lifecycle] › tests/lifecycle/field-references.spec.ts:100:3 › field references: field -> references, unreferenced, op -> columns › a field lists its references, each linked to its source line 
+  2 did not run
 spec-before rc=1

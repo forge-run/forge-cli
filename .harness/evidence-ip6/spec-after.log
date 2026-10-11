@@ -1,21 +1,17 @@
 forge-portal-e2e HEAD: 314fbe04aad3f7c2d97026be541a49379e294df1
-forge-git: /Users/rory/Documents/forge-run/forge-control-plane--step-ip6/target/release/forge-git (lane forge-control-plane--step-ip6 on 6b47b1c + working tree)
-2026-10-11T17:34:19Z
-Error: Cannot find package '@playwright/test' imported from /Users/rory/Documents/forge-run/forge-portal-e2e/playwright.config.ts
-    at Object.getPackageJSONURL (node:internal/modules/package_json_reader:314:9)
-    at packageResolve (node:internal/modules/esm/resolve:768:81)
-    at moduleResolve (node:internal/modules/esm/resolve:855:18)
-    at defaultResolve (node:internal/modules/esm/resolve:985:11)
-    at ModuleLoader.#cachedDefaultResolve (node:internal/modules/esm/loader:747:20)
-    at ModuleLoader.#resolveAndMaybeBlockOnLoaderThread (node:internal/modules/esm/loader:783:38)
-    at nextStep (node:internal/modules/customization_hooks:189:26)
-    at resolve (/Users/rory/.npm/_npx/e41f203b7505f1fb/node_modules/playwright/lib/common/index.js:829:19)
-    at nextStep (node:internal/modules/customization_hooks:189:26)
-    at resolveWithHooks (node:internal/modules/customization_hooks:417:10)
-    at ModuleLoader.resolveSync (node:internal/modules/esm/loader:803:14)
-    at ModuleLoader.resolve (node:internal/modules/esm/loader:719:19)
-    at ModuleLoader.getModuleJobForImport (node:internal/modules/esm/loader:320:38)
-    at ModuleJob._link (node:internal/modules/esm/module_job:182:49)
-    at processTicksAndRejections (node:internal/process/task_queues:103:5) {
-  code: 'ERR_MODULE_NOT_FOUND'
-}
+forge-git: /Users/rory/Documents/forge-run/forge-control-plane--step-ip6/target/release/forge-git (lane forge-control-plane--step-ip6 62990bf)
+2026-10-11T17:38:48Z
+
+Running 3 tests using 1 worker
+
+(node:72766) Warning: Setting the NODE_TLS_REJECT_UNAUTHORIZED environment variable to '0' makes TLS connections and HTTPS requests insecure by disabling certificate verification.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+  ✓  1 [lifecycle] › tests/lifecycle/field-references.spec.ts:100:3 › field references: field -> references, unreferenced, op -> columns › a field lists its references, each linked to its source line (3ms)
+  ✓  2 [lifecycle] › tests/lifecycle/field-references.spec.ts:118:3 › field references: field -> references, unreferenced, op -> columns › a column no op names is listed as unreferenced (1ms)
+  ✓  3 [lifecycle] › tests/lifecycle/field-references.spec.ts:123:3 › field references: field -> references, unreferenced, op -> columns › an op with unresolved reads shows the count beside its columns (2ms)
+(node:72765) Warning: Setting the NODE_TLS_REJECT_UNAUTHORIZED environment variable to '0' makes TLS connections and HTTPS requests insecure by disabling certificate verification.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[sweep] users: 1/1 removed; workspaces: 1/1 removed
+
+  3 passed (21.4s)

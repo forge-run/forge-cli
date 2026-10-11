@@ -1,0 +1,26 @@
+{
+  "acceptance": [
+    "The cause is named in the report with the commit that introduced it.",
+    "field-references.spec.ts passes on the dev stack, with the run's output in the step's evidence.",
+    "A test in the repo that held the defect fails before the fix and passes after."
+  ],
+  "author": "rory",
+  "events": [
+    {
+      "at": "2026-10-11T17:35:27.063674+00:00",
+      "id": "intent-recorded",
+      "revision": 1,
+      "source": "verb"
+    }
+  ],
+  "gap_reviews": [],
+  "out_of_scope": [],
+  "refs": [],
+  "revision": 1,
+  "schema": "forge-intent/v1",
+  "slug": "invoice-path-2026-10-ip-6-field-references-converge",
+  "source": "verb",
+  "statement": "The References page shows a converged index on the dev stack: forge-git records the FR-1 reference index where its own process can write it (beside the cp.json it was started with), so field-references.spec.ts passes; production's index root is unchanged.",
+  "ts": "2026-10-11T17:35:27.063674+00:00",
+  "updated_at": "2026-10-11T17:35:27.063674+00:00"
+}

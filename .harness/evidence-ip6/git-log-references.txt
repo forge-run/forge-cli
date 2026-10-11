@@ -1,0 +1,17 @@
+[2m2026-10-11T16:57:25.384200Z[0m [33m WARN[0m references: could not record the converged index [3merror[0m[2m=[0mreferences: mkdir /var/lib/forge-control-plane/references/ws-26da75269508fa0a/deploy-probe/103ec01214df51a13878960d8de67c0332859ea4: Permission denied (os error 13) [3mdir[0m[2m=[0m/var/lib/forge-control-plane/references/ws-26da75269508fa0a/deploy-probe [3mcommit[0m[2m=[0m103ec01214df51a13878960d8de67c0332859ea4
+[2m2026-10-11T16:58:16.062082Z[0m [32m INFO[0m references: the schema-change check had no prior converged commit [3mrepo[0m[2m=[0mws-7106e4f03d5b9cf3/deploy-probe
+[2m2026-10-11T16:58:16.844733Z[0m [33m WARN[0m references: could not record the converged index [3merror[0m[2m=[0mreferences: mkdir /var/lib/forge-control-plane/references/ws-7106e4f03d5b9cf3/deploy-probe/d7ac76d04743d2d948fbd5bf7c44c5fc379ff50b: Permission denied (os error 13) [3mdir[0m[2m=[0m/var/lib/forge-control-plane/references/ws-7106e4f03d5b9cf3/deploy-probe [3mcommit[0m[2m=[0md7ac76d04743d2d948fbd5bf7c44c5fc379ff50b
+[2m2026-10-11T17:36:39.841834Z[0m [32m INFO[0m references: the schema-change check had no prior converged commit [3mrepo[0m[2m=[0mws-4149e88afe989247/deploy-probe
+[2m2026-10-11T17:36:40.538919Z[0m [33m WARN[0m references: could not record the converged index [3merror[0m[2m=[0mreferences: mkdir /var/lib/forge-control-plane/references/ws-4149e88afe989247/deploy-probe/30507382cd4f4d47743f510193a22fb23ced87e5: Permission denied (os error 13) [3mdir[0m[2m=[0m/var/lib/forge-control-plane/references/ws-4149e88afe989247/deploy-probe [3mcommit[0m[2m=[0m30507382cd4f4d47743f510193a22fb23ced87e5
+[2m2026-10-11T17:39:05.838025Z[0m [32m INFO[0m references: the schema-change check had no prior converged commit [3mrepo[0m[2m=[0mws-a741e5b6ae820bb8/deploy-probe
+ws-a741e5b6ae820bb8
+
+/Users/rory/Documents/forge-run/forge-platform-operations/dev/run/cp/references/ws-a741e5b6ae820bb8:
+deploy-probe
+
+/Users/rory/Documents/forge-run/forge-platform-operations/dev/run/cp/references/ws-a741e5b6ae820bb8/deploy-probe:
+74c5e01c1bc0725c9d4ccf422816151eb5f0374f
+CONVERGED
+
+/Users/rory/Documents/forge-run/forge-platform-operations/dev/run/cp/references/ws-a741e5b6ae820bb8/deploy-probe/74c5e01c1bc0725c9d4ccf422816151eb5f0374f:
+refs.references.json
