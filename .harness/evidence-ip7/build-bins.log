@@ -1,0 +1,84 @@
+[build] forge-runtime: at main 9da61b0d
+[build] forge-runtime: cargo build --release --bin forge-runtime --locked --features adapters
+[scratch] /Users/rory/.cache/forge-harness-runs (disk)
+   Compiling forge-blob-store v0.1.0 (/Users/rory/Documents/forge-run/forge-runtime--devbuild/crates/forge-blob-store)
+   Compiling forge-lang-tree v0.1.0 (/Users/rory/Documents/forge-run/forge-lang/crates/forge-lang-tree)
+   Compiling forge-lang-rt v0.1.0 (/Users/rory/Documents/forge-run/forge-lang/crates/forge-lang-rt)
+   Compiling forge-runtime v0.33.196 (/Users/rory/Documents/forge-run/forge-runtime--devbuild)
+   Compiling forge-runtime-auth v0.1.0 (/Users/rory/Documents/forge-run/forge-runtime--devbuild/crates/forge-runtime-auth)
+   Compiling forge-quota v0.1.0 (/Users/rory/Documents/forge-run/forge-runtime--devbuild/crates/forge-quota)
+   Compiling forge-runtime-host v0.1.0 (/Users/rory/Documents/forge-run/forge-runtime--devbuild/crates/forge-runtime-host)
+   Compiling forge-lang-interp v0.1.0 (/Users/rory/Documents/forge-run/forge-lang/crates/forge-lang-interp)
+   Compiling forge-runtime-wasm v0.1.0 (/Users/rory/Documents/forge-run/forge-runtime--devbuild/crates/forge-runtime-wasm)
+   Compiling forge-capabilities v0.1.0 (/Users/rory/Documents/forge-run/forge-runtime--devbuild/crates/forge-capabilities)
+   Compiling forge-runtime-adapters-base v0.1.0 (/Users/rory/Documents/forge-run/forge-runtime--devbuild/crates/forge-runtime-adapters-base)
+   Compiling forge-scheduled v0.1.0 (/Users/rory/Documents/forge-run/forge-runtime--devbuild/crates/forge-scheduled)
+   Compiling forge-fleet v0.1.0 (/Users/rory/Documents/forge-run/forge-runtime--devbuild/crates/forge-fleet)
+   Compiling forge-adapters v0.1.0 (/Users/rory/Documents/forge-run/forge-runtime--devbuild/crates/forge-adapters)
+    Finished `release` profile [optimized] target(s) in 1m 05s
+[stage] forge-runtime/target/release/forge-runtime  sha 03378105745c  exec ok (rc=2)
+[stage] NOTE: forge-runtime is RUNNING from /Users/rory/Documents/forge-run/forge-runtime/target/release/forge-runtime and will keep serving the PREVIOUS binary until it is restarted (dev/down.sh, then dev/up-full.sh --release)
+[build] forge-runtime: at main 9da61b0d
+[build] forge-runtime: cargo build --release -p forge-otel-sidecar --locked
+[scratch] /Users/rory/.cache/forge-harness-runs (disk)
+    Finished `release` profile [optimized] target(s) in 0.12s
+[stage] forge-runtime/target/release/forge-otel-sidecar  sha 9f650639faf3  exec ok (rc=1)
+[stage] NOTE: forge-otel-sidecar is RUNNING from /Users/rory/Documents/forge-run/forge-runtime/target/release/forge-otel-sidecar and will keep serving the PREVIOUS binary until it is restarted (dev/down.sh, then dev/up-full.sh --release)
+[build] forge-agent: at main 5d5ee7e
+[build] forge-agent: cargo build --release --bin forge-agent --locked
+[scratch] /Users/rory/.cache/forge-harness-runs (disk)
+    Finished `release` profile [optimized] target(s) in 0.33s
+[stage] forge-agent/target/release/forge-agent  sha 6c90eeafff0d  exec ok (rc=0)
+[stage] NOTE: forge-agent is RUNNING from /Users/rory/Documents/forge-run/forge-agent/target/release/forge-agent and will keep serving the PREVIOUS binary until it is restarted (dev/down.sh, then dev/up-full.sh --release)
+[build] forge-control-plane: at main bd76229
+[build] forge-control-plane: cargo build --release --bin forge-control-plane --bin forge-git --locked
+[scratch] /Users/rory/.cache/forge-harness-runs (disk)
+   Compiling forge-lang-tree v0.1.0 (/Users/rory/Documents/forge-run/forge-lang/crates/forge-lang-tree)
+   Compiling forge-lang-rt v0.1.0 (/Users/rory/Documents/forge-run/forge-lang/crates/forge-lang-rt)
+   Compiling forge-lang-rustgen v0.1.0 (/Users/rory/Documents/forge-run/forge-lang/crates/forge-lang-rustgen)
+   Compiling forge-lang-rust v0.1.0 (/Users/rory/Documents/forge-run/forge-lang/crates/forge-lang-rust)
+   Compiling forge-lang-interp v0.1.0 (/Users/rory/Documents/forge-run/forge-lang/crates/forge-lang-interp)
+   Compiling forge-lang-java v0.1.0 (/Users/rory/Documents/forge-run/forge-lang/crates/forge-lang-java)
+   Compiling forge-lang-ts v0.1.0 (/Users/rory/Documents/forge-run/forge-lang/crates/forge-lang-ts)
+   Compiling forge-lang-py v0.1.0 (/Users/rory/Documents/forge-run/forge-lang/crates/forge-lang-py)
+   Compiling forge-lang-engine v0.1.0 (/Users/rory/Documents/forge-run/forge-lang/crates/forge-lang-engine)
+   Compiling forge-control-plane v0.11.80 (/Users/rory/Documents/forge-run/forge-control-plane--devbuild)
+    Finished `release` profile [optimized] target(s) in 54.90s
+[stage] forge-control-plane/target/release/forge-control-plane  sha 44e06d3873a3  exec ok (rc=0)
+[stage] NOTE: forge-control-plane is RUNNING from /Users/rory/Documents/forge-run/forge-control-plane/target/release/forge-control-plane and will keep serving the PREVIOUS binary until it is restarted (dev/down.sh, then dev/up-full.sh --release)
+[stage] forge-control-plane/target/release/forge-git  sha e2a7d82f7945  exec ok (rc=0)
+[build] forge-edge: at main 335eb7a
+[build] forge-edge: cargo build --release --bin forge-edge --locked
+[scratch] /Users/rory/.cache/forge-harness-runs (disk)
+    Finished `release` profile [optimized] target(s) in 0.33s
+[stage] forge-edge/target/release/forge-edge  sha cb96d04da448  exec ok (rc=0)
+[stage] NOTE: forge-edge is RUNNING from /Users/rory/Documents/forge-run/forge-edge/target/release/forge-edge and will keep serving the PREVIOUS binary until it is restarted (dev/down.sh, then dev/up-full.sh --release)
+[build] forge-secrets: at main 938340b
+[build] forge-secrets: cargo build --release --bin forge-secrets --locked
+[scratch] /Users/rory/.cache/forge-harness-runs (disk)
+    Finished `release` profile [optimized] target(s) in 0.08s
+[stage] forge-secrets/target/release/forge-secrets  sha 23a8be9187f0  exec ok (rc=0)
+[stage] NOTE: forge-secrets is RUNNING from /Users/rory/Documents/forge-run/forge-secrets/target/release/forge-secrets and will keep serving the PREVIOUS binary until it is restarted (dev/down.sh, then dev/up-full.sh --release)
+[build] forge-observability: at main efea2de
+[build] forge-observability: cargo build --release --bin forge-obs-collector --bin forge-obs-query --locked
+[scratch] /Users/rory/.cache/forge-harness-runs (disk)
+    Finished `release` profile [optimized] target(s) in 0.35s
+[stage] forge-observability/target/release/forge-obs-collector  sha 9e21b3d5b413  exec ok (rc=0)
+[stage] NOTE: forge-obs-collector is RUNNING from /Users/rory/Documents/forge-run/forge-observability/target/release/forge-obs-collector and will keep serving the PREVIOUS binary until it is restarted (dev/down.sh, then dev/up-full.sh --release)
+[stage] forge-observability/target/release/forge-obs-query  sha 428e703cf92d  exec ok (rc=0)
+[stage] NOTE: forge-obs-query is RUNNING from /Users/rory/Documents/forge-run/forge-observability/target/release/forge-obs-query and will keep serving the PREVIOUS binary until it is restarted (dev/down.sh, then dev/up-full.sh --release)
+[build] forge-cli: at main e5a6ca7
+[build] forge-cli: cargo build --release --locked
+   Compiling forge-lang-tree v0.1.0 (/Users/rory/Documents/forge-run/forge-lang/crates/forge-lang-tree)
+   Compiling forge-lang-rt v0.1.0 (/Users/rory/Documents/forge-run/forge-lang/crates/forge-lang-rt)
+   Compiling forge-lang-rustgen v0.1.0 (/Users/rory/Documents/forge-run/forge-lang/crates/forge-lang-rustgen)
+   Compiling forge-lang-py v0.1.0 (/Users/rory/Documents/forge-run/forge-lang/crates/forge-lang-py)
+   Compiling forge-lang-ts v0.1.0 (/Users/rory/Documents/forge-run/forge-lang/crates/forge-lang-ts)
+   Compiling forge-lang-rust v0.1.0 (/Users/rory/Documents/forge-run/forge-lang/crates/forge-lang-rust)
+   Compiling forge-lang-java v0.1.0 (/Users/rory/Documents/forge-run/forge-lang/crates/forge-lang-java)
+   Compiling forge-lang-interp v0.1.0 (/Users/rory/Documents/forge-run/forge-lang/crates/forge-lang-interp)
+   Compiling forge-lang-test v0.1.0 (/Users/rory/Documents/forge-run/forge-lang/crates/forge-lang-test)
+   Compiling forge-cli v0.5.3 (/Users/rory/Documents/forge-run/forge-cli--devbuild)
+    Finished `release` profile [optimized] target(s) in 29.28s
+[stage] forge-cli/target/release/forge  sha d48d29d495a9  exec ok (rc=0)
+[build] all binaries staged — now run: dev/up-full.sh --release

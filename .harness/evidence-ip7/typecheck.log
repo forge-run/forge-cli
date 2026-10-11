@@ -1,0 +1,4 @@
+
+> forge-portal-e2e@0.1.0 typecheck
+> tsc --noEmit
+

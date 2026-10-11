@@ -1,0 +1,9 @@
+[dev] agent stopped
+[dev] edge stopped
+[dev] cp stopped
+[dev] git stopped
+[dev] s3 stopped
+[dev] secrets stopped
+[dev] obs-collector stopped
+[dev] obs-query stopped
+[dev] stopped. State kept at /Users/rory/Documents/forge-run/forge-platform-operations/dev/run (rm -rf to reset).

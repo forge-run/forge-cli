@@ -1,0 +1,32 @@
+{
+  "agent": "orchestrator-inline",
+  "author": "rory",
+  "bundle_ids": [],
+  "bundle_note": "forge-portal-e2e is not an enrolled harness consumer (no .harness/lock.json), so no gate is bound to the lane holding the spec; its checks are the landing block's build (npm run typecheck, clean: evidence-ip7/typecheck.log) and two dev-stack runs of the spec itself",
+  "commits": [
+    "forge-portal-e2e@231753f"
+  ],
+  "lane": "/Users/rory/Documents/forge-run/forge-cli--step-ip7",
+  "notes": "Inline, not delegated: the spec is one file over existing fixtures (signup, self-serve create, federate, ship semaphore), and the whole check is the dev-stack run, which the orchestrator ran twice; a brief would have added a hand-off and no check. No forge-platform-operations glue was needed: the only local-only setting is the engine-template source (a forge-lang worktree at main, set before boot) because the substrate-build-isolation fence refuses a template build in the main checkout; CI has no fence.",
+  "repair_attempts": 0,
+  "schema": "forge-report/v1",
+  "step": "IP-7-customer-two-on-the-dev-stack",
+  "ts": "2026-10-11T18:05:35.638555+00:00",
+  "verdicts": [
+    {
+      "evidence": "forge-portal-e2e 231753f tests/lifecycle/customer-two.spec.ts: per dialect a fresh self-serve workspace, forge new --dialect, a declared c2_notes table + forge schema compile, forge push, <domain>",
+      "item": "A forge-portal-e2e spec provisions a fresh workspace and, for each of the four dialects, scaffolds, pushes, gets a served op answer through the edge, writes a row and finds it in forge export's output.",
+      "verdict": "met"
+    },
+    {
+      "evidence": "the create request carries only {name} (asserted: no workspace_id property), the answer's workspace_id matches ^ws-[0-9a-f]{8,}$, and after the op has served the spec reads CP /admin/workspaces and asserts an envelope for that id; the stack was booted once before the runs (ladder.sh boot) and nothing touched it between provisioning and serve: no allowlist, env change, restart or operator credential",
+      "item": "The spec performs no operator action between provisioning and the first served op, and asserts the workspace id came back from the control plane.",
+      "verdict": "met"
+    },
+    {
+      "evidence": "dev stack from main binaries (build-bins-worktree.sh, up-full.sh --release): run 1 on the uncommitted spec 4 passed (51.1s, spec-run-1.log); run 2 on committed 231753f 4 passed (27.7s, spec-run.log), --retries=0, sweep 4/4 users and workspaces removed; the file sits under tests/lifecycle (project lifecycle), which e2e.yml's npx playwright test runs with the deploy tier on; npm run typecheck clean (typecheck.log)",
+      "item": "The spec passes on the dev stack, with the run's output in the step's evidence, and is part of the suite e2e.yml runs.",
+      "verdict": "met"
+    }
+  ]
+}
