@@ -37,6 +37,11 @@
       "at": "2026-10-11T09:01:13.675462+00:00",
       "boundary": "scaffold",
       "id": "gap-review"
+    },
+    {
+      "at": "2026-10-11T09:01:34.386499+00:00",
+      "boundary": "build",
+      "id": "gap-review"
     }
   ],
   "gap_reviews": [
@@ -86,6 +91,17 @@
         {
           "description": "none found",
           "note": "Diffed the scaffolded tree (forge-runtime f8fa258f: tests/realtime_anon_subscribe.rs, 5 tests on notes_locked/notes_public over WS mux and SSE, plus the mux drain-identity fix and resume confinement; forge-portal-e2e edde8ae: P2.2 and the SSE anon-refusal spec retargeted to probe_locked, pinning UNAUTHENTICATED and 401) against intent revision 1 and its three acceptance criteria. Private-table refusal over both transports (WS error frame UNAUTHENTICATED never subscribed; SSE 401 + Bearer challenge, not text/event-stream): covered and green. Anon-readable literal-predicate table streams over both transports: covered and green (WS half needed the drain-identity fix the plan-boundary review already recorded as fixed). e2e specs target a private table, red before on the dev stack (subscribed; 200 text/event-stream) and green after, output verbatim in the step evidence. Subscribe and command keep the caller identity; no gap found.",
+          "resolution": "accepted"
+        }
+      ],
+      "intent_ref": ".harness/intent/invoice-path-2026-10-ip-1-anonymous-realtime-is-refused.json"
+    },
+    {
+      "boundary": "build",
+      "gaps": [
+        {
+          "description": "none found",
+          "note": "Diffed the built lanes (forge-runtime step-ip1 f8fa258f vs its base 10195fb0: sse.rs drain_identity made pub(crate), mux poll.rs/handlers.rs/socket.rs drain as it, resume map check, tests/realtime_anon_subscribe.rs; forge-portal-e2e step-ip1 edde8ae vs main 3917e43: two specs on probe_locked) against intent revision 1 statement and its acceptance. Every criterion has a passing test or run on the built tree (ip1-after2 green after the last source edit; ip1-e2e-ba2 red-before/green-after on the dev stack). Subscribe stays caller-identity so the auth gate is untouched; command frame identity unchanged; no source edits since the green runs. No gap.",
           "resolution": "accepted"
         }
       ],

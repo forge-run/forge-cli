@@ -1,0 +1,35 @@
+{
+  "agent": "forge-implementer",
+  "author": "rory",
+  "bundle_ids": [
+    "pre-done-d0b17a85",
+    "checkpoint-d35014cc"
+  ],
+  "bundle_note": "pre-done-d0b17a85 is forge-runtime--step-ip1 gate bundle for commit f8fa258f (cargo-check focused forge-adapters+forge-runtime, cargo-fmt, emitted-committed, fact-pins all pass); checkpoint-d35014cc is this lane. forge-portal-e2e has no cargo gates; its check is npm run typecheck (clean) and the dev-stack run ip1-e2e-ba2.",
+  "commits": [
+    "f8fa258f",
+    "edde8ae"
+  ],
+  "lane": "/Users/rory/Documents/forge-run/forge-cli--step-ip1",
+  "repair_attempts": 0,
+  "schema": "forge-report/v1",
+  "step": "IP-1-anonymous-realtime-is-refused",
+  "ts": "2026-10-11T09:01:57.834198+00:00",
+  "verdicts": [
+    {
+      "evidence": "forge-runtime f8fa258f tests/realtime_anon_subscribe.rs anon_ws_subscribe_to_a_private_table_is_refused (error frame code UNAUTHENTICATED, no subscribed) and anon_sse_subscribe_to_a_private_table_is_401_with_no_stream (401, www-authenticate Bearer, content-type not text/event-stream) both ok in run ip1-after2 (realtime_anon_subscribe: ok. 5 passed; 0 failed)",
+      "item": "forge-runtime tests subscribe anonymously over the WebSocket mux and over SSE to a table with no anonymous read policy and are refused (WebSocket: an error frame, never subscribed or event; SSE: 401 with a Bearer challenge, not text/event-stream).",
+      "verdict": "met"
+    },
+    {
+      "evidence": "anon_ws_subscribe_to_a_public_table_streams and anon_sse_subscribe_to_a_public_table_streams ok in ip1-after2; the WS one was red before f8fa258f (ip1-before: 3 passed; 2 failed) because the mux polled as the anon subscriber, fixed by draining as drain_identity with resume confined to ids the socket opened (ws_resume_of_a_subscription_this_socket_did_not_open_is_refused ok); sse_adapter_auth 8, websocket_adapter 15, websocket_adapter_auth 7 all pass; fmt and clippy -D warnings clean",
+      "item": "The same tests show an anonymous subscribe to a table whose select policy is a literal predicate (anon-readable) still streams, over both transports.",
+      "verdict": "met"
+    },
+    {
+      "evidence": "forge-portal-e2e edde8ae retargets both to probe_locked (no select policy); dev stack run ip1-e2e-ba2: BEFORE main 3917e43 2 failed (Received subscribed; status 200 ct text/event-stream), AFTER lane 2 passed (1.0m); verbatim lines in roadmap step evidence; npm run typecheck clean",
+      "item": "forge-portal-e2e multi-protocol.spec.ts P2.2 and realtime-sse.spec.ts 'anon subscribe on a non-anon table is refused' target a table that is in fact private, fail on the dev stack before that change and pass after, with the run's output in the step's evidence.",
+      "verdict": "met"
+    }
+  ]
+}
