@@ -41,6 +41,7 @@
   "steps": [
     {
       "id": "IP-1-anonymous-realtime-is-refused",
+      "requires": [],
       "title": "An anonymous WebSocket or SSE subscribe to a table that does not admit anonymous reads is refused",
       "status": "todo",
       "scope": ["forge-runtime/"],
@@ -55,6 +56,7 @@
     },
     {
       "id": "IP-2-every-dialect-serves-on-push",
+      "requires": [],
       "title": "A workspace scaffolded in any of the four dialects is served on its first push",
       "status": "todo",
       "scope": ["forge-control-plane/", "forge-cli/"],
@@ -69,6 +71,7 @@
     },
     {
       "id": "IP-3-forge-build-is-retired",
+      "requires": ["IP-2"],
       "title": "The customer CLI hands over no toolchain: `forge build` is gone and the wasm verbs are hidden",
       "status": "todo",
       "scope": ["forge-cli/", "forge-control-plane/"],
@@ -85,6 +88,7 @@
     },
     {
       "id": "IP-4-forge-export",
+      "requires": [],
       "title": "`forge export` writes every table the caller can read as JSONL with a manifest, under the caller's own identity",
       "status": "todo",
       "scope": ["forge-cli/"],
@@ -100,6 +104,7 @@
     },
     {
       "id": "IP-5-deploy-serve-render-data",
+      "requires": [],
       "title": "deploy-serve's wasm op supplies its render data again",
       "status": "todo",
       "scope": ["forge-runtime/", "forge-portal-e2e/"],
@@ -114,6 +119,7 @@
     },
     {
       "id": "IP-6-field-references-converge",
+      "requires": [],
       "title": "The References page shows a converged index",
       "status": "todo",
       "scope": ["forge-runtime/", "forge-portal-e2e/"],
