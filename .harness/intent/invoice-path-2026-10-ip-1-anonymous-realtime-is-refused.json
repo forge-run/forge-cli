@@ -52,6 +52,11 @@
       "at": "2026-10-11T09:07:29.447355+00:00",
       "boundary": "align",
       "id": "gap-review"
+    },
+    {
+      "at": "2026-10-11T09:07:49.232015+00:00",
+      "boundary": "review",
+      "id": "gap-review"
     }
   ],
   "gap_reviews": [
@@ -133,6 +138,17 @@
         {
           "description": "none found",
           "note": "Read the forge-runtime f8fa258f source diff (sse.rs drain_identity pub(crate); mux poll.rs, handlers.rs handle_unsubscribe/handle_resume, socket.rs teardown close now dispatch as drain_identity; handle_resume checks this socket subs map first and answers NOT_FOUND without dispatching) and forge-portal-e2e edde8ae against intent revision 1 statement: refuse anon subscribe on a non-anon table at subscribe time, keep anon-readable tables subscribable, retarget the specs to the private probe_locked. Aligned: open_subscription_in_storage and the command frame still run as the caller, so the subscribe-time auth gate (UNAUTHENTICATED / SSE 401 Bearer) is untouched; the system identity only drains ids this socket opened, mirroring SSE G1 where the caller RLS filter is captured at subscribe. Cross-socket resume is now NOT_FOUND; it was not a working path before (teardown closes the subscription in storage on socket exit, the reconnect path is subscribe with since, reconnect_with_since_skips_earlier_events still green) and no client in forge-portal-e2e, forge-ui or forge-web sends a resume frame. No gap.",
+          "resolution": "accepted"
+        }
+      ],
+      "intent_ref": ".harness/intent/invoice-path-2026-10-ip-1-anonymous-realtime-is-refused.json"
+    },
+    {
+      "boundary": "review",
+      "gaps": [
+        {
+          "description": "none found",
+          "note": "Reviewed the full step diff per repo against intent revision 1: forge-runtime--step-ip1 from 10195fb0 (f8fa258f: drain_identity shared, mux poll/resume/close drain as system confined to this socket subs map, resume NOT_FOUND before dispatch; tests/realtime_anon_subscribe.rs 5 tests), forge-portal-e2e--step-ip1 from 3917e43 (edde8ae: two specs on probe_locked, pinning UNAUTHENTICATED and 401), forge-cli--step-ip1 (roadmap evidence, report, intent), forge-platform-architecture 91f51ba (STANDING.md render only). pre-review exit 0 on all three lanes. Correctness: subscribe-time auth unchanged, no widened identity on command or subscribe, error-frame shape matches unsubscribe miss; tests fail before and pass after. Each acceptance item has verbatim evidence on the step; status set done. No gap.",
           "resolution": "accepted"
         }
       ],

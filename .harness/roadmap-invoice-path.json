@@ -42,7 +42,7 @@
     {
       "id": "IP-1-anonymous-realtime-is-refused",
       "title": "An anonymous WebSocket or SSE subscribe to a table that does not admit anonymous reads is refused",
-      "status": "todo",
+      "status": "done",
       "scope": ["forge-runtime/", "forge-portal-e2e/"],
       "lands": ["forge-runtime", "forge-portal-e2e"],
       "notes": "forge-portal-e2e CI 2026-10-11 (runs 38118823816, 38115650365): multi-protocol.spec.ts:140 (P2.2) finds an anonymous WebSocket subscribe accepted, and realtime-sse.spec.ts:72 finds an anonymous SSE subscribe on a non-anon table answering 200 text/event-stream. Both are reads of a protected table by nobody, and a customer's data must not go into a workspace while they stand. Storage runs under the caller's RLS (CLAUDE.md), so find where the realtime routes skip the auth/RLS context the HTTP data API applies, and refuse at subscribe time with the same status the data API gives an anonymous read of that table. A table that does admit anonymous reads stays subscribable anonymously. Re-read at intake 2026-10-11: no runtime hole. probe_items' select policy `title neq \"__never__\"` (added by forge-portal-e2e b906f9b, PS-1, 2026-09-19) is a literal predicate, which forge-storage crud_emitter.rs has_public_read_policy treats as publicly readable: get/list/query/subscribe are all AuthLevel::Anonymous, and an anonymous REST list of probe_items answers 200 too. The two specs' premise (probe_items is non-anon) went false with PS-1. probe_locked (no select policy) is the only private probe table. The fix is the specs' target table; forge-runtime gains the missing coverage (no test subscribed anonymously over the WS mux at all) pinning both halves of the contract.",
