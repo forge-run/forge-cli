@@ -27,7 +27,7 @@
     },
     {
       "path": ".claude/skills/forge-build/SKILL.md",
-      "sha256": "6ba14b4c8b2ee2490a6def33e7218f48bcfa6a08b7286ce480a1084a05937938"
+      "sha256": "efda0ef3bb1b9543784cc34c70d0a8815dfbbfd8dc22896c56015a467b2844e2"
     },
     {
       "path": ".claude/skills/forge-model-tiers/SKILL.md",
@@ -59,7 +59,7 @@
     },
     {
       "path": ".github/workflows/harness-gates.yml",
-      "sha256": "28f1dfae393b65239f0b479816250b18def99d71f0efae7e1b81b8d14b0abe3c"
+      "sha256": "13960b34b167bf62992b0ad4a7b7ddb04bd5e242e1a02f2248996f690ada9b9d"
     },
     {
       "path": ".gitignore#rules",
@@ -75,7 +75,7 @@
     },
     {
       "path": ".harness/plan.json",
-      "sha256": "7ba179a4a2213586bc308b9a80ddc9a95c2320804a1d3a1e9bf84890d934908f"
+      "sha256": "75feb8bd64606c5b0cfa586a7aaea0376dbc2fabad37c0e5400cf1ff26b9d55a"
     },
     {
       "path": ".harness/runner.py",
@@ -204,7 +204,7 @@
         "deny": "-D warnings",
         "manifest_path": ""
       },
-      "sha256": "25cc1b07cbae30ab7714d782d56086e5eeb734ffd48cc9d839d490dc297ac36d",
+      "sha256": "6742ab58d32e3f9f1f9a26fff0927c63cfc25fe11eeaf31be24342d0fc9c4a97",
       "source": "../../core/gates/cargo-clippy"
     },
     {
@@ -232,8 +232,13 @@
     },
     {
       "kind": "gate",
-      "sha256": "e00fe9f982f79202976c88e7f45864c165568971ac7df34c14104943b9fd13aa",
+      "sha256": "acc23224a3ea2ccea716430f166c2964d40670240e5175e9ab61ad5128ac9eec",
       "source": "../../core/gates/ci-siblings"
+    },
+    {
+      "kind": "gate",
+      "sha256": "c4d047d00752aa4d6df202744573feab63d449e464d2c9b251438d071844610a",
+      "source": "../../core/gates/toolchain-pin"
     },
     {
       "kind": "fence",
@@ -334,8 +339,8 @@
   "harness_dir": "harnesses/hybrid",
   "source": {
     "kind": "commit",
-    "ref": "6549261a6fc58b441f1a26cf20411c9f696fbc50",
-    "sha": "6549261a6fc58b441f1a26cf20411c9f696fbc50"
+    "ref": "0d4855e",
+    "sha": "0d4855ed376ad77f032e636e7a5dfa4fec4e0c52"
   },
   "targets": [
     "claude-code",

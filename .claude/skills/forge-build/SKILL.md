@@ -238,23 +238,23 @@ pointing at the wrong crate. Required checkouts, derived from each repo's CI at 
 sweep:
 
 <!-- fact: platform/ci-sibling-checkouts -->
-| forge-agent | forge-platform-wire, forge-runtime, forge-schema, forge-sdk-v2, forge-sdk-v2-hello, forge-sdk-v2-storage-probe, forge-sdk-v2-test-fixtures, forge-secrets, forge-storage, forge-types, forge-ui, forge-web |
-| forge-cli | forge-lang, forge-schema, forge-sdk-v2, forge-types, forge-ui, forge-web |
-| forge-control-plane | forge-agent, forge-lang, forge-platform-wire, forge-runtime, forge-schema, forge-sdk-v2, forge-storage, forge-types, forge-ui, forge-web |
-| forge-edge | forge-agent, forge-platform-wire, forge-runtime, forge-schema, forge-sdk-v2, forge-sdk-v2-hello, forge-sdk-v2-storage-probe, forge-sdk-v2-test-fixtures, forge-secrets, forge-storage, forge-types, forge-ui, forge-web |
+| forge-agent | forge-sdlc-harness |
+| forge-cli | forge-sdlc-harness |
+| forge-control-plane | forge-sdlc-harness |
+| forge-edge | forge-sdlc-harness |
 | forge-facts | none |
 | forge-gateway | none |
 | forge-graph | none |
 | forge-platform-operations | none |
 | forge-platform-wire | none |
 | forge-portal-web-v1-archive | forge-portal-web, forge-runtime, forge-sdk-v2, forge-web |
-| forge-runtime | forge-platform-wire, forge-schema, forge-sdk-v2, forge-sdk-v2-hello, forge-sdk-v2-storage-probe, forge-sdk-v2-test-fixtures, forge-secrets, forge-storage, forge-types, forge-ui, forge-web |
+| forge-runtime | forge-sdlc-harness |
 | forge-schema | none |
 | forge-sdk-v2 | forge-runtime, forge-schema |
 | forge-sdk | none |
 | forge-sdlc-harness | none |
 | forge-secrets | none |
-| forge-storage | forge-schema, forge-types |
+| forge-storage | forge-sdlc-harness |
 | forge-tui | none |
 | forge-types | none |
 | forge-ui | forge-schema |
@@ -266,7 +266,7 @@ resolution error — not something you need to set up.
 ## Cost awareness
 
 <!-- fact: platform/crate-line-counts -->
-forge-runtime holds 209005 lines of tracked Rust and forge-storage 312377.
+forge-runtime holds 209013 lines of tracked Rust and forge-storage 312377.
 
 Both are genuinely slow from cold — tens of minutes. Prefer `cargo check` while iterating,
 and set `CARGO_TARGET_DIR` to a stable path so the heavy unchanging deps stay compiled

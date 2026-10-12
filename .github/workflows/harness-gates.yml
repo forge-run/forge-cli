@@ -21,12 +21,12 @@ jobs:
         with:
           fetch-depth: 0
           path: forge-cli
-      - name: Checkout harness machinery (6549261)
+      - name: Checkout harness machinery (0d4855e)
         uses: actions/checkout@v4
         with:
           repository: forge-run/forge-sdlc-harness
           path: forge-sdlc-harness
-          ref: 6549261a6fc58b441f1a26cf20411c9f696fbc50
+          ref: 0d4855ed376ad77f032e636e7a5dfa4fec4e0c52
           clean: true
           token: ${{ secrets.FORGE_CROSS_REPO_TOKEN }}
       - name: Check out the sibling closure (.harness/siblings.json)
@@ -56,21 +56,44 @@ jobs:
       # starts CI everywhere at once). One lock, one installer at a time,
       # and a failed install is retried from a clean uninstall rather than
       # left as the next job's conflict.
-      - name: Install Rust toolchain (serialised on the shared box)
+      #
+      # The toolchain is the consumer's PIN (CI-5): the channel its
+      # rust-toolchain.toml names, read in the consumer directory, which is
+      # the toolchain every cargo step below runs under. Until 2026-10-12
+      # this installed `stable` and probed `cargo +stable` (1.99), a
+      # toolchain nothing used, while each pinning consumer's first cargo
+      # fetched 1.95.0 outside the lock. A consumer with no Cargo.toml has no
+      # pin (the S-3 gate requires one wherever there is a Cargo.toml) and
+      # takes the machinery's, which is what builds the runner's tool.
+      - name: Install Rust toolchain from the pin (serialised on the shared box)
+        working-directory: forge-cli
         run: |
+          set -eu
+          PIN=rust-toolchain.toml
+          [ -f "$PIN" ] || PIN="$GITHUB_WORKSPACE/forge-sdlc-harness/rust-toolchain.toml"
+          TC="$(awk -F'"' '/^[[:space:]]*channel[[:space:]]*=/ { print $2; exit }' "$PIN")"
+          if [ -z "$TC" ]; then echo "no channel in $PIN" >&2; exit 1; fi
+          echo "toolchain pin: $TC ($PIN)"
+          export TC
           flock /tmp/rustup-repair.lock -c '
             set -e
             R="$HOME/.cargo/bin/rustup"
-            install() { "$R" toolchain install stable --profile minimal --component rustfmt --component clippy --target wasm32-wasip1 --no-self-update; }
+            install() { "$R" toolchain install "$TC" --profile minimal --component rustfmt --component clippy --target wasm32-wasip1 --no-self-update; }
             if ! install; then
-              echo "rustup: stable install failed; reinstalling from a clean uninstall"
-              "$R" toolchain uninstall stable || true
+              echo "rustup: $TC install failed; reinstalling from a clean uninstall"
+              "$R" toolchain uninstall "$TC" || true
               rm -f "$HOME/.rustup/downloads/"*.partial
               install
             fi
-            "$R" default stable
-            "$HOME/.cargo/bin/cargo" +stable --version
+            "$R" default "$TC"
           '
+          # Printed from the consumer directory, so it is what rustup resolves
+          # there; a numbered pin that resolves to anything else is a red.
+          V="$("$HOME/.cargo/bin/cargo" --version)"
+          echo "$V"
+          case "$TC" in
+            [0-9]*) case "$V" in "cargo $TC "*) ;; *) echo "cargo here is not the pin $TC" >&2; exit 1 ;; esac ;;
+          esac
       # No rust-cache: the self-hosted runners persist target/ between
       # runs already, and rust-cache's post-job pruning corrupted a
       # sibling workflow's persistent target dir (missing dep-info, cargo
