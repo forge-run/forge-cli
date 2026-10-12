@@ -1,0 +1,29 @@
+{
+  "acceptance": [
+    "No workflow in these repos that runs cargo carries a hand list of forge-run sibling checkouts; each calls checkout-siblings.",
+    "forge-cli CI, forge-edge ci and forge-agent ci are green on main after this lands, with run ids in the evidence.",
+    "forge-runtime, forge-control-plane ci and forge-lang df-nightly's checkout step succeed on a runner whose workspace was cleaned first."
+  ],
+  "author": "rory",
+  "events": [
+    {
+      "at": "2026-10-12T03:02:40.671791+00:00",
+      "id": "intent-recorded",
+      "revision": 1,
+      "source": "factory-delegate"
+    }
+  ],
+  "gap_reviews": [],
+  "out_of_scope": [],
+  "refs": [
+    "plan:ci-green-2026-10",
+    "step:CI-3-hand-workflows-use-the-action"
+  ],
+  "revision": 1,
+  "schema": "forge-intent/v1",
+  "slug": "ci-green-2026-10-ci-3-hand-workflows-use-the-action",
+  "source": "factory-delegate",
+  "statement": "Every hand-written workflow that runs cargo checks out its siblings through the action instead of a list \u2014 The lists are what broke: forge-cli ci.yml and release.yml lack forge-platform-wire (Cargo.toml:92 since 390b1c1) and forge-runtime (build.rs:23), red since 2026-09-02 on a hosted runner; forge-edge and forge-agent ci.yml lack forge-lang, red since forge-runtime 6c236324 added forge-lang-interp (forge-runtime/Cargo.toml:498-499, crates/forge-adapters/Cargo.toml:65); forge-runtime ci.yml and release.yml lack forge-lang (green only on stale runner copies); forge-agent and forge-edge release.yml lack sdk-v2, ui, web (and lang); forge-lang df-nightly lacks forge-types. Replace each list with the checkout-siblings action. Also correct the comments claiming dtolnay exports RUSTUP_TOOLCHAIN (forge-runtime ci.yml:175, forge-storage ci.yml:79): it does not; rust-toolchain.toml is what pins.",
+  "ts": "2026-10-12T03:02:40.671791+00:00",
+  "updated_at": "2026-10-12T03:02:40.671791+00:00"
+}
