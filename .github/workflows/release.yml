@@ -49,75 +49,33 @@ jobs:
             runs_on: ubuntu-latest
             archive_os: linux
     steps:
-      # forge-cli has a `forge-schema = { path = "../forge-schema" }` dep,
-      # so the schema crate must be checked out as a SIBLING for the build
-      # to resolve. actions/checkout can't write outside $GITHUB_WORKSPACE,
-      # so we use the same nested layout as ci.yml (forge-cli + siblings as
-      # subdirs, build from `working-directory: forge-cli`).
+      # actions/checkout can't write outside $GITHUB_WORKSPACE, so the layout
+      # is forge-cli + siblings as subdirs (same as ci.yml), built from
+      # `working-directory: forge-cli`.
       - name: Checkout forge-cli
         uses: actions/checkout@v4
         with:
           path: forge-cli
 
-      - name: Checkout forge-schema
+      # The harness ref this repo is pinned to (.harness/lock.json), so the
+      # action and siblings.json always come from the same roll.
+      - name: Read the harness pin
+        id: harness
+        run: echo "ref=$(python3 -c 'import json;print(json.load(open("forge-cli/.harness/lock.json"))["source"]["sha"])')" >> "$GITHUB_OUTPUT"
+      - name: Checkout harness machinery (pinned)
         uses: actions/checkout@v4
         with:
-          repository: forge-run/forge-schema
+          repository: forge-run/forge-sdlc-harness
+          path: forge-sdlc-harness
+          ref: ${{ steps.harness.outputs.ref }}
+          clean: true
           token: ${{ secrets.FORGE_CROSS_REPO_TOKEN }}
-          path: forge-schema
-
-      # forge-manifest = { path = "../forge-types/crates/forge-manifest" } — the
-      # shared manifest crate; forge-types must be a sibling for the build.
-      - name: Checkout forge-types
-        uses: actions/checkout@v4
+      - name: Check out the sibling closure (.harness/siblings.json)
+        uses: ./forge-sdlc-harness/.github/actions/checkout-siblings
         with:
-          repository: forge-run/forge-types
+          consumer: forge-cli
+          keep: forge-sdlc-harness
           token: ${{ secrets.FORGE_CROSS_REPO_TOKEN }}
-          path: forge-types
-
-      # forge-web-build = { path = "../forge-web/build" } — the workspace
-      # compiler (`forge build` graph + lock stamping). Needs forge-web as a
-      # sibling; forge-web/build in turn path-deps forge-ui (../../forge-ui).
-      - name: Checkout forge-web
-        uses: actions/checkout@v4
-        with:
-          repository: forge-run/forge-web
-          token: ${{ secrets.FORGE_CROSS_REPO_TOKEN }}
-          path: forge-web
-
-      - name: Checkout forge-ui
-        uses: actions/checkout@v4
-        with:
-          repository: forge-run/forge-ui
-          token: ${{ secrets.FORGE_CROSS_REPO_TOKEN }}
-          path: forge-ui
-
-      # forge-cli path-deps ../forge-lang/crates/forge-lang-rustgen, NOT
-      # optional and not feature-gated, and forge-lang in turn path-deps
-      # forge-sdk-v2 (whose own path dep, forge-schema, is checked out above).
-      # Cargo parses every path dep's manifest before it looks at features or
-      # targets, so both must be here or the release build dies before it
-      # compiles a line.
-      #
-      # This is why forge-sdk-v2 is now present despite the note on ci.yml's
-      # copy saying the narrower release build does not pull forge-web/core:
-      # that reasoning was about core, and forge-lang reaches forge-sdk-v2 by a
-      # different edge. The release workflow has not run since the forge-lang
-      # dep landed (last tag v0.5.3, 2026-07-17), so the next tag would have
-      # been the first to find out.
-      - name: Checkout forge-lang
-        uses: actions/checkout@v4
-        with:
-          repository: forge-run/forge-lang
-          token: ${{ secrets.FORGE_CROSS_REPO_TOKEN }}
-          path: forge-lang
-
-      - name: Checkout forge-sdk-v2
-        uses: actions/checkout@v4
-        with:
-          repository: forge-run/forge-sdk-v2
-          token: ${{ secrets.FORGE_CROSS_REPO_TOKEN }}
-          path: forge-sdk-v2
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
