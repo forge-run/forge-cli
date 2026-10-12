@@ -48,6 +48,15 @@ jobs:
           components: rustfmt, clippy
           targets: wasm32-wasip1
 
+      # The Java dialect's front half parses with `javac --release 21`
+      # (forge-lang-java src/parse.rs), and the dialect tests run it.
+      # ubuntu-latest defaults to an older JDK; pin the one the dialect needs.
+      - name: Install JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
         with:
