@@ -289,6 +289,31 @@
     },
     {
       "blocking": true,
+      "check": "check.py",
+      "ci_skip": false,
+      "description": "Every job in the consumer's `.github/workflows/` that runs cargo checks out the consumer's whole sibling closure (CI-4, roadmap ci-green-2026-10). The closure is CI-1's: `core/runner/siblings.py`, the transitive walk over the `path = \"…\"` deps of every Cargo.toml reached, the same function the emitted siblings.json, the runner's memo and land.py read. A job is covered by the checkout-siblings action (whatever the consumer's `.harness/siblings.json` lists) or by explicit `actions/checkout` steps of `forge-run/<name>` at path `<name>`. The finding names the workflow, the job and every sibling it lacks.\nWritten after forge-runtime gained a forge-lang path-dep (6c236324) and every dependent's hand-listed checkouts went stale without a commit in the dependent: forge-edge and forge-agent ci went red on hosted runners, and forge-runtime's own ci stayed green only on self-hosted runners still holding a forge-lang from an earlier job. The gate re-runs on any Cargo.toml change, so a new path-dep fails at the commit that adds it in the repo that adds it, and in a dependent at its next commit under these filters rather than on a runner days later.\nWhat it cannot see, and says nothing about: cargo run from a script a step calls, or from a local composite action. It reads `run:` text. The cargo closure only: a declared `ci.sibling_checkouts` floor (a build.rs read, the forge-facts the fact-pins gate wants) is the action's business and CI-17's, not a hand workflow's obligation.\nThe workflow reader is a stdlib block-YAML subset (mappings, sequences, block scalars) because the fleet guarantees no YAML library to a check; a workflow it cannot read is exit 2 naming the file, never a pass.\nNot memoized: the verdict reads siblings' manifests outside the consumer, which D-016's condition excludes.\n",
+      "events": [
+        "pre-done",
+        "pre-commit"
+      ],
+      "exclude": [
+        ".harness/evidence/**",
+        ".harness/state/**",
+        "**/target/**"
+      ],
+      "id": "ci-siblings",
+      "include": [
+        ".github/workflows/*",
+        "**/Cargo.toml"
+      ],
+      "memoize": false,
+      "params": {},
+      "source": "core/gates/ci-siblings",
+      "timeout_seconds": 30,
+      "toolchains": []
+    },
+    {
+      "blocking": true,
       "check": "check.sh",
       "ci_skip": true,
       "description": "The stdlib-unittest suite that covers the emitted runner and dispatcher must be green before a change to them is accepted or committed.\nThis closes a hole the cargo gates cannot see. The harness repo's own `cargo-tests` is scoped to `tool/` — correctly, since that is where its crate lives — so the ~1100-test python suite that covers `core/runner/**` ran only in CI and by hand. HM2.1 found NINE reds sitting in it, unnoticed, and fixed them; nothing local would have objected while they landed (GAP-REVIEWS #hm2-1). The dispatcher those tests cover is the file every enforcement path in the fleet runs through, and its parsing code fails OPEN when wrong: a mis-parse waves the command through silently.\n`ci_skip` because ci.yml already runs exactly this discovery, in the `runner` job, on every push — this is the session-tier twin of a check that keeps its CI half (D-012), not a second copy of it.\nPath-filtered to the runner tree, so a docs or gate-asset commit does not pay for it, and memoized on that same fileset: an unchanged `core/runner/**` is a suite whose answer cannot have moved.\nNOT APPLICABLE where there is no such suite. hybrid is a shared harness and forge-portal-web has no `core/runner/`, so \"there is nothing here to run\" has to be a real answer — established by looking, the way vendor-integrity establishes its own: if a runner tests directory survives elsewhere in the tree, the pathspec MOVED and this gate is checking nothing, which is exit 2 and not a green tick. Both grep fences that died in this fleet died by matching nothing after a file move.\n",
