@@ -14,19 +14,26 @@ jobs:
     runs-on: [self-hosted]
     # The shared runner resolves its consumer from this, not from where the
     # runner file happens to live — it now lives in the harness checkout.
+    #
+    # A compile the sccache server cannot serve falls back to a local one
+    # instead of failing (CI-15): on 2026-10-11 'failed to fill whole buffer'
+    # and 'Connection reset by peer' from the shared :4227 server were reds
+    # on code that compiled. The wrapper comes from the runner box's env, so
+    # the opt-out has to be the job's; a runner without sccache ignores it.
     env:
       HARNESS_CONSUMER_ROOT: ${{ github.workspace }}/forge-cli
+      SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
           path: forge-cli
-      - name: Checkout harness machinery (0d4855e)
+      - name: Checkout harness machinery (b392d16)
         uses: actions/checkout@v4
         with:
           repository: forge-run/forge-sdlc-harness
           path: forge-sdlc-harness
-          ref: 0d4855ed376ad77f032e636e7a5dfa4fec4e0c52
+          ref: b392d16d07af67df0a88c5d999925c4dbd4875d6
           clean: true
           token: ${{ secrets.FORGE_CROSS_REPO_TOKEN }}
       - name: Check out the sibling closure (.harness/siblings.json)
