@@ -11,9 +11,41 @@
       "id": "intent-recorded",
       "revision": 1,
       "source": "factory-delegate"
+    },
+    {
+      "at": "2026-10-12T03:06:21.729249+00:00",
+      "boundary": "review",
+      "id": "gap-review"
     }
   ],
-  "gap_reviews": [],
+  "gap_reviews": [
+    {
+      "boundary": "review",
+      "gaps": [
+        {
+          "description": "forge-runtime's siblings.json does not yet carry the three fixture repos its consumer.yaml now declares",
+          "note": "harness build bakes the checkout dir name into what it emits, so it cannot run in a lane; the orchestrator re-rolls at the same ref (8cac754) right after landing, and roll.sh only commits the consumers whose emission moved",
+          "resolution": "accepted"
+        },
+        {
+          "description": "the 'Heal damaged runtime tree' steps stay in forge-agent and forge-edge ci.yml, moved before the action",
+          "note": "the action prunes only trees outside the closure and forge-runtime is inside it, and the recorded damage survived force checkouts, which is all the action does to an in-closure tree",
+          "resolution": "accepted"
+        },
+        {
+          "description": "acceptance 2 and 3 are not yet evidenced",
+          "note": "both are CI runs on main, which only exist after this lands; they are recorded on the step from the post-land and post-re-roll runs",
+          "resolution": "accepted"
+        },
+        {
+          "description": "the forge-cli lane also lands CI-2's consumer.yaml commit (53e1350)",
+          "note": "CI-2's evidence carried it to this lane; it names the hybrid manifest's four siblings explicitly, so the emitted siblings.json is unchanged by it",
+          "resolution": "accepted"
+        }
+      ],
+      "intent_ref": ".harness/intent/ci-green-2026-10-ci-3-hand-workflows-use-the-action.json"
+    }
+  ],
   "out_of_scope": [],
   "refs": [
     "plan:ci-green-2026-10",
