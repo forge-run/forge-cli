@@ -13,3 +13,17 @@ overrides:
   cargo-tests:
     params:
       scope: full
+# The CI sibling floor (CI-2). This list REPLACES the hybrid manifest's, so it
+# repeats that list in its order and the cargo closure is added after it.
+ci:
+  sibling_checkouts:
+    - forge-sdk-v2
+    - forge-schema
+    # build.rs reads ../forge-runtime/crates/forge-runtime-auth/schemas at
+    # build time to embed the runtime-owned schema bundle. No Cargo.toml here
+    # path-deps forge-runtime, so the cargo closure cannot see this read:
+    # without the declaration the build panics "cannot read the runtime-owned
+    # schema bundle".
+    - forge-runtime
+    # the fact-pins gate reads forge-facts beside the consumer
+    - forge-facts
