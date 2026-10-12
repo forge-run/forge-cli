@@ -21,77 +21,19 @@ jobs:
         with:
           fetch-depth: 0
           path: forge-cli
-      - name: Checkout harness machinery (6dcc7c6)
+      - name: Checkout harness machinery (8cac754)
         uses: actions/checkout@v4
         with:
           repository: forge-run/forge-sdlc-harness
           path: forge-sdlc-harness
-          ref: 6dcc7c687e1cdb1071025ad640a639681b10fed1
+          ref: 8cac7540dec6913d8b46fe1433071f72e09d6de8
           clean: true
           token: ${{ secrets.FORGE_CROSS_REPO_TOKEN }}
-      - name: Checkout forge-sdk-v2
-        uses: actions/checkout@v4
+      - name: Check out the sibling closure (.harness/siblings.json)
+        uses: ./forge-sdlc-harness/.github/actions/checkout-siblings
         with:
-          repository: forge-run/forge-sdk-v2
-          path: forge-sdk-v2
-          ref: main
-          clean: true
-          token: ${{ secrets.FORGE_CROSS_REPO_TOKEN }}
-      - name: Checkout forge-schema
-        uses: actions/checkout@v4
-        with:
-          repository: forge-run/forge-schema
-          path: forge-schema
-          ref: main
-          clean: true
-          token: ${{ secrets.FORGE_CROSS_REPO_TOKEN }}
-      - name: Checkout forge-runtime
-        uses: actions/checkout@v4
-        with:
-          repository: forge-run/forge-runtime
-          path: forge-runtime
-          ref: main
-          clean: true
-          token: ${{ secrets.FORGE_CROSS_REPO_TOKEN }}
-      - name: Checkout forge-facts
-        uses: actions/checkout@v4
-        with:
-          repository: forge-run/forge-facts
-          path: forge-facts
-          ref: main
-          clean: true
-          token: ${{ secrets.FORGE_CROSS_REPO_TOKEN }}
-      - name: Checkout forge-lang
-        uses: actions/checkout@v4
-        with:
-          repository: forge-run/forge-lang
-          path: forge-lang
-          ref: main
-          clean: true
-          token: ${{ secrets.FORGE_CROSS_REPO_TOKEN }}
-      - name: Checkout forge-platform-wire
-        uses: actions/checkout@v4
-        with:
-          repository: forge-run/forge-platform-wire
-          path: forge-platform-wire
-          ref: main
-          clean: true
-          token: ${{ secrets.FORGE_CROSS_REPO_TOKEN }}
-      - name: Checkout forge-types
-        uses: actions/checkout@v4
-        with:
-          repository: forge-run/forge-types
-          path: forge-types
-          ref: main
-          clean: true
-          token: ${{ secrets.FORGE_CROSS_REPO_TOKEN }}
-      - name: Checkout forge-web
-        uses: actions/checkout@v4
-        with:
-          repository: forge-run/forge-web
-          path: forge-web
-          ref: main
-          clean: true
+          consumer: forge-cli
+          keep: forge-sdlc-harness
           token: ${{ secrets.FORGE_CROSS_REPO_TOKEN }}
       # Some runners' service PATH lacks ~/.cargo/bin (per-runner skew
       # on the shared box); make resolution uniform before the action.

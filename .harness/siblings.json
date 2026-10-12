@@ -1,0 +1,67 @@
+{
+  "consumer": "forge-cli",
+  "generated_by": "forge-sdlc-harness (harness build); do not edit — edits are drift",
+  "schema": "forge-siblings/v1",
+  "siblings": [
+    {
+      "path": "forge-sdk-v2",
+      "ref": "main",
+      "repository": "forge-run/forge-sdk-v2",
+      "source": "declared"
+    },
+    {
+      "path": "forge-schema",
+      "ref": "main",
+      "repository": "forge-run/forge-schema",
+      "source": "declared"
+    },
+    {
+      "path": "forge-runtime",
+      "ref": "main",
+      "repository": "forge-run/forge-runtime",
+      "source": "declared"
+    },
+    {
+      "path": "forge-facts",
+      "ref": "main",
+      "repository": "forge-run/forge-facts",
+      "source": "declared"
+    },
+    {
+      "path": "forge-lang",
+      "ref": "main",
+      "repository": "forge-run/forge-lang",
+      "source": "cargo"
+    },
+    {
+      "path": "forge-platform-wire",
+      "ref": "main",
+      "repository": "forge-run/forge-platform-wire",
+      "source": "cargo"
+    },
+    {
+      "path": "forge-storage",
+      "ref": "main",
+      "repository": "forge-run/forge-storage",
+      "source": "cargo"
+    },
+    {
+      "path": "forge-types",
+      "ref": "main",
+      "repository": "forge-run/forge-types",
+      "source": "cargo"
+    },
+    {
+      "path": "forge-ui",
+      "ref": "main",
+      "repository": "forge-run/forge-ui",
+      "source": "cargo"
+    },
+    {
+      "path": "forge-web",
+      "ref": "main",
+      "repository": "forge-run/forge-web",
+      "source": "cargo"
+    }
+  ]
+}
