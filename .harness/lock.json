@@ -27,7 +27,7 @@
     },
     {
       "path": ".claude/skills/forge-build/SKILL.md",
-      "sha256": "ebcb5754d3312e4f3bfd959ce140c3f915eb8c0a69cb377e4549dcd5b9d5e605"
+      "sha256": "2a2625a2f7ec571487b228ad3d19c422f3b98e9951e695475742ed306ff00077"
     },
     {
       "path": ".claude/skills/forge-model-tiers/SKILL.md",
@@ -59,7 +59,7 @@
     },
     {
       "path": ".github/workflows/harness-gates.yml",
-      "sha256": "da6c5c2d90c03a0263425de074c0882a73aa3b9d8a60eb8be11457019a8945b7"
+      "sha256": "67b5868cdb16dde5b233a91e5f98746e92be341f95819f73cf6d4a5d78f82189"
     },
     {
       "path": ".gitignore#rules",
@@ -75,7 +75,7 @@
     },
     {
       "path": ".harness/plan.json",
-      "sha256": "75feb8bd64606c5b0cfa586a7aaea0376dbc2fabad37c0e5400cf1ff26b9d55a"
+      "sha256": "8f6ef2c3c518537c4ca9c3a6375735b18f33c8c9a9306cbcfeb842265aa3637b"
     },
     {
       "path": ".harness/runner.py",
@@ -241,6 +241,11 @@
       "source": "../../core/gates/toolchain-pin"
     },
     {
+      "kind": "gate",
+      "sha256": "52251625ccad999b34118426141545021b115463f54945a1f63f2954223e9811",
+      "source": "../../core/gates/minijinja-ratchet"
+    },
+    {
       "kind": "fence",
       "sha256": "eb5863341abf0eb7bdc5e48d8e6de2ca4601b96ea6ee1fd64ad0a6626cb7c750",
       "source": "local/no-substrate-path-deps"
@@ -339,8 +344,8 @@
   "harness_dir": "harnesses/hybrid",
   "source": {
     "kind": "commit",
-    "ref": "b392d16",
-    "sha": "b392d16d07af67df0a88c5d999925c4dbd4875d6"
+    "ref": "4f2338e",
+    "sha": "4f2338e72dd1eb74be12487c9159060939733786"
   },
   "targets": [
     "claude-code",

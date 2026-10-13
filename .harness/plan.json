@@ -340,6 +340,32 @@
     },
     {
       "blocking": true,
+      "check": "check.py",
+      "ci_skip": false,
+      "description": "The minijinja ratchet (TSX-6, roadmap tsx-components-2026-10): a consumer's minijinja artifacts are exactly the files its committed baseline names, so the number may fall and may not rise without a by-name acceptance. Pages and components are being rewritten as .tsx; the existing minijinja pages keep serving behind this ratchet until the refresh retires them.\nTHE COUNTING RULE. An artifact is a file git would commit (tracked, or untracked and not ignored) whose basename ends in `.component.html` or `.page.html`, at any depth in the consumer. Nothing else counts: a `.component.json`, `.component.css`, a bare `.html`, or a file under an ignored path. Counted per repo, the consumer's own tree only; a lane worktree counts its own checkout. On 2026-10-13 that is forge-portal-web 162, forge-ui 10, forge-web 2 (examples/declarative-app). forge-crm (15), forge-marketplace (6) and forge-portal-e2e (3) consume no harness and are not governed.\nTHE BASELINE is `.harness/minijinja-baseline.json`:\n\n  {\"schema\": \"forge-minijinja-baseline/v1\", \"count\": 2,\n   \"files\": [\"components/x.component.html\", \"pages/y.page.html\"]}\n\n`count` is the committed number and must equal the length of `files`, a sorted list of repo-relative paths without duplicates. The gate fails on an artifact the baseline does not name (an addition, or a rename's new name: accept it by adding the name in the same commit, where review sees it) and on a name the tree no longer holds (a deletion or a rename's old name: drop it in the same commit, so the committed count falls with the tree rather than leaving headroom a later addition could spend). A repo with no baseline is governed at zero: it passes while it holds no artifact, and an artifact there fails, the finding printing the baseline that would enrol the tree as it stands. A baseline this gate cannot read (unparseable, an unknown schema id, a `files` that is not a list of strings) is exit 2, never an empty ratchet.\nWhole-tree rather than changed-paths: the count is a property of the tree, and a gate that judged only the changed set would let a deletion leave its name standing in the baseline. It is cheap (one `git ls-files`), so not memoized; the verdict reads the index as well as the files the filters name.\n",
+      "events": [
+        "pre-done",
+        "pre-commit"
+      ],
+      "exclude": [
+        ".harness/evidence/**",
+        ".harness/state/**",
+        "**/target/**"
+      ],
+      "id": "minijinja-ratchet",
+      "include": [
+        "**/*.component.html",
+        "**/*.page.html",
+        ".harness/minijinja-baseline.json"
+      ],
+      "memoize": false,
+      "params": {},
+      "source": "core/gates/minijinja-ratchet",
+      "timeout_seconds": 30,
+      "toolchains": []
+    },
+    {
+      "blocking": true,
       "check": "check.sh",
       "ci_skip": true,
       "description": "The stdlib-unittest suite that covers the emitted runner and dispatcher must be green before a change to them is accepted or committed.\nThis closes a hole the cargo gates cannot see. The harness repo's own `cargo-tests` is scoped to `tool/` — correctly, since that is where its crate lives — so the ~1100-test python suite that covers `core/runner/**` ran only in CI and by hand. HM2.1 found NINE reds sitting in it, unnoticed, and fixed them; nothing local would have objected while they landed (GAP-REVIEWS #hm2-1). The dispatcher those tests cover is the file every enforcement path in the fleet runs through, and its parsing code fails OPEN when wrong: a mis-parse waves the command through silently.\n`ci_skip` because ci.yml already runs exactly this discovery, in the `runner` job, on every push — this is the session-tier twin of a check that keeps its CI half (D-012), not a second copy of it.\nPath-filtered to the runner tree, so a docs or gate-asset commit does not pay for it, and memoized on that same fileset: an unchanged `core/runner/**` is a suite whose answer cannot have moved.\nNOT APPLICABLE where there is no such suite. hybrid is a shared harness and forge-portal-web has no `core/runner/`, so \"there is nothing here to run\" has to be a real answer — established by looking, the way vendor-integrity establishes its own: if a runner tests directory survives elsewhere in the tree, the pathspec MOVED and this gate is checking nothing, which is exit 2 and not a green tick. Both grep fences that died in this fleet died by matching nothing after a file move.\n",

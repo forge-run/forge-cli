@@ -257,7 +257,7 @@ sweep:
 | forge-storage | forge-sdlc-harness |
 | forge-tui | none |
 | forge-types | none |
-| forge-ui | forge-schema |
+| forge-ui | forge-sdlc-harness |
 | forge-web | forge-runtime, forge-schema, forge-sdk-v2, forge-types, forge-ui |
 
 Every repo is already cloned flat in the working root, so this table is for diagnosing a
@@ -266,7 +266,7 @@ resolution error — not something you need to set up.
 ## Cost awareness
 
 <!-- fact: platform/crate-line-counts -->
-forge-runtime holds 209013 lines of tracked Rust and forge-storage 312840.
+forge-runtime holds 211924 lines of tracked Rust and forge-storage 312840.
 
 Both are genuinely slow from cold — tens of minutes. Prefer `cargo check` while iterating,
 and set `CARGO_TARGET_DIR` to a stable path so the heavy unchanging deps stay compiled
