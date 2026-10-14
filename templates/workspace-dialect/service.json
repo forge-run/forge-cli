@@ -24,7 +24,7 @@
       },
       "error_codes": [],
       "summary": "Return a greeting.",
-      "description": "The starter op. Proves the workspace builds, ships, and serves. Bind it from a page with @op:{{domain}}::hello."
+      "description": "The starter op. Proves the workspace checks, ships, and serves: apps/web/pages/index.tsx loads it and renders its answer at /."
     }
   ]
 }

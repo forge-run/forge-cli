@@ -14,8 +14,9 @@
 //! strictly less work than the reverse (PHASE5-PROPOSAL §5, recommendation
 //! ii).
 //!
-//! So: this builds the COMMAND and the dispatch. The dialect is its only
-//! checker. It does not build the TSX checker.
+//! So: this builds the COMMAND and the dispatch. The dialect was its only
+//! checker until TSX-17 put the TSX checker behind it: every `.tsx` page and
+//! component under `apps/` is judged here as the push judges it.
 //!
 //! # No warning tier
 //!
@@ -38,8 +39,10 @@ use std::path::{Path, PathBuf};
 
 use anyhow::Result;
 use clap::Args;
-use forge_lang_rustgen::ContractDiff;
-use forge_lang_rustgen::{Card, CompileError, NativeValidation, Register, check_only_with};
+use forge_lang_rustgen::{
+    Card, CompileError, ContractDiff, ContractSurfaces, NativeValidation, Register,
+    check_only_with, with_contract_surfaces,
+};
 
 use crate::cmd::contract_diff;
 use crate::dialect;
@@ -146,7 +149,7 @@ pub(crate) fn check(root: &Path) -> Result<Verdicts, String> {
     };
     let source_root: &Path = pinned.as_ref().map_or(root, |s| s.root.as_path());
     let sources = dialect::sources(source_root);
-    if sources.is_empty() {
+    if sources.is_empty() && !root.join("apps").is_dir() {
         return Ok(Verdicts::default());
     }
     // A sibling unit is in that enumeration (shared-code SC-8): a Python,
@@ -262,6 +265,11 @@ pub(crate) fn check(root: &Path) -> Result<Verdicts, String> {
         ),
         None => (registers, units),
     };
+    let (mut registers, mut cards) = (registers, cards);
+    for register in tsx_registers(root, &contracts)? {
+        registers.push(register);
+        cards.push(Vec::new());
+    }
     Ok(Verdicts {
         registers,
         cards,
@@ -270,6 +278,45 @@ pub(crate) fn check(root: &Path) -> Result<Verdicts, String> {
         schema,
         units,
     })
+}
+
+/// One verdict per `.tsx` page and component under `apps/*/`, in tree order
+/// (TSX-17): the TS front half under its component profile with the tree's
+/// contract surfaces in scope, as the control plane checks each module at
+/// push (`tsx_derive::derive`), so a loader naming an op this tree does not
+/// declare is refused here and not a push later. A module has no ops, so it
+/// carries no cost card.
+fn tsx_registers(root: &Path, contracts: &ContractSurfaces) -> Result<Vec<Register>, String> {
+    let Ok(entries) = std::fs::read_dir(root.join("apps")) else {
+        return Ok(Vec::new());
+    };
+    let mut apps: Vec<PathBuf> = entries
+        .filter_map(|e| e.ok().map(|e| e.path()))
+        .filter(|p| p.is_dir())
+        .collect();
+    apps.sort();
+    let mut registers = Vec::new();
+    for app in apps {
+        let records = forge_web_build::tsx_walker::collect_tsx(&app, &[], &[])
+            .map_err(|e| format!("{}: {e}", app.display()))?;
+        for record in records {
+            let verdict = with_contract_surfaces(contracts, || {
+                forge_lang_tree::surface::with_generated_surface(contracts, || {
+                    forge_lang_ts::front_end_units(&record.path)
+                })
+            })
+            .map_err(|e| format!("{}: {e}", record.path.display()))?;
+            match verdict {
+                Ok((source, _)) => registers.push(Register::new(source.display())),
+                Err(forge_lang_ts::FrontEndError::Rejected(register)) => registers.push(register),
+                Err(
+                    forge_lang_ts::FrontEndError::Toolchain(m)
+                    | forge_lang_ts::FrontEndError::Blocked(m),
+                ) => return Err(format!("{}: {m}", record.path.display())),
+            }
+        }
+    }
+    Ok(registers)
 }
 
 /// Which domain a source belongs to — `domains/<d>/services/x.py` -> `<d>`.

@@ -1,0 +1,30 @@
+{
+  "acceptance": [
+    "forge new --dialect <any> produces a workspace whose TSX page serves its op's answer on first push; a CLI test and a dev-stack run.",
+    "The published docs carry the components guide."
+  ],
+  "author": "rory",
+  "events": [
+    {
+      "at": "2026-10-14T01:12:25.305536+00:00",
+      "id": "intent-recorded",
+      "revision": 1,
+      "source": "verb"
+    }
+  ],
+  "gap_reviews": [],
+  "out_of_scope": [
+    "Client-mode pages, state cells, islands (TSX-23..29)",
+    "Scoped component CSS (TSX-16)"
+  ],
+  "refs": [
+    "tsx-components-2026-10/TSX-17-forge-new-starts-with-ui"
+  ],
+  "revision": 1,
+  "schema": "forge-intent/v1",
+  "slug": "tsx-components-2026-10-tsx-17-forge-new-starts-with-ui",
+  "source": "verb",
+  "statement": "forge new, for every dialect, scaffolds a TSX page with a loader calling the hello op and one TSX component beside the op, so a fresh workspace serves its op's answer through a TSX page on first push; and the portal's published docs carry the components guide generated from SUBSET-SKILL-TS's components section.",
+  "ts": "2026-10-14T01:12:25.305536+00:00",
+  "updated_at": "2026-10-14T01:12:25.305536+00:00"
+}

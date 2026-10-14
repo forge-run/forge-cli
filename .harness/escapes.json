@@ -1,0 +1,8 @@
+[
+  {
+    "fence": "no-substrate-path-deps",
+    "reason": "forge-cli path-depends on forge-platform-wire for the shared-unit shapes (D-110, shared-code SC-11): the pin file, the unit address and the publish/record bodies `forge check`, `forge units` and the control plane must read as one definition. No customer-surface crate carries them, which is the gap this entry records. The escape covers the one forbidden line already on main; it surfaced when TSX-17 added forge-lang-ts and forge-lang-tree beside it.",
+    "paths": ["Cargo.toml"],
+    "at": "2026-10-14"
+  }
+]

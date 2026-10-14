@@ -851,6 +851,8 @@ dependencies = [
  "clap",
  "forge-lang-rustgen",
  "forge-lang-test",
+ "forge-lang-tree",
+ "forge-lang-ts",
  "forge-manifest",
  "forge-platform-wire",
  "forge-schema",

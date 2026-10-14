@@ -1,0 +1,10 @@
+{
+  "schema_version": "0.1",
+  "app": {
+    "name": "web",
+    "version": "0.1.0",
+    "description": "{{workspace_name}}'s pages: TSX, server-rendered, their data from the {{domain}} ops."
+  },
+  "routing_claim": { "host": "@default", "path": "/" },
+  "consumes": ["{{domain}}"]
+}

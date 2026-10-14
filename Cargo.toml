@@ -86,6 +86,11 @@ forge-lang-rustgen = { path = "../forge-lang/crates/forge-lang-rustgen" }
 # run by the interpreter the platform serves. The library half lives in
 # forge-lang so the platform can run the same tests later.
 forge-lang-test = { path = "../forge-lang/crates/forge-lang-test" }
+# `forge check` judges an app's `.tsx` pages and components (TSX-17) with
+# the TS front half the control plane runs on them at push, scoped by the
+# tree's generated surface, so the two refuse alike.
+forge-lang-ts = { path = "../forge-lang/crates/forge-lang-ts" }
+forge-lang-tree = { path = "../forge-lang/crates/forge-lang-tree" }
 # Shared units (D-110): the pin file, the address and the publish/record
 # shapes are the wire crate's, so `forge check`, `forge units` and the
 # control plane read one definition.

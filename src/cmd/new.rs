@@ -389,6 +389,25 @@ const DIALECT_OPS: &[(Lang, &str, &str)] = &[
     ),
 ];
 
+/// The UI every dialect scaffold starts with (TSX-17): one app whose page
+/// loads `hello` and renders its answer through one component. The UI is TSX
+/// whatever language the ops are written in, so these are the same files in
+/// all four scaffolds.
+const DIALECT_APP: &[(&str, &str)] = &[
+    (
+        "apps/web/app.json",
+        include_str!("../../templates/workspace-dialect/apps/web/app.json"),
+    ),
+    (
+        "apps/web/pages/index.tsx",
+        include_str!("../../templates/workspace-dialect/apps/web/pages/index.tsx"),
+    ),
+    (
+        "apps/web/components/greeting.tsx",
+        include_str!("../../templates/workspace-dialect/apps/web/components/greeting.tsx"),
+    ),
+];
+
 /// The `workspace` template's files a dialect workspace does not carry: the
 /// cargo manifests and the raw wasm module, plus the README and the untyped
 /// `service.json` it writes its own of.
@@ -444,7 +463,8 @@ fn scaffold_dialect_workspace(crate_name: &str, lang: Lang) -> Result<()> {
 }
 
 /// Everything a dialect scaffold writes before `git init`: the workspace
-/// tree with the starter op in `lang`, then the dialect's subset skill
+/// tree with the starter op in `lang` and the TSX page that loads it, then
+/// the dialect's subset skill
 /// (typed-boundary TB-7) beside the schema surface TB-6 writes. Answers the
 /// skill's path.
 pub(crate) fn write_dialect_tree(
@@ -472,6 +492,7 @@ pub(crate) fn write_dialect_tree(
     files.push(("README.md", &readme));
     files.push(("domains/{{domain}}/service.json", DIALECT_SERVICE));
     files.push((&op_path, op_body));
+    files.extend_from_slice(DIALECT_APP);
     // The marker is the dialect tree's opt-in to the interpreted converge,
     // for all four dialects: without it a push with no `forge.lock` never
     // converges. For Rust it is also the ruling that the tree's `.rs`
@@ -479,13 +500,22 @@ pub(crate) fn write_dialect_tree(
     files.push((".forge-interpret", ""));
     write_workspace_tree(target_dir, crate_name, domain, "", &files)?;
 
-    subset_skill::write(target_dir, lang).with_context(|| {
-        format!(
-            "writing {}/{}",
-            subset_skill::SKILL_DIR,
-            subset_skill::file_name(lang)
-        )
-    })
+    // The page and its component are TSX in every scaffold, and the TS
+    // skill's components section is the subset they are checked against, so
+    // a workspace whose ops are another dialect is handed it too.
+    let write_skill = |lang| {
+        subset_skill::write(target_dir, lang).with_context(|| {
+            format!(
+                "writing {}/{}",
+                subset_skill::SKILL_DIR,
+                subset_skill::file_name(lang)
+            )
+        })
+    };
+    if lang != Lang::TypeScript {
+        write_skill(Lang::TypeScript)?;
+    }
+    write_skill(lang)
 }
 
 /// The editor mapping for `service.json` (ST-6): every domain's declaration
@@ -688,6 +718,7 @@ fn validate_crate_name(name: &str) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use forge_lang_rustgen::Register;
 
     #[test]
     fn validate_crate_name_accepts_normal_names() {
@@ -1104,11 +1135,16 @@ mod tests {
 
             match crate::cmd::check::check(&dir) {
                 Ok(found) => {
-                    assert_eq!(found.registers.len(), 1, "{lang:?}: one starter op");
+                    let ops = found
+                        .registers
+                        .iter()
+                        .filter(|r| !r.path.ends_with(".tsx"))
+                        .count();
+                    assert_eq!(ops, 1, "{lang:?}: one starter op");
                     assert!(
                         found.ok(),
                         "{lang:?}: the starter is refused:\n{}",
-                        found.registers[0].render()
+                        rendered(&found.registers)
                     );
                 }
                 Err(e) => panic!("{lang:?}: the checker could not run: {e}"),
@@ -1119,6 +1155,79 @@ mod tests {
             let pushed = git(&dir, &["ls-files"]);
             assert!(!pushed.contains(".forge/"), "the push carries the skill");
         }
+    }
+
+    fn rendered(registers: &[Register]) -> String {
+        registers.iter().map(Register::render).collect()
+    }
+
+    /// TSX-17: every dialect scaffold starts with the same TSX page and
+    /// component, the page's loader naming the starter op, and `forge check`
+    /// admits both against the tree's own `service.json`, as the push's
+    /// checker does; the TS skill a component is written to rides along
+    /// whatever the ops' dialect.
+    #[test]
+    fn every_dialect_scaffold_starts_with_a_tsx_page_that_loads_its_op() {
+        for lang in [Lang::Python, Lang::TypeScript, Lang::Java, Lang::Rust] {
+            let tmp = tempfile::tempdir().unwrap();
+            let dir = tmp.path().join("acme");
+            write_dialect_tree(&dir, "acme", "acme", lang).unwrap();
+
+            for (rel, _) in DIALECT_APP {
+                assert!(dir.join(rel).is_file(), "{lang:?}: {rel} not scaffolded");
+            }
+            let page = std::fs::read_to_string(dir.join("apps/web/pages/index.tsx")).unwrap();
+            assert!(
+                page.contains(r#"load("hello", { name: "acme" })"#),
+                "{lang:?}: the page does not load the starter op:\n{page}"
+            );
+            let skill = dir.join(subset_skill::SKILL_DIR).join("SUBSET-SKILL-TS.md");
+            assert!(skill.is_file(), "{lang:?}: no TS skill for the components");
+
+            let found = crate::cmd::check::check(&dir)
+                .unwrap_or_else(|e| panic!("{lang:?}: the checker could not run: {e}"));
+            let modules: Vec<&str> = found
+                .registers
+                .iter()
+                .map(|r| r.path.as_str())
+                .filter(|p| p.ends_with(".tsx"))
+                .collect();
+            assert_eq!(
+                modules.len(),
+                2,
+                "{lang:?}: page and component: {modules:?}"
+            );
+            assert!(
+                found.ok(),
+                "{lang:?}: the UI is refused:\n{}",
+                rendered(&found.registers)
+            );
+        }
+    }
+
+    /// The check that admits the scaffold's page is the push's, not a
+    /// parse: a loader naming an op the tree does not declare is refused by
+    /// `forge check` (FL1958) before any push.
+    #[test]
+    fn a_scaffold_page_loading_an_undeclared_op_is_refused_by_forge_check() {
+        let tmp = tempfile::tempdir().unwrap();
+        let dir = tmp.path().join("acme");
+        write_dialect_tree(&dir, "acme", "acme", Lang::Python).unwrap();
+        let page = dir.join("apps/web/pages/index.tsx");
+        let text = std::fs::read_to_string(&page).unwrap();
+        std::fs::write(&page, text.replace(r#"load("hello""#, r#"load("goodbye""#)).unwrap();
+
+        let found = crate::cmd::check::check(&dir).unwrap();
+        assert!(!found.ok(), "a page loading `goodbye` was admitted");
+        let refused = rendered(&found.registers);
+        assert!(
+            refused.contains("FL1958"),
+            "not refused as FL1958:\n{refused}"
+        );
+        assert!(
+            refused.contains("index.tsx"),
+            "the refusal names no page:\n{refused}"
+        );
     }
 
     /// invoice-path IP-2: every dialect tree carries `.forge-interpret` and
