@@ -20,6 +20,11 @@
       "at": "2026-10-15T11:18:23.245672+00:00",
       "boundary": "review",
       "id": "gap-review"
+    },
+    {
+      "at": "2026-10-15T11:21:09.265313+00:00",
+      "boundary": "land",
+      "id": "gap-review"
     }
   ],
   "gap_reviews": [
@@ -54,6 +59,17 @@
         {
           "description": "none found",
           "note": "Diffed forge-cli step-tsx28 (61dbabf..72afb1c: templates/workspace-dialect/apps/web/pages/wave.tsx, components/wave.tsx, README.md, src/cmd/new.rs), forge-portal-web step-tsx28 (046d534..48ee433: components_guide.py client-page section, regenerated components.json and cms seed) and forge-portal-e2e step-tsx28 (0e5109e..0141dbb: client-page.spec.ts, fixtures/client-page-app, customer-two /wave assertions, e2e.yml forge_cli_ref) against intent tsx-components-2026-10-tsx-28-a-client-page-end-to-end: a client page holding a typed cell, handling a click, calling add_note over its REST route with X-Forge-CSRF and rendering the re-run loader's rows is driven in real Chromium on the dev stack (ws-b10412ee85cbe70e) and in portal-e2e CI run 38723053727 (success, 214 passed, at the pushed heads); forge new scaffolds / (server) and /wave (client) sharing Greeting, both served on first push in all four dialects. No evaluator, cell or loader code changed; the align-boundary gaps stand as recorded.",
+          "resolution": "accepted"
+        }
+      ],
+      "intent_ref": ".harness/intent/tsx-components-2026-10-tsx-28-a-client-page-end-to-end.json"
+    },
+    {
+      "boundary": "land",
+      "gaps": [
+        {
+          "description": "none found",
+          "note": "Diffed what lands (forge-cli step-tsx28 over main 61dbabf: wave.tsx page and component, README, new.rs; forge-portal-web step-tsx28 over 046d534: the guide's client-page section and regenerated content; forge-portal-e2e step-tsx28 over 0e5109e: client-page spec and fixture, customer-two /wave, e2e.yml forge_cli_ref) against intent tsx-components-2026-10-tsx-28-a-client-page-end-to-end; nothing past the reviewed heads but harness bookkeeping. Order forge-cli, forge-portal-web, forge-portal-e2e, so main's customer-two never asserts a /wave the CLI does not scaffold.",
           "resolution": "accepted"
         }
       ],
