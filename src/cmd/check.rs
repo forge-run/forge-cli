@@ -55,7 +55,7 @@ use crate::dialect;
 /// exists only because a workspace has many sources and that envelope has one
 /// `path`. Additive-only, and the `N` bumps when a field is added
 /// (`forge-lang/REJECTIONS.md`, the machine-envelope section).
-const CHECK_SCHEMA: &str = "forge-check/3";
+const CHECK_SCHEMA: &str = "forge-check/4";
 
 /// This machine could not do its job — the toolchain exit code, distinct from
 /// a refusal so a CI step can tell "your source is wrong" from "my runner is".
@@ -266,7 +266,8 @@ pub(crate) fn check(root: &Path) -> Result<Verdicts, String> {
         None => (registers, units),
     };
     let (mut registers, mut cards) = (registers, cards);
-    for register in tsx_registers(root, &contracts)? {
+    let (tsx, island_pages) = tsx_registers(root, &contracts)?;
+    for register in tsx {
         registers.push(register);
         cards.push(Vec::new());
     }
@@ -277,6 +278,7 @@ pub(crate) fn check(root: &Path) -> Result<Verdicts, String> {
         contract_mismatches,
         schema,
         units,
+        island_pages,
     })
 }
 
@@ -286,9 +288,13 @@ pub(crate) fn check(root: &Path) -> Result<Verdicts, String> {
 /// push (`tsx_derive::derive`), so a loader naming an op this tree does not
 /// declare is refused here and not a push later. A module has no ops, so it
 /// carries no cost card.
-fn tsx_registers(root: &Path, contracts: &ContractSurfaces) -> Result<Vec<Register>, String> {
+///
+/// TSX-29: beside the verdicts, every page that reaches an island and the
+/// islands it reaches, as the control plane names them at push; empty when a
+/// module was refused, because a refused tree is not what the push carries.
+fn tsx_registers(root: &Path, contracts: &ContractSurfaces) -> Result<TsxVerdicts, String> {
     let Ok(entries) = std::fs::read_dir(root.join("apps")) else {
-        return Ok(Vec::new());
+        return Ok(Default::default());
     };
     let mut apps: Vec<PathBuf> = entries
         .filter_map(|e| e.ok().map(|e| e.path()))
@@ -296,10 +302,14 @@ fn tsx_registers(root: &Path, contracts: &ContractSurfaces) -> Result<Vec<Regist
         .collect();
     apps.sort();
     let mut registers = Vec::new();
+    let mut pages = Vec::new();
     for app in apps {
         let records = forge_web_build::tsx_walker::collect_tsx(&app, &[], &[])
             .map_err(|e| format!("{}: {e}", app.display()))?;
         for record in records {
+            if record.kind == forge_schema::TsxKind::Page {
+                pages.push(record.path.clone());
+            }
             let verdict = with_contract_surfaces(contracts, || {
                 forge_lang_tree::surface::with_generated_surface(contracts, || {
                     forge_lang_ts::front_end_units(&record.path)
@@ -316,7 +326,41 @@ fn tsx_registers(root: &Path, contracts: &ContractSurfaces) -> Result<Vec<Regist
             }
         }
     }
-    Ok(registers)
+    if registers.iter().any(|r| !r.is_empty()) {
+        return Ok((registers, Vec::new()));
+    }
+    let island_pages = with_contract_surfaces(contracts, || {
+        forge_lang_tree::surface::with_generated_surface(contracts, || island_pages(&pages))
+    })
+    .map_err(|e| e.to_string())?;
+    match island_pages {
+        Ok(found) => Ok((registers, found)),
+        // The front end above refuses a bad island, so a refusal here is one
+        // more register, not a second diagnosis of one already printed.
+        Err(forge_lang_ts::FrontEndError::Rejected(register)) => {
+            registers.push(register);
+            Ok((registers, Vec::new()))
+        }
+        Err(
+            forge_lang_ts::FrontEndError::Toolchain(m) | forge_lang_ts::FrontEndError::Blocked(m),
+        ) => Err(m),
+    }
+}
+
+/// The TSX verdicts and the island pages beside them.
+type TsxVerdicts = (Vec<Register>, Vec<(String, Vec<String>)>);
+
+/// Each page of `pages` that reaches an island, workspace-relative, with
+/// the islands it reaches.
+fn island_pages(
+    pages: &[PathBuf],
+) -> Result<Vec<(String, Vec<String>)>, forge_lang_ts::FrontEndError> {
+    let sources = pages
+        .iter()
+        .map(|p| forge_lang_ts::parse::Source::read(p))
+        .collect::<std::io::Result<Vec<_>>>()
+        .map_err(|e| forge_lang_ts::FrontEndError::Toolchain(e.to_string()))?;
+    Ok(forge_lang_ts::components::island_pages(&sources)?.pages)
 }
 
 /// Which domain a source belongs to — `domains/<d>/services/x.py` -> `<d>`.
@@ -354,6 +398,10 @@ pub(crate) struct Verdicts {
     /// the output so a reader can see a unit was resolved rather than
     /// silently skipped.
     units: Vec<PathBuf>,
+    /// TSX-29: each page that reaches an island, workspace-relative, with
+    /// the island `src`s it reaches — the pages the push serves under the
+    /// island fence. Empty when none does, or when a TSX module was refused.
+    pub(crate) island_pages: Vec<(String, Vec<String>)>,
 }
 
 impl Verdicts {
@@ -407,8 +455,22 @@ fn human_report(found: &Verdicts) -> String {
     for m in &found.mismatches {
         out.push_str(&format!("error: {}\n", m.render()));
     }
+    for line in island_lines(&found.island_pages) {
+        out.push_str(&line);
+        out.push('\n');
+    }
     out.push_str(&summary(found));
     out
+}
+
+/// TSX-29: one `island pages: <page> (<island src>, …)` line per page
+/// reaching an island, the words the control plane's push response uses,
+/// formatted in ONE place so `forge check` and `forge push` cannot drift.
+pub(crate) fn island_lines(pages: &[(String, Vec<String>)]) -> Vec<String> {
+    pages
+        .iter()
+        .map(|(page, islands)| format!("island pages: {page} ({})", islands.join(", ")))
+        .collect()
 }
 
 /// The closing line a person reads.
@@ -475,6 +537,13 @@ fn envelope(root: &Path, found: &Verdicts) -> String {
             .contract_mismatches
             .iter()
             .map(contract_diff::to_json)
+            .collect::<Vec<_>>(),
+        // forge-check/4 (TSX-29): each page that reaches an island, with
+        // the islands it reaches; empty when none does.
+        "island_pages": found
+            .island_pages
+            .iter()
+            .map(|(page, islands)| serde_json::json!({ "page": page, "islands": islands }))
             .collect::<Vec<_>>(),
         "op_mismatches": found.mismatches.iter().map(|m| serde_json::json!({
             "domain": m.domain,
@@ -1273,5 +1342,53 @@ def plan_badge(ctx: OpContext, input: Value) -> Badge:
         .unwrap();
         let err = check(ws.path()).expect_err("edited bytes");
         assert!(err.contains("does not hash to its address"), "{err}");
+    }
+
+    /// TSX-29's island push, a copy of forge-lang's
+    /// `fixtures/components-ts/island`: two pages reach one island, which
+    /// imports a copied-in file; a third page reaches none.
+    fn island_workspace() -> PathBuf {
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/tsx-island")
+    }
+
+    /// `forge check` names each page reaching an island beside the verdicts,
+    /// in the words the push response uses, and the envelope carries them.
+    #[test]
+    fn forge_check_names_the_pages_that_reach_an_island() {
+        let root = island_workspace();
+        let found = check(&root).expect("the island workspace checks");
+        assert!(found.ok(), "{}", human_report(&found));
+        let chart = "apps/web/components/chart.island.js";
+        let report = human_report(&found);
+        for want in [
+            format!("island pages: apps/web/pages/live.tsx ({chart})\n"),
+            format!("island pages: apps/web/pages/report.tsx ({chart})\n"),
+        ] {
+            assert!(report.contains(&want), "`{want}` not in:\n{report}");
+        }
+        assert!(!report.contains("plain.tsx ("), "{report}");
+
+        let doc: serde_json::Value = serde_json::from_str(&envelope(&root, &found)).unwrap();
+        assert_eq!(doc["schema_version"], "forge-check/4");
+        assert_eq!(
+            doc["island_pages"],
+            serde_json::json!([
+                { "page": "apps/web/pages/live.tsx", "islands": [chart] },
+                { "page": "apps/web/pages/report.tsx", "islands": [chart] },
+            ])
+        );
+    }
+
+    /// A workspace with no island prints no island line and an empty list.
+    #[test]
+    fn a_workspace_without_an_island_names_none() {
+        let ws = workspace(&[
+            ("workspace.json", "{}"),
+            ("domains/c/services/hello.ts", ACCEPTED_TS),
+        ]);
+        let found = check(ws.path()).expect("checks");
+        assert!(!human_report(&found).contains("island pages"));
+        let doc: serde_json::Value = serde_json::from_str(&envelope(ws.path(), &found)).unwrap();
+        assert_eq!(doc["island_pages"], serde_json::json!([]));
     }
 }

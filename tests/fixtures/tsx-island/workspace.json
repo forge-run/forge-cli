@@ -1,0 +1,4 @@
+{
+  "workspace": { "name": "islands", "version": "0.1.0" },
+  "hosts": { "app.example.com": { "app": "web" } }
+}

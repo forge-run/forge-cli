@@ -196,7 +196,8 @@ pub async fn push_and_poll(
 
 /// The client-side dialect gate: run the shared `forge check` over `dir` and
 /// return one cost-card line per accepted op, formatted through the SAME
-/// `card_line` seam `forge check` uses so the two outputs cannot drift.
+/// `card_line` seam `forge check` uses so the two outputs cannot drift, then
+/// one `island pages:` line per page reaching an island (`island_lines`).
 ///
 /// A refusal aborts with a nonzero error carrying the register's alternative
 /// text, before the caller pushes anything. A toolchain problem or a directory
@@ -223,6 +224,9 @@ fn dialect_cards(dir: &Path) -> Result<Vec<String>> {
                     refusals.trim_end()
                 );
             }
+            // TSX-29: the pages this push serves under the island fence,
+            // named before pushing in the words `forge check` prints.
+            lines.extend(crate::cmd::check::island_lines(&found.island_pages));
             Ok(lines)
         }
         Err(message) => {
@@ -640,5 +644,21 @@ export const hello = op("hello", (ctx: OpContext, input: Value) => {
     fn a_non_workspace_dir_skips_the_gate_and_does_not_abort() {
         let dir = tempfile::tempdir().unwrap();
         assert!(dialect_cards(dir.path()).unwrap().is_empty());
+    }
+
+    /// TSX-29: the push names the pages it will serve under the island fence
+    /// before pushing, in `forge check`'s words.
+    #[test]
+    fn the_push_gate_names_the_pages_that_reach_an_island() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/tsx-island");
+        let lines = dialect_cards(&root).expect("the island workspace does not abort");
+        let chart = "apps/web/components/chart.island.js";
+        assert_eq!(
+            lines,
+            [
+                format!("island pages: apps/web/pages/live.tsx ({chart})"),
+                format!("island pages: apps/web/pages/report.tsx ({chart})"),
+            ],
+        );
     }
 }
