@@ -1172,7 +1172,8 @@ mod tests {
 
     /// TSX-17: every dialect scaffold starts with the same TSX pages and
     /// components, each page's loader naming the starter op, `/wave` a client
-    /// page holding a cell a click sets (TSX-28), and `forge check` admits all against the tree's own `service.json`, as the push's
+    /// page holding a cell a click sets (TSX-28), and `forge check` admits
+    /// all of them against the tree's own `service.json`, as the push's
     /// checker does; the TS skill a component is written to rides along
     /// whatever the ops' dialect.
     #[test]

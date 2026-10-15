@@ -10,9 +10,40 @@
       "id": "intent-recorded",
       "revision": 1,
       "source": "factory-delegate"
+    },
+    {
+      "at": "2026-10-15T11:14:45.285270+00:00",
+      "boundary": "align",
+      "id": "gap-review"
     }
   ],
-  "gap_reviews": [],
+  "gap_reviews": [
+    {
+      "boundary": "align",
+      "gaps": [
+        {
+          "description": "src/cmd/new.rs: the scaffold test's doc comment ran one line past the wrap width after the TSX-28 edit; rewrapped.",
+          "resolution": "fixed"
+        },
+        {
+          "description": "The starter client page's click sets a cell only and calls no op: hello is a query whose REST route is a GET, and an action POSTs, so an op call on click would need a mutation the starter does not declare. The intent's 'calls an op over REST and renders the result' is carried by forge-portal-e2e's client-page fixture (add_note, the loader re-run listing the row), and the starter's loader still fetches hello over REST in the browser",
+          "note": "the acceptance asks the starter only that both modes serve on first push, and adding a write op to every dialect's starter widens forge new beyond this step's intent",
+          "resolution": "accepted"
+        },
+        {
+          "description": "ci/e2e.yml.template in forge-portal-e2e did not gain forge_cli_ref",
+          "note": "that file is headed OBSOLETE, kept for reference, and never carried portal_web_ref; the live workflow .github/workflows/e2e.yml did",
+          "resolution": "accepted"
+        },
+        {
+          "description": "forge-cli was built through the plain cargo shim, not .harness/cargo as the brief said",
+          "note": "forge-cli is a hybrid consumer with wrap: false and has no .harness/cargo; the brief's operating fact was wrong, the forge-build skill's command was followed",
+          "resolution": "accepted"
+        }
+      ],
+      "intent_ref": ".harness/intent/tsx-components-2026-10-tsx-28-a-client-page-end-to-end.json"
+    }
+  ],
   "out_of_scope": [],
   "refs": [
     "plan:tsx-components-2026-10",
