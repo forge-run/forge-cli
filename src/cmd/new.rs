@@ -389,10 +389,11 @@ const DIALECT_OPS: &[(Lang, &str, &str)] = &[
     ),
 ];
 
-/// The UI every dialect scaffold starts with (TSX-17): one app whose page
-/// loads `hello` and renders its answer through one component. The UI is TSX
-/// whatever language the ops are written in, so these are the same files in
-/// all four scaffolds.
+/// The UI every dialect scaffold starts with (TSX-17): one app whose pages
+/// load `hello` and render its answer through one shared component, `/` a
+/// server page and `/wave` a client page whose component holds a state cell
+/// and a click handler (TSX-28). The UI is TSX whatever language the ops are
+/// written in, so these are the same files in all four scaffolds.
 const DIALECT_APP: &[(&str, &str)] = &[
     (
         "apps/web/app.json",
@@ -403,8 +404,16 @@ const DIALECT_APP: &[(&str, &str)] = &[
         include_str!("../../templates/workspace-dialect/apps/web/pages/index.tsx"),
     ),
     (
+        "apps/web/pages/wave.tsx",
+        include_str!("../../templates/workspace-dialect/apps/web/pages/wave.tsx"),
+    ),
+    (
         "apps/web/components/greeting.tsx",
         include_str!("../../templates/workspace-dialect/apps/web/components/greeting.tsx"),
+    ),
+    (
+        "apps/web/components/wave.tsx",
+        include_str!("../../templates/workspace-dialect/apps/web/components/wave.tsx"),
     ),
 ];
 
@@ -1161,9 +1170,9 @@ mod tests {
         registers.iter().map(Register::render).collect()
     }
 
-    /// TSX-17: every dialect scaffold starts with the same TSX page and
-    /// component, the page's loader naming the starter op, and `forge check`
-    /// admits both against the tree's own `service.json`, as the push's
+    /// TSX-17: every dialect scaffold starts with the same TSX pages and
+    /// components, each page's loader naming the starter op, `/wave` a client
+    /// page holding a cell a click sets (TSX-28), and `forge check` admits all against the tree's own `service.json`, as the push's
     /// checker does; the TS skill a component is written to rides along
     /// whatever the ops' dialect.
     #[test]
@@ -1176,10 +1185,22 @@ mod tests {
             for (rel, _) in DIALECT_APP {
                 assert!(dir.join(rel).is_file(), "{lang:?}: {rel} not scaffolded");
             }
-            let page = std::fs::read_to_string(dir.join("apps/web/pages/index.tsx")).unwrap();
+            for rel in ["apps/web/pages/index.tsx", "apps/web/pages/wave.tsx"] {
+                let page = std::fs::read_to_string(dir.join(rel)).unwrap();
+                assert!(
+                    page.contains(r#"load("hello", { name: "acme" })"#),
+                    "{lang:?}: {rel} does not load the starter op:\n{page}"
+                );
+            }
+            let client = std::fs::read_to_string(dir.join("apps/web/pages/wave.tsx")).unwrap();
             assert!(
-                page.contains(r#"load("hello", { name: "acme" })"#),
-                "{lang:?}: the page does not load the starter op:\n{page}"
+                client.contains(r#"export const mode = "client";"#),
+                "{lang:?}: wave.tsx is not a client page:\n{client}"
+            );
+            let cell = std::fs::read_to_string(dir.join("apps/web/components/wave.tsx")).unwrap();
+            assert!(
+                cell.contains("useState<number>(0)") && cell.contains("onClick={() => setWaves("),
+                "{lang:?}: the client component holds no cell set by a click:\n{cell}"
             );
             let skill = dir.join(subset_skill::SKILL_DIR).join("SUBSET-SKILL-TS.md");
             assert!(skill.is_file(), "{lang:?}: no TS skill for the components");
@@ -1194,8 +1215,12 @@ mod tests {
                 .collect();
             assert_eq!(
                 modules.len(),
-                2,
-                "{lang:?}: page and component: {modules:?}"
+                4,
+                "{lang:?}: two pages and two components: {modules:?}"
+            );
+            assert!(
+                modules.iter().any(|p| p.ends_with("pages/wave.tsx")),
+                "{lang:?}: forge check never read the client page: {modules:?}"
             );
             assert!(
                 found.ok(),
