@@ -15,6 +15,11 @@
       "at": "2026-10-15T11:14:45.285270+00:00",
       "boundary": "align",
       "id": "gap-review"
+    },
+    {
+      "at": "2026-10-15T11:18:23.245672+00:00",
+      "boundary": "review",
+      "id": "gap-review"
     }
   ],
   "gap_reviews": [
@@ -38,6 +43,17 @@
         {
           "description": "forge-cli was built through the plain cargo shim, not .harness/cargo as the brief said",
           "note": "forge-cli is a hybrid consumer with wrap: false and has no .harness/cargo; the brief's operating fact was wrong, the forge-build skill's command was followed",
+          "resolution": "accepted"
+        }
+      ],
+      "intent_ref": ".harness/intent/tsx-components-2026-10-tsx-28-a-client-page-end-to-end.json"
+    },
+    {
+      "boundary": "review",
+      "gaps": [
+        {
+          "description": "none found",
+          "note": "Diffed forge-cli step-tsx28 (61dbabf..72afb1c: templates/workspace-dialect/apps/web/pages/wave.tsx, components/wave.tsx, README.md, src/cmd/new.rs), forge-portal-web step-tsx28 (046d534..48ee433: components_guide.py client-page section, regenerated components.json and cms seed) and forge-portal-e2e step-tsx28 (0e5109e..0141dbb: client-page.spec.ts, fixtures/client-page-app, customer-two /wave assertions, e2e.yml forge_cli_ref) against intent tsx-components-2026-10-tsx-28-a-client-page-end-to-end: a client page holding a typed cell, handling a click, calling add_note over its REST route with X-Forge-CSRF and rendering the re-run loader's rows is driven in real Chromium on the dev stack (ws-b10412ee85cbe70e) and in portal-e2e CI run 38723053727 (success, 214 passed, at the pushed heads); forge new scaffolds / (server) and /wave (client) sharing Greeting, both served on first push in all four dialects. No evaluator, cell or loader code changed; the align-boundary gaps stand as recorded.",
           "resolution": "accepted"
         }
       ],
