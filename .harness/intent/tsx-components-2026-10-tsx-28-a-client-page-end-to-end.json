@@ -1,0 +1,28 @@
+{
+  "acceptance": [
+    "The client-page spec passes on the dev stack and in portal-e2e CI, run ids in evidence.",
+    "forge new scaffolds a server page and a client page; both serve on first push."
+  ],
+  "author": "rory",
+  "events": [
+    {
+      "at": "2026-10-15T10:31:54.428144+00:00",
+      "id": "intent-recorded",
+      "revision": 1,
+      "source": "factory-delegate"
+    }
+  ],
+  "gap_reviews": [],
+  "out_of_scope": [],
+  "refs": [
+    "plan:tsx-components-2026-10",
+    "step:TSX-28-a-client-page-end-to-end"
+  ],
+  "revision": 1,
+  "schema": "forge-intent/v1",
+  "slug": "tsx-components-2026-10-tsx-28-a-client-page-end-to-end",
+  "source": "factory-delegate",
+  "statement": "A real interactive client page is proven end to end, and the customer starter offers both modes \u2014 Extend forge-portal-e2e with a client page that holds state, handles a click, calls an op over REST and renders the result; extend forge new's TSX starter (TSX-17) with a client page beside the server page. The record is forge-platform-architecture ADR-0039 (decisions 7a, 8, 9), which supersedes ADR-0038 decision 7's 'no JavaScript' paragraph.",
+  "ts": "2026-10-15T10:31:54.428144+00:00",
+  "updated_at": "2026-10-15T10:31:54.428144+00:00"
+}
