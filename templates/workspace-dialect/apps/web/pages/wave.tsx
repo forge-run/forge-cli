@@ -29,7 +29,7 @@ export default function WavePage({ hello }: WavePageProps): Node {
     case "failed":
       return (
         <main>
-          <p>{hello.code === "UNAUTHENTICATED" ? "Sign in to wave." : hello.message}</p>
+          <p>{hello.reason === "denied" ? "Sign in to wave." : `The greeting did not load (trace ${hello.traceId}).`}</p>
         </main>
       );
   }

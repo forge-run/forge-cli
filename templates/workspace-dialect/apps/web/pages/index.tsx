@@ -23,10 +23,12 @@ export default function Home({ hello }: HomeProps): Node {
       );
     case "failed":
       // `hello` is declared `authenticated`: a visitor who has not signed in
-      // reaches this arm, and so does any other failure, named by its code.
+      // reaches this arm as `denied`, and so does any other failure, named by
+      // its reason and the trace id an operator finds its cause under. The
+      // op's own message is in that trace, never in the page.
       return (
         <main>
-          <p>{hello.code === "UNAUTHENTICATED" ? "Sign in to be greeted." : hello.message}</p>
+          <p>{hello.reason === "denied" ? "Sign in to be greeted." : `The greeting did not load (trace ${hello.traceId}).`}</p>
         </main>
       );
   }
