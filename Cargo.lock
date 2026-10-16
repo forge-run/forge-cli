@@ -1019,6 +1019,7 @@ dependencies = [
  "forge-lang-tree",
  "forge-registry",
  "forge-types",
+ "forge-ui",
  "oxc_allocator",
  "oxc_ast",
  "oxc_ast_visit",
