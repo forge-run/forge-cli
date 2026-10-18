@@ -982,6 +982,7 @@ dependencies = [
  "forge-lang-rust",
  "forge-lang-tree",
  "forge-lang-ts",
+ "forge-ui",
  "serde_json",
 ]
 
