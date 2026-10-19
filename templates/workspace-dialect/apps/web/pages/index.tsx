@@ -19,6 +19,9 @@ export default function Home({ hello }: HomeProps): Node {
       return (
         <main>
           <Greeting message={hello.value.message} />
+          <p>
+            <a href="/notes">Notes</a> and <a href="/wave">Wave</a> are client pages.
+          </p>
         </main>
       );
     case "failed":

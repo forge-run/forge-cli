@@ -1,0 +1,19 @@
+{
+  "name": "notes",
+  "archetype": "Record",
+  "label": "Note",
+  "plural_label": "Notes",
+  "description": "The notes page's notes: list_notes reads them, add_note writes one. Each signed-in user reads the notes they wrote.",
+  "header_fields": ["body"],
+  "api": { "access": "read_write" },
+  "row_security": [
+    {
+      "name": "writer_reads_own_notes",
+      "filter": { "column": "created_by", "op": "eq", "value": "$user_id" },
+      "scopes": ["select"]
+    }
+  ],
+  "columns": [
+    { "name": "body", "type": "string", "required": true, "maxLength": 200, "label": "Body" }
+  ]
+}

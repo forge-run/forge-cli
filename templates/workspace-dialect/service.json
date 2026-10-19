@@ -11,20 +11,102 @@
       "input_schema": {
         "type": "object",
         "properties": {
-          "name": { "type": "string" }
+          "name": {
+            "type": "string"
+          }
         },
-        "required": ["name"]
+        "required": [
+          "name"
+        ]
       },
       "output_schema": {
         "type": "object",
         "properties": {
-          "message": { "type": "string" }
+          "message": {
+            "type": "string"
+          }
         },
-        "required": ["message"]
+        "required": [
+          "message"
+        ]
       },
       "error_codes": [],
       "summary": "Return a greeting.",
       "description": "The starter op. Proves the workspace checks, ships, and serves: apps/web/pages/index.tsx loads it and renders its answer at /."
+    },
+    {
+      "name": "list_notes",
+      "kind": "query",
+      "auth": "authenticated",
+      "idempotency": "idempotent",
+      "input_schema": {
+        "type": "object",
+        "properties": {}
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/NoteRow"
+            }
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "$defs": {
+          "NoteRow": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "body": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "body"
+            ]
+          }
+        }
+      },
+      "error_codes": [],
+      "summary": "List the caller's notes.",
+      "description": "The live loader of apps/web/pages/notes.tsx: the page re-runs it when a row of notes changes."
+    },
+    {
+      "name": "add_note",
+      "kind": "mutation",
+      "auth": "authenticated",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "body": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "body"
+        ]
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "body": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "body"
+        ]
+      },
+      "error_codes": [],
+      "summary": "Write one note.",
+      "description": "The form in apps/web/components/note_composer.tsx posts to it."
     }
   ]
 }

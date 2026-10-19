@@ -361,39 +361,93 @@ fn scaffold_workspace(crate_name: &str, template: &str, files: &[(&str, &str)]) 
 }
 
 /// The dialect scaffold's own files: the README, a `service.json` declaring
-/// `hello`'s request and response, and one starter op per dialect binding
-/// them. Everything else comes from the `workspace` template minus its wasm
-/// crate — a dialect workspace builds nothing on the author's side.
+/// `hello`, `list_notes` and `add_note`, the `notes` table the last two read
+/// and write, and per dialect the three ops' sources in that order. Everything
+/// else comes from the `workspace` template minus its wasm crate — a dialect
+/// workspace builds nothing on the author's side.
 const DIALECT_README: &str = include_str!("../../templates/workspace-dialect/README.md");
 const DIALECT_SERVICE: &str = include_str!("../../templates/workspace-dialect/service.json");
-const DIALECT_OPS: &[(Lang, &str, &str)] = &[
+const DIALECT_TABLE: &str =
+    include_str!("../../templates/workspace-dialect/schemas/notes.table.json");
+const DIALECT_OPS: &[(Lang, &[(&str, &str)])] = &[
     (
         Lang::Python,
-        "hello.py",
-        include_str!("../../templates/workspace-dialect/hello.py"),
+        &[
+            (
+                "hello.py",
+                include_str!("../../templates/workspace-dialect/hello.py"),
+            ),
+            (
+                "list_notes.py",
+                include_str!("../../templates/workspace-dialect/list_notes.py"),
+            ),
+            (
+                "add_note.py",
+                include_str!("../../templates/workspace-dialect/add_note.py"),
+            ),
+        ],
     ),
     (
         Lang::TypeScript,
-        "hello.ts",
-        include_str!("../../templates/workspace-dialect/hello.ts"),
+        &[
+            (
+                "hello.ts",
+                include_str!("../../templates/workspace-dialect/hello.ts"),
+            ),
+            (
+                "list_notes.ts",
+                include_str!("../../templates/workspace-dialect/list_notes.ts"),
+            ),
+            (
+                "add_note.ts",
+                include_str!("../../templates/workspace-dialect/add_note.ts"),
+            ),
+        ],
     ),
     (
         Lang::Java,
-        "Hello.java",
-        include_str!("../../templates/workspace-dialect/Hello.java"),
+        &[
+            (
+                "Hello.java",
+                include_str!("../../templates/workspace-dialect/Hello.java"),
+            ),
+            (
+                "ListNotes.java",
+                include_str!("../../templates/workspace-dialect/ListNotes.java"),
+            ),
+            (
+                "AddNote.java",
+                include_str!("../../templates/workspace-dialect/AddNote.java"),
+            ),
+        ],
     ),
     (
         Lang::Rust,
-        "hello.rs",
-        include_str!("../../templates/workspace-dialect/hello.rs"),
+        &[
+            (
+                "hello.rs",
+                include_str!("../../templates/workspace-dialect/hello.rs"),
+            ),
+            (
+                "list_notes.rs",
+                include_str!("../../templates/workspace-dialect/list_notes.rs"),
+            ),
+            (
+                "add_note.rs",
+                include_str!("../../templates/workspace-dialect/add_note.rs"),
+            ),
+        ],
     ),
 ];
 
 /// The UI every dialect scaffold starts with (TSX-17): one app whose pages
 /// load `hello` and render its answer through one shared component, `/` a
 /// server page and `/wave` a client page whose component holds a state cell
-/// and a click handler (TSX-28). The UI is TSX whatever language the ops are
-/// written in, so these are the same files in all four scaffolds.
+/// and a click handler (TSX-28). SPA-9 adds the client app beside them: a
+/// layout `/wave` and `/notes` sit in, `/notes` a live load of `list_notes`,
+/// and a form posting `add_note` that reads its own pending state. The UI is
+/// TSX whatever language the ops are written in, so these are the same files
+/// in all four scaffolds.
 const DIALECT_APP: &[(&str, &str)] = &[
     (
         "apps/web/app.json",
@@ -414,6 +468,18 @@ const DIALECT_APP: &[(&str, &str)] = &[
     (
         "apps/web/components/wave.tsx",
         include_str!("../../templates/workspace-dialect/apps/web/components/wave.tsx"),
+    ),
+    (
+        "apps/web/layouts/app.tsx",
+        include_str!("../../templates/workspace-dialect/apps/web/layouts/app.tsx"),
+    ),
+    (
+        "apps/web/pages/notes.tsx",
+        include_str!("../../templates/workspace-dialect/apps/web/pages/notes.tsx"),
+    ),
+    (
+        "apps/web/components/note_composer.tsx",
+        include_str!("../../templates/workspace-dialect/apps/web/components/note_composer.tsx"),
     ),
 ];
 
@@ -483,14 +549,22 @@ pub(crate) fn write_dialect_tree(
     lang: Lang,
 ) -> Result<PathBuf> {
     let (_, base) = WORKSPACE_TEMPLATES[0];
-    let (_, op_file, op_body) = DIALECT_OPS
+    let (_, ops) = DIALECT_OPS
         .iter()
-        .find(|(l, _, _)| *l == lang)
-        .expect("every dialect has a starter op");
-    let op_path = format!("domains/{{{{domain}}}}/services/{op_file}");
+        .find(|(l, _)| *l == lang)
+        .expect("every dialect has its ops");
+    let op_paths: Vec<(String, &str)> = ops
+        .iter()
+        .map(|(file, body)| (format!("domains/{{{{domain}}}}/services/{file}"), *body))
+        .collect();
+    let [(hello, _), (list_notes, _), (add_note, _)] = ops else {
+        unreachable!("every dialect lists hello, list_notes and add_note")
+    };
     let readme = DIALECT_README
         .replace("{{dialect_name}}", dialect_name(lang))
-        .replace("{{op_file}}", op_file)
+        .replace("{{op_file}}", hello)
+        .replace("{{list_file}}", list_notes)
+        .replace("{{add_file}}", add_note)
         .replace("{{skill_file}}", subset_skill::file_name(lang));
 
     let mut files: Vec<(&str, &str)> = base
@@ -500,7 +574,8 @@ pub(crate) fn write_dialect_tree(
         .collect();
     files.push(("README.md", &readme));
     files.push(("domains/{{domain}}/service.json", DIALECT_SERVICE));
-    files.push((&op_path, op_body));
+    files.push(("domains/{{domain}}/schemas/notes.table.json", DIALECT_TABLE));
+    files.extend(op_paths.iter().map(|(path, body)| (path.as_str(), *body)));
     files.extend_from_slice(DIALECT_APP);
     // The marker is the dialect tree's opt-in to the interpreted converge,
     // for all four dialects: without it a push with no `forge.lock` never
@@ -1149,10 +1224,10 @@ mod tests {
                         .iter()
                         .filter(|r| !r.path.ends_with(".tsx"))
                         .count();
-                    assert_eq!(ops, 1, "{lang:?}: one starter op");
+                    assert_eq!(ops, 3, "{lang:?}: hello, list_notes and add_note");
                     assert!(
                         found.ok(),
-                        "{lang:?}: the starter is refused:\n{}",
+                        "{lang:?}: a starter op is refused:\n{}",
                         rendered(&found.registers)
                     );
                 }
@@ -1175,7 +1250,10 @@ mod tests {
     /// page holding a cell a click sets (TSX-28), and `forge check` admits
     /// all of them against the tree's own `service.json`, as the push's
     /// checker does; the TS skill a component is written to rides along
-    /// whatever the ops' dialect.
+    /// whatever the ops' dialect. SPA-9: the client app is in it too, `/wave`
+    /// and `/notes` in one layout, `/notes` a live load of `list_notes` over
+    /// a table `schema.lock` declares, and a form reading its own pending
+    /// state.
     #[test]
     fn every_dialect_scaffold_starts_with_a_tsx_page_that_loads_its_op() {
         for lang in [Lang::Python, Lang::TypeScript, Lang::Java, Lang::Rust] {
@@ -1203,6 +1281,39 @@ mod tests {
                 cell.contains("useState<number>(0)") && cell.contains("onClick={() => setWaves("),
                 "{lang:?}: the client component holds no cell set by a click:\n{cell}"
             );
+            let notes = std::fs::read_to_string(dir.join("apps/web/pages/notes.tsx")).unwrap();
+            for line in [
+                r#"export const mode = "client";"#,
+                "export const layout = AppLayout;",
+                r#"export const loader = { notes: load("list_notes", {}, { live: true }) };"#,
+                "<h1>Notes</h1>",
+                r#"<ul id="notes">"#,
+            ] {
+                assert!(
+                    notes.contains(line),
+                    "{lang:?}: notes.tsx lacks `{line}`:\n{notes}"
+                );
+            }
+            assert!(
+                client.contains("export const layout = AppLayout;"),
+                "{lang:?}: wave.tsx is not in the layout:\n{client}"
+            );
+            let composer =
+                std::fs::read_to_string(dir.join("apps/web/components/note_composer.tsx")).unwrap();
+            assert!(
+                composer.contains(r#"const saving = isPending(action("add_note"));"#)
+                    && composer.contains(r#"id="note-body""#)
+                    && composer.contains(r#"id="note-add""#),
+                "{lang:?}: the composer does not read its own pending state:\n{composer}"
+            );
+            let lock: serde_json::Value = serde_json::from_str(
+                &std::fs::read_to_string(dir.join(forge_lang_rustgen::SNAPSHOT_FILE)).unwrap(),
+            )
+            .unwrap();
+            assert!(
+                lock["tables"]["notes"].is_object(),
+                "{lang:?}: schema.lock does not declare `notes`"
+            );
             let skill = dir.join(subset_skill::SKILL_DIR).join("SUBSET-SKILL-TS.md");
             assert!(skill.is_file(), "{lang:?}: no TS skill for the components");
 
@@ -1216,13 +1327,15 @@ mod tests {
                 .collect();
             assert_eq!(
                 modules.len(),
-                4,
-                "{lang:?}: two pages and two components: {modules:?}"
+                DIALECT_APP.len() - 1,
+                "{lang:?}: three pages, a layout and three components: {modules:?}"
             );
-            assert!(
-                modules.iter().any(|p| p.ends_with("pages/wave.tsx")),
-                "{lang:?}: forge check never read the client page: {modules:?}"
-            );
+            for page in ["pages/wave.tsx", "pages/notes.tsx", "layouts/app.tsx"] {
+                assert!(
+                    modules.iter().any(|p| p.ends_with(page)),
+                    "{lang:?}: forge check never read {page}: {modules:?}"
+                );
+            }
             assert!(
                 found.ok(),
                 "{lang:?}: the UI is refused:\n{}",
@@ -1254,6 +1367,42 @@ mod tests {
             refused.contains("index.tsx"),
             "the refusal names no page:\n{refused}"
         );
+    }
+
+    /// SPA-9: the push holds a live load to the tables `schema.lock`
+    /// declares (FL1981), so a scaffold whose lock leaves `notes` out, or
+    /// that has no lock, is refused at `/notes` before any push.
+    #[test]
+    fn a_live_load_over_a_table_the_lock_leaves_out_is_refused_by_forge_check() {
+        for drop_whole_lock in [false, true] {
+            let tmp = tempfile::tempdir().unwrap();
+            let dir = tmp.path().join("acme");
+            write_dialect_tree(&dir, "acme", "acme", Lang::TypeScript).unwrap();
+            let lock = dir.join(forge_lang_rustgen::SNAPSHOT_FILE);
+            if drop_whole_lock {
+                std::fs::remove_file(&lock).unwrap();
+            } else {
+                let mut snapshot: serde_json::Value =
+                    serde_json::from_str(&std::fs::read_to_string(&lock).unwrap()).unwrap();
+                snapshot["tables"]
+                    .as_object_mut()
+                    .unwrap()
+                    .remove("notes")
+                    .expect("the scaffold's lock declares notes");
+                std::fs::write(&lock, snapshot.to_string()).unwrap();
+            }
+
+            let found = crate::cmd::check::check(&dir).unwrap();
+            assert!(
+                !found.ok(),
+                "a live load with no `notes` in the lock was admitted"
+            );
+            let refused = rendered(&found.registers);
+            assert!(
+                refused.contains("FL1981") && refused.contains("notes.tsx"),
+                "lock dropped whole: {drop_whole_lock}; not refused as FL1981 at notes.tsx:\n{refused}"
+            );
+        }
     }
 
     /// invoice-path IP-2: every dialect tree carries `.forge-interpret` and

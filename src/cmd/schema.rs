@@ -1238,7 +1238,7 @@ mod tests {
     ];
 
     /// For each language: `op new` in a workspace from the `forge new`
-    /// template declares the op after the starter and writes its stub; a
+    /// template declares the op after the starter ops and writes its stub; a
     /// second `op new` of the same op is refused, naming it.
     #[test]
     fn op_new_declares_the_op_writes_its_stub_and_refuses_a_second() {
@@ -1251,7 +1251,11 @@ mod tests {
                 scaffold::handler_stub(scaffold::Lang::parse(word).unwrap(), "acme", "plan_refund");
             assert_eq!(std::fs::read_to_string(&written[1]).unwrap(), text);
             let declared = crate::dialect::declared_ops(&dir.join("domains/acme")).unwrap();
-            assert_eq!(declared, ["hello", "plan_refund"], "{word}");
+            assert_eq!(
+                declared,
+                ["hello", "list_notes", "add_note", "plan_refund"],
+                "{word}"
+            );
 
             let again = op_new(&dir, &args).expect_err("a second `op new` of the same op");
             assert!(
