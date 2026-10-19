@@ -10,9 +10,36 @@
       "id": "intent-recorded",
       "revision": 1,
       "source": "factory-delegate"
+    },
+    {
+      "at": "2026-10-19T12:51:31.372035+00:00",
+      "boundary": "build",
+      "id": "gap-review"
     }
   ],
-  "gap_reviews": [],
+  "gap_reviews": [
+    {
+      "boundary": "build",
+      "gaps": [
+        {
+          "description": "notes are readable only by the user who wrote them (select policy created_by eq $user_id), not by every viewer",
+          "note": "a table with no select policy is default-deny (forge-storage rls.rs rls_enforcement), so some policy is required; owner-reads is the simplest one true as written, the README says so, and the e2e's two sessions are the same user, which is what a live list across a user's tabs means",
+          "resolution": "accepted"
+        },
+        {
+          "description": "a schema.lock compile failure at forge new is still a printed warning, not a scaffold error",
+          "note": "the brief asked to verify, not change it; every_dialect_scaffold now asserts the lock is written and holds notes, so a template that stops compiling fails the test",
+          "resolution": "accepted"
+        },
+        {
+          "description": "serving is not proven by forge-cli's tests",
+          "note": "by design: forge check (the push's checker) admits all four dialects in-process; serving is proven by forge-portal-e2e spa-beta.spec.ts in portal-e2e run 39252809740 (forge_cli_ref=step-spa9)",
+          "resolution": "accepted"
+        }
+      ],
+      "intent_ref": ".harness/intent/tsx-spa-2026-10-spa-9.json"
+    }
+  ],
   "out_of_scope": [],
   "refs": [
     "plan:tsx-spa-2026-10",
