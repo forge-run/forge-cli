@@ -8,7 +8,7 @@ description: File a roadmap the harness driver accepts: the template in the skil
 name: forge-roadmap
 description: File a roadmap the harness driver accepts. Use when writing or editing any *roadmap*.json, before `plan start` or run-plan.sh — the template below IS the schema, and the roadmap-valid gate refuses anything else at the Write.
 ---
-<!-- last-confirmed: 2026-10-19 -->
+<!-- last-confirmed: 2026-10-20 -->
 
 # Filing a roadmap
 
@@ -25,7 +25,8 @@ python3 $ROOT/.harness/dispatch.py plan validate <file>
 ## The shape
 
 Copy this and fill it in. Every key shown on a step is REQUIRED except
-`notes`, `phase`, `scope`, `requires`, `lands`, `blocked_on`, `evidence` —
+`notes`, `phase`, `scope`, `requires`, `lands`, `blocked_on`, `escalation`,
+`decided`, `evidence` —
 and `lands` is required on a step whose `scope` names more than one repo.
 The four steps are the two shapes that fan out (below): E-1 lands the
 contract, E-2 and E-3 run at once, E-4 deletes the old form.
@@ -115,7 +116,15 @@ contract, E-2 and E-3 run at once, E-4 deletes the old form.
 - Every step: `id`, `title`, `status`, `acceptance` are required; `acceptance`
   is a non-empty array of strings. `status` is free text; the loop asks only
   whether it is one of `done`, `landed`, `landed_v0`.
-- `blocked_on`, when present, is `null`, `user`, `ci` or `budget`.
+- `blocked_on`, when present, is `null`, `user`, `ci` or `budget`. An edit
+  that newly sets `user` must carry `escalation: {class, why}` naming one of
+  the classes below; a step already held for a user before the edit is not
+  asked (see deciding, below).
+- `escalation`, when present, is `{class, why}`: `class` one of the
+  escalation classes, `why` a non-empty line.
+- `decided`, when present, is an array of `{at, choice, alternative, why,
+  rule}`: `at` an ISO date or timestamp, the next three non-empty strings,
+  `rule` optional and non-empty.
 - `scope`, when present, is a non-empty array of path prefixes.
 - `lands` is the order a step's repos reach main in, hubs first: an array
   naming every repo its `scope` names, once each, and no other (RS-1). A
@@ -131,6 +140,11 @@ contract, E-2 and E-3 run at once, E-4 deletes the old form.
   none runs one step at a time.
 - `sequential_because`, top level, when present, is a non-empty string: why
   this plan is a chain (see shaping a plan, below).
+- `stack`, on a step or top level (a step's own wins), when present, is
+  true or false. A stacked step whose one unmet `requires` parent has passed
+  review opens on lanes cut from the parent's, and the conductor rebases and
+  re-verifies it onto main when the parent lands (BE-18). One level deep: a
+  step stacked on a stacked step waits.
 - `evidence`, when present, is an array.
 - `drift`, when present, is `{max_unlanded_hours?, max_ahead_commits?}`: a
   number of hours > 0 and an integer >= 1, no other key (DR-1). The loop
@@ -146,6 +160,38 @@ contract, E-2 and E-3 run at once, E-4 deletes the old form.
   because the driver rewrites its own roadmap at every landed step — it
   meets the judge at its next `plan start` instead. `vision.one_plan`,
   when present, is a non-empty string (see sizing a plan, below).
+
+## Deciding, not holding (D-140)
+
+A driver that meets a choice takes its own recommended option, unless the
+choice is one a person must make for the long term. Rory, 2026-10-19: "Many
+of the decisions that wait on me I usually go with recommended, unless I
+need to ask you if it is the best long-term product/architecture decision."
+So a decision is the driver's unless it falls in one of these classes:
+
+<!-- escalation-classes:start (rendered from factory.ESCALATION_CLASSES; test_be28 checks it) -->
+- `vision`: a VISION.md claim, ledger row or refusal
+- `product-surface`: a new customer-facing surface, knob or dialect feature
+- `contract`: a forge-platform-wire type, the WIT ABI, or a D-n decision
+- `security`: auth, RLS, key material or the secrets broker
+- `money-or-public`: pricing, billing, or anything public-facing
+- `irreversible`: a destructive or outward act the standing rules do not authorise
+<!-- escalation-classes:end -->
+
+Outside them: take the recommended option, record it on the step, name it
+in the step's report, and keep working. Never `blocked_on` for it:
+
+```json
+"decided": [{"at": "2026-10-20", "choice": "the option taken",
+             "alternative": "the option a person would reverse to",
+             "why": "one line", "rule": "standing rule 2026-10-19"}]
+```
+
+`dispatch.py decisions` lists every one from the last 7 days beside the open
+decisions, so the veto is one read. Inside a class, hold:
+`"blocked_on": "user", "escalation": {"class": "contract", "why": "..."}`,
+with the recommendation in `blocked_reason`. The `roadmap-valid` gate
+refuses a newly set user hold that names no class.
 
 ## Where it goes
 

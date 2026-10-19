@@ -34,7 +34,7 @@
       "blocking": true,
       "check": "check.sh",
       "ci_skip": false,
-      "description": "A roadmap is validated where it is WRITTEN, not at launch (LE-5, 2026-09-05). Four of the five roadmaps filed in one week carried `execution: inline` — a value the driver refuses — and none carried step titles; `plan start` refused each one correctly, but only after lanes had been made, plans copied and commits made. This gate runs the same validator (factory.problems) over every changed `*roadmap*.json` at post-edit, so the refusal arrives at the Write, and it prints EVERY problem rather than the first plus a count. The accepted shape is the template in the forge-roadmap skill.\n",
+      "description": "A roadmap is validated where it is WRITTEN, not at launch (LE-5, 2026-09-05). Four of the five roadmaps filed in one week carried `execution: inline` — a value the driver refuses — and none carried step titles; `plan start` refused each one correctly, but only after lanes had been made, plans copied and commits made. This gate runs the same validator (factory.problems) over every changed `*roadmap*.json` at post-edit, so the refusal arrives at the Write, and it prints EVERY problem rather than the first plus a count. The accepted shape is the template in the forge-roadmap skill. BE-28 (D-140): it also diffs each roadmap against its base (HARNESS_DIFF_BASE, else HEAD) and refuses a `blocked_on: user` the edit newly set without an `escalation` class from factory.ESCALATION_CLASSES; a hold already in the base stands.\n",
       "events": [
         "post-edit",
         "pre-done",

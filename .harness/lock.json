@@ -27,7 +27,7 @@
     },
     {
       "path": ".claude/skills/forge-build/SKILL.md",
-      "sha256": "f5b8e355208a021b1087030c2a8341d57602de71b000b4a1850e5fe3a8b11a35"
+      "sha256": "faef19c04c7f0955d43134a955b4e082c27f4f4ae6f15e7574912bef045e4beb"
     },
     {
       "path": ".claude/skills/forge-model-tiers/SKILL.md",
@@ -35,11 +35,11 @@
     },
     {
       "path": ".claude/skills/forge-roadmap/SKILL.md",
-      "sha256": "bf505b6b79a6d9c69f3f1d237f3e5120819e854c0261c1be8cf52fc6dbf208ff"
+      "sha256": "0de522360b41e20c52a313131631bae3d4e6b0832b0e65ea32edb7b04f00cebc"
     },
     {
       "path": ".claude/skills/forge-session-economy/SKILL.md",
-      "sha256": "3a8206287bc1dee465ec38a1116160d78308a0ca3ff4d0340b9778f4e1360352"
+      "sha256": "8cc49a1764e379897cc3b92225a6ab3faeb43a124ae214e0419a22953e01fed9"
     },
     {
       "path": ".claude/skills/forge-wire-change/SKILL.md",
@@ -59,7 +59,7 @@
     },
     {
       "path": ".github/workflows/harness-gates.yml",
-      "sha256": "f5131bfcafd353078eb2e76fd2e2ae05434e7af546a3b55fb8d70dc60d746ee2"
+      "sha256": "5bb638c1d942d8c09af081c9dc72e6551497c2d4e46028da226f85f1a6196dbd"
     },
     {
       "path": ".gitignore#rules",
@@ -79,7 +79,7 @@
     },
     {
       "path": ".harness/plan.json",
-      "sha256": "8f6ef2c3c518537c4ca9c3a6375735b18f33c8c9a9306cbcfeb842265aa3637b"
+      "sha256": "e8348312fc18cae49fd369165f7723f130196537d4aab3a68e4758b6de184be5"
     },
     {
       "path": ".harness/runner.py",
@@ -102,7 +102,7 @@
     },
     {
       "kind": "skill",
-      "sha256": "56ef3699f4010e7bc959ac8523b76fdcb9117923ccc604e2db1b2ad1cb768369",
+      "sha256": "e0243dcdd25fab15f88a1933843d41b23c66ca51d22d3e872c43fa8c547fe9cc",
       "source": "../../core/skills/forge-session-economy"
     },
     {
@@ -112,7 +112,7 @@
     },
     {
       "kind": "skill",
-      "sha256": "84d8f18fe6949158d127603c96cc9432a84e3e202690d8e01aadaa7cd8b56822",
+      "sha256": "28a6702548b00cde107ee685cf32f6d349af4ea12a76fcc1dcb68c6df430a8f7",
       "source": "../../core/skills/forge-roadmap"
     },
     {
@@ -130,7 +130,7 @@
     },
     {
       "kind": "gate",
-      "sha256": "2708df896cb2bbb4384c51d9e6e1295dc659f3c981f9c7cd6cc133dd2758dd69",
+      "sha256": "5204f45b3f93ea23c7c1c76ade0314818dc3d6b1b855000124c6cfde8926f80e",
       "source": "../../core/gates/roadmap-valid"
     },
     {
@@ -139,7 +139,7 @@
         "cargo": "cargo",
         "cargo_wrap": "bash -c"
       },
-      "sha256": "b51b0c0bc8f6f3b309e5d693d3bb9e9d8a3043857b5dd29ed4ceae715f63ede7",
+      "sha256": "6f70f291c81a9e11ae8c2ababc6fa3bd074722e415e44d93767302b587c348c2",
       "source": "../../core/skills/forge-build"
     },
     {
@@ -198,7 +198,7 @@
         "scope": "full",
         "test_args": "--workspace --locked"
       },
-      "sha256": "62ea801d03a7c883292f64a97a5711c79285365db79f9ca38cb43ebc3058ce0a",
+      "sha256": "575a87f05d623d5e1c5cdd4d341f88deb1174337591a9e4f3b747bf58adf6048",
       "source": "../../core/gates/cargo-tests"
     },
     {
@@ -208,7 +208,7 @@
         "deny": "-D warnings",
         "manifest_path": ""
       },
-      "sha256": "6742ab58d32e3f9f1f9a26fff0927c63cfc25fe11eeaf31be24342d0fc9c4a97",
+      "sha256": "18dec9679c6733d34da20a06380747c1fa8af9d9fbd4135eeda23b93bae3f717",
       "source": "../../core/gates/cargo-clippy"
     },
     {
@@ -348,8 +348,8 @@
   "harness_dir": "harnesses/hybrid",
   "source": {
     "kind": "commit",
-    "ref": "9ed7486",
-    "sha": "9ed748680370bbe40b8e48a66718a16b4fe3ff23"
+    "ref": "825337aaefe9721c3b575d9b49a00d8d43638d96",
+    "sha": "825337aaefe9721c3b575d9b49a00d8d43638d96"
   },
   "targets": [
     "claude-code",
