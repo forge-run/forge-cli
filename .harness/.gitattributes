@@ -1,0 +1,7 @@
+# Emitted by the harness (BE-12, BE-13): every consumer's roadmaps merge step by step through
+# forge-keyed and its per-step sidecars take the merging branch's copy through forge-incoming.
+# The policy is DEFAULTS in merge_drivers.py; edit it, not this file.
+/roadmap.json merge=forge-keyed
+/roadmap-*.json merge=forge-keyed
+/report.json merge=forge-incoming
+/intent/CURRENT merge=forge-incoming

@@ -27,7 +27,7 @@
     },
     {
       "path": ".claude/skills/forge-build/SKILL.md",
-      "sha256": "a7dc34475b5f9289cdcb468dcdd06b4920a5ef3c5658dac2a5028d9a90000913"
+      "sha256": "f5b8e355208a021b1087030c2a8341d57602de71b000b4a1850e5fe3a8b11a35"
     },
     {
       "path": ".claude/skills/forge-model-tiers/SKILL.md",
@@ -35,7 +35,7 @@
     },
     {
       "path": ".claude/skills/forge-roadmap/SKILL.md",
-      "sha256": "56daf5a24bbd8fe83f893265eb2059d71fc16676893e8185c0517420c503d349"
+      "sha256": "bf505b6b79a6d9c69f3f1d237f3e5120819e854c0261c1be8cf52fc6dbf208ff"
     },
     {
       "path": ".claude/skills/forge-session-economy/SKILL.md",
@@ -59,7 +59,7 @@
     },
     {
       "path": ".github/workflows/harness-gates.yml",
-      "sha256": "9762b507652437b912f60a4271b1cd0e045829521000f2beefbde6f0d477d3c6"
+      "sha256": "f5131bfcafd353078eb2e76fd2e2ae05434e7af546a3b55fb8d70dc60d746ee2"
     },
     {
       "path": ".gitignore#rules",
@@ -72,6 +72,10 @@
         ".harness/report.json"
       ],
       "sha256": "70a18b134a959a19ee397b3fd0f52d70ec7f60b25d6fa66cad4b46504b001e1b"
+    },
+    {
+      "path": ".harness/.gitattributes",
+      "sha256": "682da69cd48a8a75a219a441e5b0a5d813a5ad685b6b827fb3ead5031442af36"
     },
     {
       "path": ".harness/plan.json",
@@ -108,7 +112,7 @@
     },
     {
       "kind": "skill",
-      "sha256": "f2e6a3529cb65e31264d12b2e1d3d500bff77337a61708875789493f62c9cfa3",
+      "sha256": "84d8f18fe6949158d127603c96cc9432a84e3e202690d8e01aadaa7cd8b56822",
       "source": "../../core/skills/forge-roadmap"
     },
     {
@@ -344,8 +348,8 @@
   "harness_dir": "harnesses/hybrid",
   "source": {
     "kind": "commit",
-    "ref": "e1ec2c791f85f31d0e3adf3ec04b87264be785c0",
-    "sha": "e1ec2c791f85f31d0e3adf3ec04b87264be785c0"
+    "ref": "9ed7486",
+    "sha": "9ed748680370bbe40b8e48a66718a16b4fe3ff23"
   },
   "targets": [
     "claude-code",

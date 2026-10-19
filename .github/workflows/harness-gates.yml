@@ -28,12 +28,12 @@ jobs:
         with:
           fetch-depth: 0
           path: forge-cli
-      - name: Checkout harness machinery (e1ec2c7)
+      - name: Checkout harness machinery (9ed7486)
         uses: actions/checkout@v4
         with:
           repository: forge-run/forge-sdlc-harness
           path: forge-sdlc-harness
-          ref: e1ec2c791f85f31d0e3adf3ec04b87264be785c0
+          ref: 9ed748680370bbe40b8e48a66718a16b4fe3ff23
           clean: true
           token: ${{ secrets.FORGE_CROSS_REPO_TOKEN }}
       - name: Check out the sibling closure (.harness/siblings.json)

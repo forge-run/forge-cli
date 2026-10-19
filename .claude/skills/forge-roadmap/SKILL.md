@@ -8,7 +8,7 @@ description: File a roadmap the harness driver accepts: the template in the skil
 name: forge-roadmap
 description: File a roadmap the harness driver accepts. Use when writing or editing any *roadmap*.json, before `plan start` or run-plan.sh — the template below IS the schema, and the roadmap-valid gate refuses anything else at the Write.
 ---
-<!-- last-confirmed: 2026-10-11 -->
+<!-- last-confirmed: 2026-10-19 -->
 
 # Filing a roadmap
 
@@ -25,8 +25,10 @@ python3 $ROOT/.harness/dispatch.py plan validate <file>
 ## The shape
 
 Copy this and fill it in. Every key shown on a step is REQUIRED except
-`notes`, `phase`, `scope`, `lands`, `blocked_on`, `evidence` — and `lands`
-is required on a step whose `scope` names more than one repo.
+`notes`, `phase`, `scope`, `requires`, `lands`, `blocked_on`, `evidence` —
+and `lands` is required on a step whose `scope` names more than one repo.
+The four steps are the two shapes that fan out (below): E-1 lands the
+contract, E-2 and E-3 run at once, E-4 deletes the old form.
 
 ```json
 {
@@ -48,11 +50,12 @@ is required on a step whose `scope` names more than one repo.
   },
   "steps": [
     {
-      "id": "E-1-short-slug",
-      "title": "One sentence naming the change, in the present tense",
+      "id": "E-1-the-contract-lands",
+      "title": "The new shared type lands beside the old one, read by nobody yet",
       "status": "todo",
-      "phase": "harness-core",
-      "scope": ["forge-example/"],
+      "phase": "contract",
+      "scope": ["forge-platform-wire/src/"],
+      "requires": [],
       "notes": "Measured cost, cause, mechanism. Everything a fresh session needs that the acceptance list does not say.",
       "acceptance": [
         "A checkable statement: a test that fails before and passes after, a number that moves, a file that exists.",
@@ -61,13 +64,32 @@ is required on a step whose `scope` names more than one repo.
       "evidence": []
     },
     {
-      "id": "E-2-cross-repo-slug",
-      "title": "A step whose scope names two repos says which reaches main first",
+      "id": "E-2-the-runtime-reads-it",
+      "title": "The runtime's callers move to the new type",
       "status": "todo",
-      "scope": ["forge-platform-wire/src/", "forge-runtime/crates/"],
-      "lands": ["forge-platform-wire", "forge-runtime"],
+      "scope": ["forge-runtime/crates/"],
+      "requires": ["E-1"],
+      "acceptance": ["The runtime's suite passes reading only the new type."],
+      "evidence": []
+    },
+    {
+      "id": "E-3-the-cp-reads-it",
+      "title": "The control plane's callers move to the new type",
+      "status": "todo",
+      "scope": ["forge-control-plane/src/"],
+      "requires": ["E-1"],
+      "acceptance": ["The control plane's suite passes reading only the new type."],
+      "evidence": []
+    },
+    {
+      "id": "E-4-the-old-form-goes",
+      "title": "The old type is deleted once nothing reads it",
+      "status": "todo",
+      "scope": ["forge-platform-wire/src/", "forge-runtime/crates/", "forge-control-plane/src/"],
+      "requires": ["E-2", "E-3"],
+      "lands": ["forge-platform-wire", "forge-runtime", "forge-control-plane"],
       "acceptance": [
-        "The hub's change is on main before the dependent that reads it."
+        "No consumer names the old type, and every repo's suite passes with the hub on main first."
       ],
       "evidence": []
     }
@@ -104,6 +126,11 @@ is required on a step whose `scope` names more than one repo.
   which goes first is how conformance-2026-09 needed two catch-up landing
   steps. Like `vision`, a missing `lands` is asked for only until the
   plan's first step is done; a `lands` that is present is always checked.
+- `requires`, when present, is an array of step ids, short (`E-1`) or full.
+  A step without it waits on EVERY step before it, so a plan that declares
+  none runs one step at a time.
+- `sequential_because`, top level, when present, is a non-empty string: why
+  this plan is a chain (see shaping a plan, below).
 - `evidence`, when present, is an array.
 - `drift`, when present, is `{max_unlanded_hours?, max_ahead_commits?}`: a
   number of hours > 0 and an integer >= 1, no other key (DR-1). The loop
@@ -154,6 +181,30 @@ between the halves, one migration that lands whole. The CEO's judge refuses
 it at `plan start` without one, or with a reason that would hold for any
 plan ("the steps are related"). conformance-2026-09 grew to 107 steps; a
 plan that size cannot land as it goes.
+
+## Shaping a plan to fan out
+
+`plan validate` prints every plan's shape: `critical path L of N steps,
+widest level W`. L is the longest `requires` chain, and it is the floor on
+how many steps-worth of wall-clock the plan takes however many run at once.
+When L is over 70% of N on a plan of 6 or more steps it warns and names the
+chain. codebases-2026-10 is 10 levels of 12 steps: nothing at filing said
+so. Two shapes turn a chain into a fan:
+
+- **Contract first.** One step lands the shared type or wire contract and
+  nothing else; every consumer is then its own step requiring only that one,
+  and they run at once. A chain whose later steps each read only what the
+  first one landed is consumers of one contract, written in the order
+  someone thought of them.
+- **Expand and contract.** Add the new form beside the old; move callers in
+  independent steps, each requiring only the expand step; delete the old form
+  in one last step requiring them all. No step in the middle leaves main
+  broken, so none of them waits on another.
+
+The warning is advice, never a refusal: some plans are chains, because each
+step reads what the one before it measured. Such a plan says so in a
+top-level `sequential_because`, and the warning is not printed. A reason
+that would hold for any plan ("the steps are related") is not one.
 
 ## Sizing a step
 
