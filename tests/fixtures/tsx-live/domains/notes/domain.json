@@ -1,0 +1,7 @@
+{
+  "schema_version": "0.1",
+  "name": "notes",
+  "description": "SPA-6's live fixture: ops a live load is held to by what they read.",
+  "consumes": [],
+  "secrets": []
+}

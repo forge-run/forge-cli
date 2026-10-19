@@ -1,0 +1,49 @@
+{
+  "content_hash": "sha256:5e6a",
+  "forge_schema_lock": 1,
+  "inputs": {
+    "authored": {},
+    "platform_bundle": {
+      "hash": "sha256:0aa068d8db395e48e9d32d707e29fe4cbbaed98d56555bd2768eeb684293ae5a",
+      "source": "forge-runtime/crates/forge-runtime-auth/schemas"
+    }
+  },
+  "tables": {
+    "notes": {
+      "archetype": "Base",
+      "columns": [
+        {
+          "name": "id",
+          "nullable": false,
+          "primary_key": true,
+          "type": "Uuid",
+          "wire": "text"
+        },
+        {
+          "name": "title",
+          "nullable": false,
+          "type": "Text",
+          "wire": "text"
+        }
+      ]
+    },
+    "tags": {
+      "archetype": "Base",
+      "columns": [
+        {
+          "name": "id",
+          "nullable": false,
+          "primary_key": true,
+          "type": "Uuid",
+          "wire": "text"
+        },
+        {
+          "name": "title",
+          "nullable": false,
+          "type": "Text",
+          "wire": "text"
+        }
+      ]
+    }
+  }
+}

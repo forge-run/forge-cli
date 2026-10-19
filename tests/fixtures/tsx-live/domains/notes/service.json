@@ -1,0 +1,147 @@
+{
+  "name": "notes",
+  "domain": "notes",
+  "api_version": 1,
+  "operations": [
+    {
+      "name": "list_notes",
+      "kind": "query",
+      "auth": "user",
+      "input_schema": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/NoteRow"
+            }
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "$defs": {
+          "NoteRow": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "title"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "name": "fetched_notes",
+      "kind": "query",
+      "auth": "user",
+      "input_schema": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/NoteRow"
+            }
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "$defs": {
+          "NoteRow": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "title"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "name": "note_clock",
+      "kind": "query",
+      "auth": "user",
+      "input_schema": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "count"
+        ]
+      }
+    },
+    {
+      "name": "list_tags",
+      "kind": "query",
+      "auth": "user",
+      "input_schema": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/NoteRow"
+            }
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "$defs": {
+          "NoteRow": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "title"
+            ]
+          }
+        }
+      }
+    }
+  ]
+}

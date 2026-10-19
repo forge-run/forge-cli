@@ -172,7 +172,7 @@ pub(crate) fn check(root: &Path) -> Result<Verdicts, String> {
     // ST-6: what each domain's `service.json` declares for its ops' input,
     // output and errors, scoped around every source's front end — the same
     // surfaces the control plane scopes at push, so the two refuse alike.
-    let contracts = dialect::contract_surfaces(root)?;
+    let mut contracts = dialect::contract_surfaces(root)?;
 
     // Every source is checked. Stopping at the first refusal would make a
     // second run necessary to see the second problem, which is the round trip
@@ -266,6 +266,13 @@ pub(crate) fn check(root: &Path) -> Result<Verdicts, String> {
         None => (registers, units),
     };
     let (mut registers, mut cards) = (registers, cards);
+    // SPA-6: each op's read set, off the same op sources and tables the
+    // checks above read, so a page's `live` load is held to what its op reads
+    // exactly as the control plane holds it at push (`tsx_derive`).
+    if root.join("apps").is_dir() {
+        contracts.op_reads =
+            forge_lang_rustgen::partition::op_reads(&sources, tables.as_ref(), &contracts);
+    }
     let (tsx, island_pages) = tsx_registers(root, &contracts)?;
     for register in tsx {
         registers.push(register);
@@ -1390,5 +1397,54 @@ def plan_badge(ctx: OpContext, input: Value) -> Badge:
         assert!(!human_report(&found).contains("island pages"));
         let doc: serde_json::Value = serde_json::from_str(&envelope(ws.path(), &found)).unwrap();
         assert_eq!(doc["island_pages"], serde_json::json!([]));
+    }
+
+    /// SPA-6's live push, a copy of forge-lang's
+    /// `fixtures/components-ts/live/push`: a page loading `list_notes`,
+    /// which reads `notes` alone, with `{ live: true }`.
+    fn live_workspace() -> PathBuf {
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/tsx-live")
+    }
+
+    /// `forge check` holds a `live` load to what its op reads, read off the
+    /// workspace's own op sources as the push reads them: a live load of an
+    /// op reading `notes` checks, and one of an op that also reads the world
+    /// (`http.fetch`, wide) is `FL1981`.
+    #[test]
+    fn forge_check_holds_a_live_load_to_what_its_op_reads() {
+        let found = check(&live_workspace()).expect("the live workspace checks");
+        assert!(found.ok(), "{}", human_report(&found));
+
+        let ws = tempfile::tempdir().unwrap();
+        copy_tree(&live_workspace(), ws.path());
+        let page = ws.path().join("apps/web/pages/notes.tsx");
+        let text = std::fs::read_to_string(&page).unwrap();
+        std::fs::write(
+            &page,
+            text.replace("\"list_notes\"", "\"fetched_notes\"")
+                .replace("ListNotesResponse", "FetchedNotesResponse"),
+        )
+        .unwrap();
+        let found = check(ws.path()).expect("checks to a verdict");
+        let codes: Vec<&str> = found
+            .registers
+            .iter()
+            .flat_map(|r| r.rejections.iter().map(|x| x.code))
+            .collect();
+        assert_eq!(codes, ["FL1981"], "{}", human_report(&found));
+        assert!(human_report(&found).contains("which reads tables it does not name"));
+    }
+
+    fn copy_tree(from: &Path, to: &Path) {
+        std::fs::create_dir_all(to).unwrap();
+        for e in std::fs::read_dir(from).unwrap() {
+            let path = e.unwrap().path();
+            let target = to.join(path.file_name().unwrap());
+            if path.is_dir() {
+                copy_tree(&path, &target);
+            } else {
+                std::fs::copy(&path, &target).unwrap();
+            }
+        }
     }
 }

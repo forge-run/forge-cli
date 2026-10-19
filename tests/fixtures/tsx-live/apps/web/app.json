@@ -1,0 +1,4 @@
+{
+  "app": { "name": "web", "version": "0.1.0" },
+  "routing_claim": { "host": "app.example.com" }
+}
