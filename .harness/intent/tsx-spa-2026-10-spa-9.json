@@ -20,6 +20,11 @@
       "at": "2026-10-19T13:30:19.113834+00:00",
       "boundary": "verify",
       "id": "gap-review"
+    },
+    {
+      "at": "2026-10-19T13:37:46.655081+00:00",
+      "boundary": "align",
+      "id": "gap-review"
     }
   ],
   "gap_reviews": [
@@ -54,6 +59,22 @@
         {
           "description": "the forge-lang verify ladder (exit 0, all four rungs) is not recorded green because the forge-portal-e2e lane is not a harness consumer",
           "note": "forge-lang is unchanged by this step; the ladder's pass stands as run and re-running it would meet the same unreadable lane",
+          "resolution": "accepted"
+        }
+      ],
+      "intent_ref": ".harness/intent/tsx-spa-2026-10-spa-9.json"
+    },
+    {
+      "boundary": "align",
+      "gaps": [
+        {
+          "description": "the forge-cli diff (796b929..HEAD, outside .harness) against intent statement 'forge new ... gets a client app beside the starter page: a layout whose links route between two client pages ... a /notes page whose list is a live loader over a scaffolded notes table ... a form posting add_note with its submit disabled and labelled while isPending, and the starter ops for both in the scaffold's dialect': every element is present in all four dialects; the one divergence is that the live list is per-writer (created_by = $user_id) rather than all viewers",
+          "note": "the intent says 'under the viewer's RLS' and a table with no select policy is unreadable, so a per-writer policy is that RLS made explicit; README states it",
+          "resolution": "accepted"
+        },
+        {
+          "description": "the intent's CI clause is not yet met: run 39260691024 attempt 1 never ran the suite (forge-agent: binding 127.0.0.1:39000 Address already in use, an orphan from the shared runner)",
+          "note": "infrastructure, not this diff; rerun requested as attempt 2 of the same run id, and the step is not marked done until a run passes",
           "resolution": "accepted"
         }
       ],
