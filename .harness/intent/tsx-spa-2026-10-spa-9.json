@@ -1,0 +1,28 @@
+{
+  "acceptance": [
+    "`forge new` with the TSX template produces the client app, which pushes clean and serves; forge-portal-e2e's suite exercises navigation, live update and a pending form and passes on CI (run id in evidence).",
+    "The step's report restates SPA-1's ranking for SPA-10..SPA-13 and the order this roadmap runs them in."
+  ],
+  "author": "rory",
+  "events": [
+    {
+      "at": "2026-10-19T12:23:31.623057+00:00",
+      "id": "intent-recorded",
+      "revision": 1,
+      "source": "factory-delegate"
+    }
+  ],
+  "gap_reviews": [],
+  "out_of_scope": [],
+  "refs": [
+    "plan:tsx-spa-2026-10",
+    "step:SPA-9"
+  ],
+  "revision": 1,
+  "schema": "forge-intent/v1",
+  "slug": "tsx-spa-2026-10-spa-9",
+  "source": "factory-delegate",
+  "statement": "The beta line: a client app with routing, a live list and pending forms ships through forge new and the portal end to end \u2014 Rows 1, 2, 3 and 5 are what make client TSX credible before the beta waitlist (Rory, 2026-10-17); rows 4, 6, 7 and 8 follow during the beta. forge new's TSX starter gains a client app: layout, two routed pages, a live list and a form with pending state. forge-portal-e2e proves it pushed and served on the dev stack.",
+  "ts": "2026-10-19T12:23:31.623057+00:00",
+  "updated_at": "2026-10-19T12:23:31.623057+00:00"
+}

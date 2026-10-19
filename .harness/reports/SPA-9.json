@@ -1,0 +1,42 @@
+{
+  "author": "rory",
+  "bundle_ids": [],
+  "bundle_note": "gates run through the cargo shim via detached sdk-bg jobs cli9-newtests and cli9-full2; no evidence run directory was produced",
+  "commits": [
+    "84ed177"
+  ],
+  "lane": "/Users/rory/Documents/forge-run/forge-cli--step-spa9",
+  "notes": "RLS: a customer table with no select policy is default-deny for a subject caller (forge-storage rls.rs rls_enforcement), so notes carries created_by eq $user_id select; e2e second session must be the same user. schema.rs op_new test updated for the three scaffold ops. forge-cli has no .harness/structure.yaml, so no new.rs size ratchet applied.",
+  "repair_attempts": 1,
+  "repair_attempts_unattributed": 1,
+  "schema": "forge-report/v1",
+  "step": "SPA-9",
+  "ts": "2026-10-19T12:30:56.745412+00:00",
+  "verdicts": [
+    {
+      "evidence": "forge check admits all four dialect scaffolds (10/10 sources each, in-process tests + built binary); serving is owed to the orchestrator's forge-portal-e2e run",
+      "item": "forge new with the TSX template produces the client app, which pushes clean and serves",
+      "verdict": "met-with-owed"
+    },
+    {
+      "evidence": "18/18 cmd",
+      "item": "every_dialect_scaffold test holds the whole app",
+      "verdict": "met"
+    },
+    {
+      "evidence": "test passes",
+      "item": "a_dialect_scaffold test: 3 ops per dialect, all admitted",
+      "verdict": "met"
+    },
+    {
+      "evidence": "a_live_load_over_a_table_the_lock_leaves_out_is_refused_by_forge_check asserts FL1981 at notes.tsx, lock trimmed and lock removed",
+      "item": "new test: lock lacking notes is refused with the live-load code",
+      "verdict": "met"
+    },
+    {
+      "evidence": "182+3+1 passed, commit 84ed177",
+      "item": "fmt, clippy -D warnings, full forge-cli suite green; commit on step-spa9",
+      "verdict": "met"
+    }
+  ]
+}
