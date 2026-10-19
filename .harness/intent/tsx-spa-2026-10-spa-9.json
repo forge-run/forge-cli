@@ -25,6 +25,11 @@
       "at": "2026-10-19T13:37:46.655081+00:00",
       "boundary": "align",
       "id": "gap-review"
+    },
+    {
+      "at": "2026-10-19T13:57:13.715205+00:00",
+      "boundary": "review",
+      "id": "gap-review"
     }
   ],
   "gap_reviews": [
@@ -75,6 +80,17 @@
         {
           "description": "the intent's CI clause is not yet met: run 39260691024 attempt 1 never ran the suite (forge-agent: binding 127.0.0.1:39000 Address already in use, an orphan from the shared runner)",
           "note": "infrastructure, not this diff; rerun requested as attempt 2 of the same run id, and the step is not marked done until a run passes",
+          "resolution": "accepted"
+        }
+      ],
+      "intent_ref": ".harness/intent/tsx-spa-2026-10-spa-9.json"
+    },
+    {
+      "boundary": "review",
+      "gaps": [
+        {
+          "description": "none found",
+          "note": "forge-cli 796b929..84ed177 (the SPA-9 commit; later lane commits are .harness bookkeeping only) and forge-portal-e2e 02c702a..8ce4d09 against intent tsx-spa-2026-10-spa-9 ('forge new ... gets a client app ... forge check admits the tree as scaffolded, a git push of it converges with no customer additions, and forge-portal-e2e's spa-beta spec drives the scaffolded app ... and passes in a portal-e2e CI run'): every clause is met, proven by portal-e2e run 39260691024 attempt 2 (219 passed, 0 failed; spa-beta ws-716f87cc7a6d7cf3 converged and routed /wave -> /notes, pending then listed, B repainted live) on exactly those two SHAs; the per-writer RLS and the scaffold's lock-warning were accepted at build and align",
           "resolution": "accepted"
         }
       ],
