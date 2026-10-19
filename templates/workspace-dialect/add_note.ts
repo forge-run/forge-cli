@@ -4,6 +4,6 @@ import { AddNoteRequest, AddNoteResponse } from "forge/schema";
 import { Notes } from "forge/schema/tables";
 
 export const addNote = op((ctx: OpContext, req: AddNoteRequest): AddNoteResponse => {
-  const written = Notes.insert([{ body: req.body }]).execute();
+  const _written = Notes.insert([{ body: req.body }]).execute();
   return { body: req.body };
 });
