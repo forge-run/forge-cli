@@ -1,12 +1,19 @@
 {
   "author": "rory",
-  "bundle_ids": [],
+  "bundle_ids": [
+    "pre-commit-20ea3ebc",
+    "pre-commit-a4fe0298"
+  ],
   "bundle_note": "gates run through the cargo shim via detached sdk-bg jobs cli9-newtests and cli9-full2; no evidence run directory was produced",
   "commits": [
-    "84ed177"
+    "84ed177",
+    "6273e06",
+    "c519b30"
   ],
   "lane": "/Users/rory/Documents/forge-run/forge-cli--step-spa9",
   "notes": "RLS: a customer table with no select policy is default-deny for a subject caller (forge-storage rls.rs rls_enforcement), so notes carries created_by eq $user_id select; e2e second session must be the same user. schema.rs op_new test updated for the three scaffold ops. forge-cli has no .harness/structure.yaml, so no new.rs size ratchet applied.",
+  "refresh_note": "re-stamped by the driver at verify (2026-10-19T13:28:38.532107+00:00): the report at 2026-10-19T12:30:56.745412+00:00 predated commit 6273e06, commit c519b30, bundle pre-commit-20ea3ebc, bundle pre-commit-a4fe0298; verdicts are as the implementer wrote them and may understate the tree",
+  "refreshed_at": "2026-10-19T13:28:38.532107+00:00",
   "repair_attempts": 1,
   "repair_attempts_unattributed": 1,
   "schema": "forge-report/v1",

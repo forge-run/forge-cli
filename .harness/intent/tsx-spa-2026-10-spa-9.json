@@ -15,6 +15,11 @@
       "at": "2026-10-19T12:51:31.372035+00:00",
       "boundary": "build",
       "id": "gap-review"
+    },
+    {
+      "at": "2026-10-19T13:30:19.113834+00:00",
+      "boundary": "verify",
+      "id": "gap-review"
     }
   ],
   "gap_reviews": [
@@ -34,6 +39,21 @@
         {
           "description": "serving is not proven by forge-cli's tests",
           "note": "by design: forge check (the push's checker) admits all four dialects in-process; serving is proven by forge-portal-e2e spa-beta.spec.ts in portal-e2e run 39252809740 (forge_cli_ref=step-spa9)",
+          "resolution": "accepted"
+        }
+      ],
+      "intent_ref": ".harness/intent/tsx-spa-2026-10-spa-9.json"
+    },
+    {
+      "boundary": "verify",
+      "gaps": [
+        {
+          "description": "portal-e2e run 39252809740 (step-spa9, forge_cli_ref=step-spa9): spa-beta passed (ws-668470acaa7bdae0 converged, routed /wave -> /notes, pending then listed, B repainted live) but client-page and spa-live failed because their fixtures re-declared the notes table, list_notes and add_note the scaffold now ships (forge check: two NoteRow shapes; spa-live never converged, 404). forge-portal-e2e 8ce4d09 drops the fixtures' domain halves so each brings only its page; forge check on the lane binary admits scaffold+client-page (11/11), scaffold+spa-live (11/11) and the bare scaffold (10/10); re-run dispatched as 39260691024",
+          "resolution": "fixed"
+        },
+        {
+          "description": "the forge-lang verify ladder (exit 0, all four rungs) is not recorded green because the forge-portal-e2e lane is not a harness consumer",
+          "note": "forge-lang is unchanged by this step; the ladder's pass stands as run and re-running it would meet the same unreadable lane",
           "resolution": "accepted"
         }
       ],
