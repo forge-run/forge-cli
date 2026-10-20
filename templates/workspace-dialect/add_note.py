@@ -8,5 +8,5 @@ from forge_schema.tables import notes
 @op
 def add_note(ctx: OpContext, req: AddNoteRequest) -> AddNoteResponse:
     """Write one note as the caller."""
-    written: Value = notes.insert(notes.new_row().set(notes.BODY, req.body)).execute()
+    _written: Value = notes.insert(notes.new_row().set(notes.BODY, req.body)).execute()
     return AddNoteResponse(body=req.body)

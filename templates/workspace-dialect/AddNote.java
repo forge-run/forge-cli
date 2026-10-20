@@ -13,7 +13,7 @@ public final class AddNote {
   /** Writes one note as the caller. */
   @Op
   public static AddNoteResponse addNote(OpContext ctx, AddNoteRequest req) {
-    Value written = Notes.insert(Notes.newRow().set(Notes.BODY, req.body())).execute();
+    Value unused = Notes.insert(Notes.newRow().set(Notes.BODY, req.body())).execute();
     return new AddNoteResponse(req.body());
   }
 }
