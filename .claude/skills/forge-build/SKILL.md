@@ -266,7 +266,7 @@ resolution error — not something you need to set up.
 ## Cost awareness
 
 <!-- fact: platform/crate-line-counts -->
-forge-runtime holds 236078 lines of tracked Rust and forge-storage 312859.
+forge-runtime holds 236629 lines of tracked Rust and forge-storage 312859.
 
 Both are genuinely slow from cold — tens of minutes. Prefer `cargo check` while iterating,
 and set `CARGO_TARGET_DIR` to a stable path so the heavy unchanging deps stay compiled
@@ -601,12 +601,20 @@ A lane is a worktree. The substrate-build-isolation fence declares `lock_scope: 
 **Set either variable yourself and yours wins**, recorded as `jobs_from: caller` in
 `.harness/log/lock.jsonl` alongside `active_lanes`.
 
-<!-- fact: platform/remap-path-prefix-in-lanes -->
-The cargo wrapper appends --remap-path-prefix=<lane>=/forge/<repo> to RUSTFLAGS so a worktree's path stays out of the sccache key.
+<!-- fact: platform/cargo-wrapper-applies-no-path-remap -->
+The cargo wrapper applies no per-lane --remap-path-prefix and passes a caller's RUSTFLAGS through untouched, so every lane hashes registry crates under one sccache key.
 
-`core/runner/cargo.sh` appends `--remap-path-prefix=<lane root>=/forge/<repo>` to `RUSTFLAGS`, the repo name being the worktree basename before its `--`. Without it every worktree's absolute path reaches the sccache key and our own crates recompile cold in each lane. It appends, so a caller's `RUSTFLAGS` survives, and a caller who already remapped that prefix is left alone. Sibling path-deps are not remapped: they resolve to the same main-checkout path from every lane.
+BE-5 (forge-sdlc-harness f841b34, 2026-10-19) removed the remap H-F.6 appended.
+`--remap-path-prefix=<lane>=/forge/<repo>` was meant to keep a lane's path out of
+the sccache key and did the opposite: the flag itself carries the lane's path,
+RUSTFLAGS reaches every crate including the registry ones, and sccache hashes every
+argument, so each lane had its own key for every crate. Measured: 24 cold
+forge-lang lane builds 2026-10-01..18 hit 148 of 4648 lookups (3%). Our own crates
+were never cache hits anyway, because cargo compiles path packages incrementally
+and sccache does not cache an incremental compile. `core/runner/cargo.sh` now sets
+`REMAP_APPLIED=none` and records it as `remap` in `.harness/log/lock.jsonl`.
 
-**That remap is gone (BE-5, D-140), and the atom above is owed a supersession in
+**That remap is gone (BE-5, D-140); the atom above is its supersession in
 forge-facts.** The flag carried the lane's own path, RUSTFLAGS reaches every crate
 including the registry ones, and sccache hashes every argument, so each lane had its own
 key for every crate: 24 cold forge-lang lane builds hit 3% of lookups. Our own crates were
