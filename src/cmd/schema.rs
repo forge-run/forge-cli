@@ -520,6 +520,18 @@ pub fn compile_snapshot(root: &Path) -> Result<CompiledSnapshot> {
                     serde_json::json!({"table": fk.table, "column": fk.column}),
                 );
             }
+            // A blob column's write gates, in `BlobColumnDef`'s own serde
+            // shape: a page's file field bound to the column is typed by the
+            // limits the write is held to (forge-lang schemagen/blob.rs).
+            if let Some(blob) = &col.blob {
+                doc.insert(
+                    "blob".into(),
+                    serde_json::json!({
+                        "mime_allowlist": blob.mime_allowlist,
+                        "max_size_bytes": blob.max_size_bytes,
+                    }),
+                );
+            }
             cols.push(serde_json::Value::Object(doc));
         }
         let mut rels = Vec::new();
@@ -1086,6 +1098,43 @@ mod tests {
         let parts = serde_json::to_string_pretty(&doc["tables"]["widget_parts"]).unwrap();
         assert!(!parts.contains("has_default"), "{parts}");
         assert!(!compiled.text.contains("\"has_default\": false"));
+    }
+
+    /// UP-5: a blob column's gates reach the lock in `BlobColumnDef`'s
+    /// shape, which forge-lang's checker reads to type a page's file field;
+    /// a column with no `blob` writes no key, so an older lock keeps its bytes.
+    #[test]
+    fn a_blob_column_records_its_mime_allowlist_and_byte_cap() {
+        let ws = workspace();
+        std::fs::write(
+            ws.path().join("domains/d/schemas/profiles.table.json"),
+            r#"{"name":"profiles","archetype":"Base",
+                "label":"Profile","plural_label":"Profiles","header_fields":["label"],
+                "columns":[{"name":"label","type":"string"},
+                           {"name":"avatar","type":"string","format":"uuid","required":false,
+                            "blob":{"mime_allowlist":["image/png","image/jpeg"],
+                                    "max_size_bytes":2000000}},
+                           {"name":"source","type":"string","format":"uuid","required":false,
+                            "blob":{}}]}"#,
+        )
+        .unwrap();
+        let compiled = compile_snapshot(ws.path()).unwrap();
+        let doc: serde_json::Value = serde_json::from_str(&compiled.text).unwrap();
+        let cols = doc["tables"]["profiles"]["columns"].as_array().unwrap();
+        let col = |n: &str| cols.iter().find(|c| c["name"] == n).unwrap();
+        assert_eq!(
+            col("avatar")["blob"],
+            serde_json::json!({"mime_allowlist": ["image/png", "image/jpeg"],
+                               "max_size_bytes": 2000000})
+        );
+        // An empty block admits any type at any size, and says so.
+        assert_eq!(
+            col("source")["blob"],
+            serde_json::json!({"mime_allowlist": [], "max_size_bytes": null})
+        );
+        assert!(col("label").get("blob").is_none());
+        let parts = serde_json::to_string_pretty(&doc["tables"]["widget_parts"]).unwrap();
+        assert!(!parts.contains("\"blob\""), "{parts}");
     }
 
     #[test]
