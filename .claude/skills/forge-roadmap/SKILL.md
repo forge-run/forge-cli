@@ -257,3 +257,31 @@ that would hold for any plan ("the steps are related") is not one.
 A step's brief must say three things: the bounded file set it touches, the
 one coherent change it makes, and how its tests derive from the acceptance
 list. A step that cannot say all three is two steps.
+
+The opposite failure is commoner, and it is measured. On 2026-10-22 a review of
+the twelve tsx-depth plans found 109 steps for about 59 steps' worth of work, a
+46% surplus, because every plan was filed from one skeleton (design, contract,
+checker, server, client, forge-ui, skill text, e2e, closing census) and a
+"5 to 12 steps" target. Measured costs: a step closed done with no lines
+(SS-4); a 9-line portal change as its own step (PH-7); a contract step split
+from the checker that read it, 7 h of wall time with 200 lines reworked
+(IM-2); a closing census re-run two hours after a "baseline" taken after the
+feature (PH-8). Every step is a fresh driver session, a verify and a land, so
+a needless step costs hours, not minutes.
+
+So a step is a unit of work that needs its own verify and land, not a layer:
+
+- **Do not split by layer.** A contract lands with the first code that reads
+  it. Skill text rides with the checker step that makes it true. An e2e or
+  oracle spec rides with the server or client step it proves. A forge-ui
+  wrapper of a few dozen lines rides with the client step.
+- **A step earns its own entry** only for a different repo's substantial
+  change, a real ordering constraint (a hub crate first, a migration before
+  a refusal), or a measurement a later step reads.
+- **No per-plan closing census.** Plans that share a census share one closing
+  reading, filed once as its own small plan. A baseline is taken in step 1,
+  before the feature, or not at all.
+- **A typical dialect feature is 4 to 6 steps:** design and census, held for
+  approval; contract plus checker plus skill text; server with its test;
+  client with its forge-ui piece and spec; and only where real, a second-repo
+  or migration step. Do not give a plan a step-count target; give it the work.
