@@ -41,13 +41,14 @@ them to `Node`. A page's data comes only from the ops its `loader` names, each
 run as the requesting user and typed by the op's generated `<Op>Response`.
 A page renders on the server; nothing is built, bundled or installed.
 
-A page that declares `export const mode = "client";` is a client page, like
+A page whose first line is `"use client";` is a client page, like
 `wave.tsx`: the server answers it with a shell, and the browser fetches the
 loader's ops from their REST routes as the signed-in user and renders the
 page. Its components may hold state cells, `const [waves, setWaves] =
 useState<number>(0);`, and click handlers, `onClick={() => setWaves(waves + 1)}`,
 whose only effects are setting a cell and calling an op with
-`action("<op>", { … })`. A server page refuses both.
+`action("<op>", { … })`; a component holding them carries the same first
+line, like `components/wave.tsx`. A server page refuses both.
 
 ## The client app
 

@@ -1273,7 +1273,7 @@ mod tests {
             }
             let client = std::fs::read_to_string(dir.join("apps/web/pages/wave.tsx")).unwrap();
             assert!(
-                client.contains(r#"export const mode = "client";"#),
+                client.starts_with("\"use client\";\n"),
                 "{lang:?}: wave.tsx is not a client page:\n{client}"
             );
             let cell = std::fs::read_to_string(dir.join("apps/web/components/wave.tsx")).unwrap();
@@ -1282,8 +1282,11 @@ mod tests {
                 "{lang:?}: the client component holds no cell set by a click:\n{cell}"
             );
             let notes = std::fs::read_to_string(dir.join("apps/web/pages/notes.tsx")).unwrap();
+            assert!(
+                notes.starts_with("\"use client\";\n"),
+                "{lang:?}: notes.tsx is not a client page:\n{notes}"
+            );
             for line in [
-                r#"export const mode = "client";"#,
                 "export const layout = AppLayout;",
                 r#"export const loader = { notes: load("list_notes", {}, { live: true }) };"#,
                 "<h1>Notes</h1>",

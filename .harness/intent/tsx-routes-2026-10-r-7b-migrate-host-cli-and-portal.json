@@ -1,0 +1,31 @@
+{
+  "acceptance": [
+    "a recorded git grep for export const route|mode over each repo finds no hit outside a refusal test or fixture whose subject is the old spelling",
+    "forge-cli's template test passes: forge new from workspace-dialect produces pages that check clean and serve",
+    "forge-runtime's and forge-control-plane's suites pass on the migrated fixtures"
+  ],
+  "author": "rory",
+  "events": [
+    {
+      "at": "2026-10-25T16:27:50.667022+00:00",
+      "id": "intent-recorded",
+      "revision": 1,
+      "source": "verb"
+    }
+  ],
+  "gap_reviews": [],
+  "out_of_scope": [
+    "refusing the old spellings, and checker messages naming them (R-9)",
+    "forge-lang fixtures and the census (R-7a)"
+  ],
+  "refs": [
+    "tsx-routes-2026-10/R-7b-migrate-host-cli-and-portal"
+  ],
+  "revision": 1,
+  "schema": "forge-intent/v1",
+  "slug": "tsx-routes-2026-10-r-7b-migrate-host-cli-and-portal",
+  "source": "verb",
+  "statement": "Every live TSX page in forge-runtime and forge-control-plane fixtures and test sources, forge-cli's forge new workspace-dialect template, and forge-portal-web's customer docs writes the new spellings: a page is routed by its file under pages/ (bracketed [name] segments for params, index.tsx for a directory) instead of export const route, and a client page carries \"use client\"; as its first statement instead of export const mode. Fixtures move only; no checker, host or wire behaviour changes, since R-3 and R-5 already read both spellings.",
+  "ts": "2026-10-25T16:27:50.667022+00:00",
+  "updated_at": "2026-10-25T16:27:50.667022+00:00"
+}

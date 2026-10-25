@@ -1,3 +1,4 @@
+"use client";
 import { Node, useState } from "forge";
 
 export interface WaveProps {

@@ -1,4 +1,5 @@
-// The page at `/wave`, a client page: `mode = "client"` serves it as a shell
+"use client";
+// The page at `/wave`, a client page: `"use client"` serves it as a shell
 // the browser renders, so its components may hold state cells and click
 // handlers. Its loader is the same as a server page's, but the browser runs
 // it, fetching `hello` from the op's REST route as the signed-in user. It
@@ -9,7 +10,6 @@ import Greeting from "../components/greeting";
 import Wave from "../components/wave";
 import AppLayout from "../layouts/app";
 
-export const mode = "client";
 export const layout = AppLayout;
 
 export const loader = {

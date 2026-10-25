@@ -1,7 +1,6 @@
+"use client";
 import { Node } from "forge";
 import Chart from "../components/chart";
-
-export const mode = "client";
 
 export default function LivePage(): Node {
   return (

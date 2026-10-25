@@ -1,3 +1,4 @@
+"use client";
 // The page at `/notes`, a client page in the app's layout. Its load is live:
 // when a row of `notes` the viewer may read changes, here or in another
 // browser, the page fetches `list_notes` again and repaints.
@@ -7,7 +8,6 @@ import { ListNotesResponse } from "forge/schema";
 import AppLayout from "../layouts/app";
 import NoteComposer from "../components/note_composer";
 
-export const mode = "client";
 export const layout = AppLayout;
 export const loader = { notes: load("list_notes", {}, { live: true }) };
 
