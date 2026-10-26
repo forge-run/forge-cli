@@ -1347,6 +1347,42 @@ mod tests {
         }
     }
 
+    /// TAR-3 serves a page that declares no tier only to signed-in viewers,
+    /// so the scaffold's `/` declares `anonymous`, read by the function the
+    /// control plane ships a page's tier with; every other page declares no
+    /// tier and keeps the signed-in default.
+    #[test]
+    fn the_scaffold_home_page_is_public_and_its_other_pages_are_not() {
+        let tmp = tempfile::tempdir().unwrap();
+        let dir = tmp.path().join("acme");
+        write_dialect_tree(&dir, "acme", "acme", Lang::TypeScript).unwrap();
+        let home = "apps/web/pages/index.tsx";
+        let contracts = crate::dialect::contract_surfaces(&dir).unwrap();
+        let source = forge_lang_ts::parse::Source::read(&dir.join(home)).unwrap();
+        let shape = forge_lang_rustgen::with_contract_surfaces(&contracts, || {
+            forge_lang_tree::surface::with_generated_surface(&contracts, || {
+                forge_lang_ts::components::page_shape(&source)
+            })
+        })
+        .unwrap()
+        .unwrap_or_else(|e| panic!("{home}: {e:?}"))
+        .unwrap_or_else(|| panic!("{home} is not read as a page"));
+        assert_eq!(
+            shape.auth,
+            Some(forge_lang_tree::page::auth::Tier::Anonymous),
+            "{home} is not public"
+        );
+        for (rel, _) in DIALECT_APP {
+            if rel.starts_with("apps/web/pages/") && *rel != home {
+                let page = std::fs::read_to_string(dir.join(rel)).unwrap();
+                assert!(
+                    !page.contains("export const auth"),
+                    "{rel} declares a tier; only the home page is public:\n{page}"
+                );
+            }
+        }
+    }
+
     /// The check that admits the scaffold's page is the push's, not a
     /// parse: a loader naming an op the tree does not declare is refused by
     /// `forge check` (FL1958) before any push.

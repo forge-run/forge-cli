@@ -5,6 +5,10 @@ import { Node, Loaded, load } from "forge";
 import { HelloResponse } from "forge/schema";
 import Greeting from "../components/greeting";
 
+// A new app's landing page is public: a page that declares no tier is served
+// only to signed-in viewers, and a visitor must be able to reach `/`.
+export const auth = "anonymous";
+
 export const loader = {
   hello: load("hello", { name: "{{workspace_name}}" }),
 };
