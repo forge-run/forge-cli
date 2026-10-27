@@ -1017,6 +1017,7 @@ dependencies = [
 name = "forge-lang-ts"
 version = "0.1.0"
 dependencies = [
+ "forge-lang-rt",
  "forge-lang-tree",
  "forge-registry",
  "forge-types",
