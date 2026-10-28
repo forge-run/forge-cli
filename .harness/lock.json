@@ -27,7 +27,7 @@
     },
     {
       "path": ".claude/skills/forge-build/SKILL.md",
-      "sha256": "2ba7fd41d890ceb7bb7f5bcbc5579619785ce2db641d48ed0be7f0574ba82db7"
+      "sha256": "1a6bc320f4e5c72dfdc0bd3e5388ea8b1f61978b4088f063c2109b57bb262dde"
     },
     {
       "path": ".claude/skills/forge-model-tiers/SKILL.md",
@@ -59,7 +59,7 @@
     },
     {
       "path": ".github/workflows/harness-gates.yml",
-      "sha256": "9ccc1c37b3092cdf6911121797d26d0c42e103c98ee09c60b99f301548e109e4"
+      "sha256": "04cdc2a4ed4c1fe33ef8215081994757ca34fd58e16d1d41d6e10ba6a0d31afa"
     },
     {
       "path": ".gitignore#rules",
@@ -87,7 +87,7 @@
     },
     {
       "path": ".harness/rustc-wrapper",
-      "sha256": "4be5a5d2a6b56a0b7c4edb1a2766842d1f8cb61d6c5a26b3571e1e057f66cf0c"
+      "sha256": "7f009a977e0b1b73c8a75b9f755b9dc230e67c77a5939046207346a1dca79425"
     },
     {
       "path": ".harness/siblings.json",
@@ -130,7 +130,7 @@
     },
     {
       "kind": "gate",
-      "sha256": "5204f45b3f93ea23c7c1c76ade0314818dc3d6b1b855000124c6cfde8926f80e",
+      "sha256": "e20a8f81441ba09cb44afcea6e2d59fde15cf1f6dcd127da08320be45073ecce",
       "source": "../../core/gates/roadmap-valid"
     },
     {
@@ -183,7 +183,7 @@
         "full_args": "--workspace --locked",
         "package_memo": true
       },
-      "sha256": "e4741c0faa2e16695a9e930879422af14313c0e7748eb873808a6ef7bcbf0f95",
+      "sha256": "ed11d5fd3d5378a213b64cbc85664645b83222d3f82ad054ba33a7db0e32f96a",
       "source": "../../core/gates/cargo-check"
     },
     {
@@ -198,7 +198,7 @@
         "scope": "full",
         "test_args": "--workspace --locked"
       },
-      "sha256": "575a87f05d623d5e1c5cdd4d341f88deb1174337591a9e4f3b747bf58adf6048",
+      "sha256": "02c59620f0e1d86a50c84b5eb20afa870a6d5220fd259b51a5ca56b85f0dbae3",
       "source": "../../core/gates/cargo-tests"
     },
     {
@@ -208,7 +208,7 @@
         "deny": "-D warnings",
         "manifest_path": ""
       },
-      "sha256": "18dec9679c6733d34da20a06380747c1fa8af9d9fbd4135eeda23b93bae3f717",
+      "sha256": "568ff720df7636b0b66bed745ab47e4d535c72ab0079f3a8aee29da288bd1552",
       "source": "../../core/gates/cargo-clippy"
     },
     {
@@ -218,7 +218,7 @@
     },
     {
       "kind": "gate",
-      "sha256": "017baa620ab3f6fc286aae8640c0d88e4654bc5138b14c0b4fb0ac71c502cb24",
+      "sha256": "a1f501a357a768c24416e07b20a36a694218f3ea17800bda167d25a303c4b7b9",
       "source": "../../core/gates/code-structure"
     },
     {
@@ -348,8 +348,8 @@
   "harness_dir": "harnesses/hybrid",
   "source": {
     "kind": "commit",
-    "ref": "77db2730e8447733b89fcdedd2ca231f0b518e6c",
-    "sha": "77db2730e8447733b89fcdedd2ca231f0b518e6c"
+    "ref": "b70ab64ca0638f1dc776c09f038f301ee37403a2",
+    "sha": "b70ab64ca0638f1dc776c09f038f301ee37403a2"
   },
   "targets": [
     "claude-code",

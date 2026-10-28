@@ -51,4 +51,14 @@ for a in "$@"; do
             ;;
     esac
 done
+# The cache never sees the TARGET DIR either (BE-52). sccache hashes
+# CARGO_TARGET_DIR into every crate's key when it is in the environment, and
+# a verify tree, plan land's rung and any lane that sets it carry their own
+# path there: two byte-identical trees, one with it set, hit 1 and miss 1 on
+# the same registry crate (scripts/be52-results/key-probe.txt), and a fresh
+# forge-runtime build with it set hit 0 of 671 against a 27 GiB cache. rustc
+# never reads it — cargo has already put every path on the command line — and
+# no crate the fleet compiles reads it with env!(), so it is dropped here, on
+# the hop to the cache, and nowhere else.
+unset CARGO_TARGET_DIR
 exec "$FORGE_RUSTC_WRAPPER" "$@"
