@@ -25,8 +25,8 @@ python3 $ROOT/.harness/dispatch.py plan validate <file>
 ## The shape
 
 Copy this and fill it in. Every key shown on a step is REQUIRED except
-`notes`, `phase`, `scope`, `requires`, `lands`, `blocked_on`, `escalation`,
-`decided`, `evidence` —
+`notes`, `phase`, `scope`, `requires`, `lands`, `ships_off`, `turns_on`,
+`blocked_on`, `escalation`, `decided`, `evidence` —
 and `lands` is required on a step whose `scope` names more than one repo.
 The four steps are the two shapes that fan out (below): E-1 lands the
 contract, E-2 and E-3 run at once, E-4 deletes the old form.
@@ -145,12 +145,25 @@ contract, E-2 and E-3 run at once, E-4 deletes the old form.
   review opens on lanes cut from the parent's, and the conductor rebases and
   re-verifies it onto main when the parent lands (BE-18). One level deep: a
   step stacked on a stacked step waits.
+- `ships_off` and `turns_on`, on a step, when present, are switch names
+  (lowercase letters, digits, hyphens). A step lands on main when it
+  finishes (BE-46), so a customer surface it starts must land OFF: the land
+  refuses a step that adds a route, an SDK or WIT op, a checker admission
+  (a refusal code removed) or skill text unless it declares `ships_off:
+  <switch>` and every file adding the surface carries `#[cfg(forge_switch =
+  "<switch>")]`, or it declares `turns_on: <switch>` — the one step that
+  finishes the surface, removes the gates and requires every step that
+  shipped it off. Text surfaces (WIT, a refusal register, skill text)
+  cannot be compiled out and land only with the `turns_on` step. Nothing
+  sets the cfg: on is the gate removed, so no app.json key, CLI flag or env
+  reaches a switch. A step that adds finished surface on its own declares
+  `turns_on` alone.
 - `evidence`, when present, is an array.
 - `drift`, when present, is `{max_unlanded_hours?, max_ahead_commits?}`: a
   number of hours > 0 and an integer >= 1, no other key (DR-1). The loop
   halts, naming each branch, when a done step's branch has been off
-  origin/main longer than the first (default 24) or the plan's lane is
-  more commits ahead of main than the second (default 150). Leave it out
+  origin/main longer than the first (default 8) or the plan's lane is
+  more commits ahead of main than the second (default 40). Leave it out
   for the defaults; set it only with a reason in `intent`.
 - `vision` is required until the plan's first step is done: an object with
   `rows` and `claims` (arrays of strings, either may be empty) and the
