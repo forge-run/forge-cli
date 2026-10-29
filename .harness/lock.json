@@ -27,7 +27,7 @@
     },
     {
       "path": ".claude/skills/forge-build/SKILL.md",
-      "sha256": "1a6bc320f4e5c72dfdc0bd3e5388ea8b1f61978b4088f063c2109b57bb262dde"
+      "sha256": "64344e06f44d20bf349924173da30d41ac41aa11b07df94e43e3c0f00ffc0a3e"
     },
     {
       "path": ".claude/skills/forge-model-tiers/SKILL.md",
@@ -59,7 +59,7 @@
     },
     {
       "path": ".github/workflows/harness-gates.yml",
-      "sha256": "b721d2fa8c1b5782e85216d24ce5a9630315f2125a7ffdcd0b241d7a16754018"
+      "sha256": "9c8b32666b6b54ab537dde73d58cebb299477af3818212934899584cc8909bce"
     },
     {
       "path": ".gitignore#rules",
@@ -79,7 +79,7 @@
     },
     {
       "path": ".harness/plan.json",
-      "sha256": "e8348312fc18cae49fd369165f7723f130196537d4aab3a68e4758b6de184be5"
+      "sha256": "e1c817eee656c312b6fd1b6b1b90d5a4d7ffb6d21e4f690d3b9f91f0c50a5a04"
     },
     {
       "path": ".harness/runner.py",
@@ -87,7 +87,7 @@
     },
     {
       "path": ".harness/rustc-wrapper",
-      "sha256": "7f009a977e0b1b73c8a75b9f755b9dc230e67c77a5939046207346a1dca79425"
+      "sha256": "1ba4dbb784d433231b1335ed587ee9f8b458b06372ccc78c29596ed8e145293c"
     },
     {
       "path": ".harness/siblings.json",
@@ -264,7 +264,7 @@
       "params": {
         "tests_dir": "core/runner/tests"
       },
-      "sha256": "446c8dd3fb7a7696f11d63ab7e89c4d172e73743967c26986d8c33d05035262e",
+      "sha256": "b930b66dc9b5d7884b780ecd3f5eef3ed4688718c707dfe64e3004f13300f6d7",
       "source": "local/python-suite"
     },
     {
@@ -348,8 +348,8 @@
   "harness_dir": "harnesses/hybrid",
   "source": {
     "kind": "commit",
-    "ref": "d66888a861c4a49d8b5ab433d60aa0ce4abf3759",
-    "sha": "d66888a861c4a49d8b5ab433d60aa0ce4abf3759"
+    "ref": "bb3bbbae42defce65fd2ca0f20e417e98d81260f",
+    "sha": "bb3bbbae42defce65fd2ca0f20e417e98d81260f"
   },
   "targets": [
     "claude-code",

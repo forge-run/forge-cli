@@ -386,7 +386,7 @@
         "tests_dir": "core/runner/tests"
       },
       "source": "harnesses/hybrid/local/python-suite",
-      "timeout_seconds": 1800,
+      "timeout_seconds": 4810,
       "toolchains": [
         "python3"
       ]
