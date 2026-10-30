@@ -99,9 +99,10 @@ forge-platform-wire = { path = "../forge-platform-wire" }
 # before deploy. forge-runtime W3 cutover (2026-05-15) made the
 # runtime reject core modules — only Components instantiate. The
 # adapter blob ships inside the provider crate's `artefacts/` dir.
-# Versions pinned to the major forge-runtime uses (see its
-# Cargo.lock).
-wit-component = "0.236"
+# On wasmtime 43's wasm-tools train (0.245), the version
+# forge-runtime's [workspace.dependencies] names; forge-control-plane
+# and forge-lang-rustgen carry the same pin (BE-116).
+wit-component = "0.245.1"
 wasi-preview1-component-adapter-provider = "37.0.3"
 # Open the device-flow verification URL in the operator's default
 # browser. Cross-platform; failures (no DISPLAY, no default
