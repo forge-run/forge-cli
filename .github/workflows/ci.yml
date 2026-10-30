@@ -3,6 +3,12 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
+    inputs:
+      monorepo:
+        description: Build against the forge monorepo checked out here (forge); empty = vars.FORGE_MONOREPO
+        required: false
+        default: ""
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -40,6 +46,10 @@ jobs:
         with:
           consumer: forge-cli
           keep: forge-sdlc-harness
+          # BE-50: the forge monorepo switch. Set (org var FORGE_MONOREPO, or
+          # this dispatch's input), the core repos come from one checkout of
+          # forge-run/forge, linked at their names; empty, one clone each.
+          monorepo: ${{ github.event.inputs.monorepo || vars.FORGE_MONOREPO }}
           token: ${{ secrets.FORGE_CROSS_REPO_TOKEN }}
 
       - name: Install Rust toolchain
