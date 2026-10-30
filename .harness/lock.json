@@ -35,7 +35,7 @@
     },
     {
       "path": ".claude/skills/forge-roadmap/SKILL.md",
-      "sha256": "825f9f316bcbf4701f4b46b366bccc5f7c489a77beedda30f65dd4ff6123ab7e"
+      "sha256": "b6115e2bcd53269cafc144e83935841e6b91c4a7c323ffc70ea0c935861ed3b9"
     },
     {
       "path": ".claude/skills/forge-session-economy/SKILL.md",
@@ -59,7 +59,7 @@
     },
     {
       "path": ".github/workflows/harness-gates.yml",
-      "sha256": "9c8b32666b6b54ab537dde73d58cebb299477af3818212934899584cc8909bce"
+      "sha256": "c4f5f0f9d83fa0c9d1303368cf32fe6cd89769165bcc4273d63bd442ac449119"
     },
     {
       "path": ".gitignore#rules",
@@ -112,7 +112,7 @@
     },
     {
       "kind": "skill",
-      "sha256": "9eb8ae3721a22eb7397f713a02554827960e020051b2752fb91636d2bad83af6",
+      "sha256": "44464d36a4602c9564385a306cced6af9abac48d1dab1104563be219ea0cb032",
       "source": "../../core/skills/forge-roadmap"
     },
     {
@@ -130,7 +130,7 @@
     },
     {
       "kind": "gate",
-      "sha256": "e20a8f81441ba09cb44afcea6e2d59fde15cf1f6dcd127da08320be45073ecce",
+      "sha256": "5669bd1e8ba9b67e9ceb7ed8013ca97b5070d6e9bc9e6a02f67b20f37ae0078d",
       "source": "../../core/gates/roadmap-valid"
     },
     {
@@ -348,8 +348,8 @@
   "harness_dir": "harnesses/hybrid",
   "source": {
     "kind": "commit",
-    "ref": "bb3bbbae42defce65fd2ca0f20e417e98d81260f",
-    "sha": "bb3bbbae42defce65fd2ca0f20e417e98d81260f"
+    "ref": "9ae134226b37eeb0a55b236682f6d8700fcf93eb",
+    "sha": "9ae134226b37eeb0a55b236682f6d8700fcf93eb"
   },
   "targets": [
     "claude-code",

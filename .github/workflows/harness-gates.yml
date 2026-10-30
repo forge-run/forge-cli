@@ -9,6 +9,10 @@ on:
         description: Diff base for the sweep (ref); empty = HEAD~1
         required: false
         default: ""
+      monorepo:
+        description: Build against the forge monorepo checked out here (forge); empty = vars.FORGE_MONOREPO
+        required: false
+        default: ""
 jobs:
   gates:
     runs-on: [self-hosted]
@@ -28,12 +32,12 @@ jobs:
         with:
           fetch-depth: 0
           path: forge-cli
-      - name: Checkout harness machinery (bb3bbba)
+      - name: Checkout harness machinery (9ae1342)
         uses: actions/checkout@v4
         with:
           repository: forge-run/forge-sdlc-harness
           path: forge-sdlc-harness
-          ref: bb3bbbae42defce65fd2ca0f20e417e98d81260f
+          ref: 9ae134226b37eeb0a55b236682f6d8700fcf93eb
           clean: true
           token: ${{ secrets.FORGE_CROSS_REPO_TOKEN }}
       - name: Check out the sibling closure (.harness/siblings.json)
@@ -41,6 +45,7 @@ jobs:
         with:
           consumer: forge-cli
           keep: forge-sdlc-harness
+          monorepo: ${{ github.event.inputs.monorepo || vars.FORGE_MONOREPO }}
           token: ${{ secrets.FORGE_CROSS_REPO_TOKEN }}
       # Some runners' service PATH lacks ~/.cargo/bin (per-runner skew
       # on the shared box); make resolution uniform before the action.

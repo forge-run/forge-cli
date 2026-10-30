@@ -294,7 +294,84 @@ So a step is a unit of work that needs its own verify and land, not a layer:
 - **No per-plan closing census.** Plans that share a census share one closing
   reading, filed once as its own small plan. A baseline is taken in step 1,
   before the feature, or not at all.
-- **A typical dialect feature is 4 to 6 steps:** design and census, held for
-  approval; contract plus checker plus skill text; server with its test;
-  client with its forge-ui piece and spec; and only where real, a second-repo
-  or migration step. Do not give a plan a step-count target; give it the work.
+- **A dialect feature is a design step plus one step per approved surface**
+  (below), not a fixed count. Do not give a plan a step-count target; give
+  it the work.
+
+### A dialect feature
+
+A review of tsx-widen (34.7 h, 9 steps built, 3.2 h and 5.2 turns a step)
+found every surface filed as a pair: a forge-lang step, then an "in the
+evaluator" step. The second was small (TW-13 changed no forge-lang code;
+TW-7 took 2 turns) but paid 1.1 to 4.3 h of step overhead, and both pairs
+pinned a FORMAT_WITHOUT_X in one step and unpinned it in the next, across
+forge-runtime and forge-web. Four of 13 steps were filed speculatively and
+dropped at TW-1. So a dialect feature has two kinds of step:
+
+1. **A design and census step, held for the person.** A dialect feature is
+   in the `product-surface` class (D-140), so the step carries
+   `"blocked_on": "user"` and `"escalation": {"class": "product-surface",
+   ...}`. It decides which surfaces exist.
+2. **One step per approved surface.** Its `scope` spans `forge-lang/`,
+   `forge-web/` and `forge-runtime/`, and its `lands` names them in hub
+   order. Its acceptance names the checker, runtime (rt) and evaluator
+   oracle results equal in both page modes, and the e2e that proves the
+   wiring, so folding the forge-lang step and its evaluator step into one
+   removes no proof. There is no separate "in the evaluator" step, and no
+   FORMAT_WITHOUT_X pinned in one step and unpinned in another.
+
+**Surface steps are filed by the design step after the person decides**,
+with `dispatch.py plan edit --add-step`, one per surface approved. They are
+never filed up front, and a placeholder surface step is not filed: the plan
+as first written holds the design step and whatever does not depend on its
+answer.
+
+The worked example below is the plan after the design step has added its
+first surface; `roadmap-valid` accepts it.
+
+<!-- dialect-feature-example -->
+```json
+{
+  "id": "tsx-example-2026-11",
+  "title": "Optional chaining in the TSX dialect",
+  "intent": "A TSX op can write a?.b and get the same value from the checker, the runtime and the evaluator in both page modes.",
+  "execution": "continuous",
+  "vision": {
+    "rows": [],
+    "claims": ["V-4"],
+    "moves": "A customer writing TSX stops rewriting a?.b by hand into guards the checker accepts.",
+    "unit": "Census frequency of optional chaining in the TSX corpus, and host-band entries with an oracle: 0 today, one per approved surface after.",
+    "if_none": "Serves V-4: a construct admitted by census and proven by an oracle on every engine.",
+    "forbids_checked": "V-4 forbids admission by request; the design step's census decides each surface, and nothing bypasses the checker."
+  },
+  "steps": [
+    {
+      "id": "OC-1-design-and-census",
+      "title": "Census the corpus and decide which optional-chaining surfaces exist",
+      "status": "todo",
+      "scope": ["forge-lang/"],
+      "blocked_on": "user",
+      "blocked_reason": "Recommend admitting member access and call; defer element access.",
+      "escalation": {"class": "product-surface", "why": "A dialect feature is a customer-facing surface."},
+      "acceptance": [
+        "The census counts each surface in the corpus, and the person's decision is recorded on the step.",
+        "One surface step per approved surface is added with plan edit --add-step."
+      ],
+      "evidence": []
+    },
+    {
+      "id": "OC-2-member-access",
+      "title": "a?.b is admitted and served on every engine",
+      "status": "todo",
+      "scope": ["forge-lang/", "forge-web/", "forge-runtime/"],
+      "requires": ["OC-1"],
+      "lands": ["forge-lang", "forge-web", "forge-runtime"],
+      "acceptance": [
+        "The checker, runtime (rt) and evaluator oracle results are equal for a?.b in both page modes.",
+        "An e2e serves a page using a?.b through the runtime and asserts the rendered value."
+      ],
+      "evidence": []
+    }
+  ]
+}
+```
