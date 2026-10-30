@@ -59,7 +59,7 @@
     },
     {
       "path": ".github/workflows/harness-gates.yml",
-      "sha256": "c4f5f0f9d83fa0c9d1303368cf32fe6cd89769165bcc4273d63bd442ac449119"
+      "sha256": "a715b3ce22d7d626178d115c2b20b0cf70924a899fe22ed962c445ece3356452"
     },
     {
       "path": ".gitignore#rules",
@@ -87,7 +87,7 @@
     },
     {
       "path": ".harness/rustc-wrapper",
-      "sha256": "1ba4dbb784d433231b1335ed587ee9f8b458b06372ccc78c29596ed8e145293c"
+      "sha256": "d964e30a98897c286c867c0a719a956b3d5bcd376c2eb9a427f455d6b98e8a10"
     },
     {
       "path": ".harness/siblings.json",
@@ -348,8 +348,8 @@
   "harness_dir": "harnesses/hybrid",
   "source": {
     "kind": "commit",
-    "ref": "9ae134226b37eeb0a55b236682f6d8700fcf93eb",
-    "sha": "9ae134226b37eeb0a55b236682f6d8700fcf93eb"
+    "ref": "ef9464b80c3ad3976d93815787440fea02d4543f",
+    "sha": "ef9464b80c3ad3976d93815787440fea02d4543f"
   },
   "targets": [
     "claude-code",

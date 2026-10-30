@@ -151,8 +151,9 @@ fi
 case "$_led" in
     ""|off)
         [ -z "$_bare" ] || exec "$@"
-        # The cache never sees the TARGET DIR (BE-52) — see below.
-        unset CARGO_TARGET_DIR
+        # The cache never sees the TARGET DIR or the lean settings (BE-52) —
+        # see below.
+        unset CARGO_TARGET_DIR CARGO_INCREMENTAL CARGO_PROFILE_DEV_DEBUG
         exec "$FORGE_RUSTC_WRAPPER" "$@"
         ;;
 esac
@@ -170,8 +171,13 @@ else
     # 671 against a 27 GiB cache. rustc never reads it — cargo has already
     # put every path on the command line — and no crate the fleet compiles
     # reads it with env!(), so it is dropped here, on the hop to the cache,
-    # and nowhere else.
-    unset CARGO_TARGET_DIR
+    # and nowhere else. The lean settings cargo.sh exports are dropped for
+    # the same reason: sccache hashes every CARGO_* variable, so a tree with
+    # CARGO_INCREMENTAL=0 missed on a registry crate a tree without it had
+    # just cached, and hit once the hop unset it (key-probe.txt). Cargo has
+    # already turned both into -C incremental / -C debuginfo on the command
+    # line, which the cache keys on, and rustc reads neither.
+    unset CARGO_TARGET_DIR CARGO_INCREMENTAL CARGO_PROFILE_DEV_DEBUG
     "$FORGE_RUSTC_WRAPPER" "$@"
 fi
 _rc=$?
