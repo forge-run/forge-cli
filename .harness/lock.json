@@ -27,7 +27,7 @@
     },
     {
       "path": ".claude/skills/forge-build/SKILL.md",
-      "sha256": "64344e06f44d20bf349924173da30d41ac41aa11b07df94e43e3c0f00ffc0a3e"
+      "sha256": "788e3948f0b29182ed75f8e699c92bd74650f4043a20fb0d94475f2e8ba389a6"
     },
     {
       "path": ".claude/skills/forge-model-tiers/SKILL.md",
@@ -59,7 +59,7 @@
     },
     {
       "path": ".github/workflows/harness-gates.yml",
-      "sha256": "9aa9c2e29c121ca38fabd2f2a6d719574d5f4b0aaa2aa3436e3e609310052426"
+      "sha256": "d1ce5e27103d517fb6ff3ef94dab99d29fee74f6a405d8534bf38b27e4556223"
     },
     {
       "path": ".gitignore#rules",
@@ -87,7 +87,7 @@
     },
     {
       "path": ".harness/rustc-wrapper",
-      "sha256": "d964e30a98897c286c867c0a719a956b3d5bcd376c2eb9a427f455d6b98e8a10"
+      "sha256": "759dbe1573861814fb97204b61838b6788a766d7d862a2ad227b64eaabf16140"
     },
     {
       "path": ".harness/siblings.json",
@@ -348,8 +348,8 @@
   "harness_dir": "harnesses/hybrid",
   "source": {
     "kind": "commit",
-    "ref": "b8bf2d5691c9c3591079ab5038481d10ef562b9a",
-    "sha": "b8bf2d5691c9c3591079ab5038481d10ef562b9a"
+    "ref": "e650bf58b1d80c71e7e22d7b576aace86bd9662e",
+    "sha": "e650bf58b1d80c71e7e22d7b576aace86bd9662e"
   },
   "targets": [
     "claude-code",

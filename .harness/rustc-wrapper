@@ -151,9 +151,9 @@ fi
 case "$_led" in
     ""|off)
         [ -z "$_bare" ] || exec "$@"
-        # The cache never sees the TARGET DIR or the lean settings (BE-52) —
-        # see below.
-        unset CARGO_TARGET_DIR CARGO_INCREMENTAL CARGO_PROFILE_DEV_DEBUG
+        # The cache never sees the TARGET DIR, the lean settings (BE-52) or
+        # the caller's TMPDIR (BE-121) — see below.
+        unset CARGO_TARGET_DIR CARGO_INCREMENTAL CARGO_PROFILE_DEV_DEBUG TMPDIR
         exec "$FORGE_RUSTC_WRAPPER" "$@"
         ;;
 esac
@@ -177,7 +177,19 @@ else
     # just cached, and hit once the hop unset it (key-probe.txt). Cargo has
     # already turned both into -C incremental / -C debuginfo on the command
     # line, which the cache keys on, and rustc reads neither.
-    unset CARGO_TARGET_DIR CARGO_INCREMENTAL CARGO_PROFILE_DEV_DEBUG
+    #
+    # Nor the caller's TMPDIR (BE-121). A client that finds no server starts
+    # one, and the server keeps the client's environment for as long as it
+    # lives, serving every lane on the box. forge-runtime's gates point
+    # TMPDIR at a per-run scratch subdirectory release() reaps, so a server
+    # spawned from a compile in one gate failed every later compile on the
+    # box ("No such file or directory" under the reaped .../forge-storage-
+    # tests/sccacheXXXX) while still answering --show-stats: 24 fixture-
+    # building tests red on BE-120's land, 2026-10-31. cargo.sh's
+    # _sccache_start already strips it (BE-52); this is the other way a
+    # server is born. rustc keeps no state in TMPDIR, and the server, not
+    # this client, runs the compile.
+    unset CARGO_TARGET_DIR CARGO_INCREMENTAL CARGO_PROFILE_DEV_DEBUG TMPDIR
     "$FORGE_RUSTC_WRAPPER" "$@"
 fi
 _rc=$?
