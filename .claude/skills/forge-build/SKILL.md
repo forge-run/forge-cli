@@ -231,6 +231,19 @@ cargo test --workspace --tests --no-fail-fast --locked
 
 It is also the one Rust repo whose `rust-toolchain.toml` says `stable` rather than `1.95.0`.
 
+## In the monorepo: one workspace, each directory its own packages
+
+`forge/` builds its Rust directories as one Cargo workspace (BE-141): one root
+`Cargo.toml`, one `Cargo.lock`, one `target/` at `forge/target`. From a
+directory, `--workspace` would mean all of them, so every per-directory command
+runs that directory's packages: the harness cargo wrapper and the emitted CI's
+`cargo` shim rewrite `--workspace` (and a bare command in forge-lang,
+forge-types or forge-web, which have no package at their top) to the
+directory's `-p` list, read from the root's members. Run the per-repo commands
+below unchanged, from the directory, through `.harness/cargo`. To see the list:
+`python3 forge-sdlc-harness/scripts/be141-one-workspace.py members forge <dir> --flags`.
+At the root, `cargo build --workspace --all-targets --locked` builds everything.
+
 ## Which siblings a repo needs
 
 If a sibling is missing, cargo fails to resolve the graph — often with a confusing error

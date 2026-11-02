@@ -27,7 +27,7 @@
     },
     {
       "path": ".claude/skills/forge-build/SKILL.md",
-      "sha256": "788e3948f0b29182ed75f8e699c92bd74650f4043a20fb0d94475f2e8ba389a6"
+      "sha256": "19f49f6551bdf3fdae9d140cb398a97072ee7c040616c9673c39935dfd4c89f1"
     },
     {
       "path": ".claude/skills/forge-model-tiers/SKILL.md",
@@ -59,7 +59,7 @@
     },
     {
       "path": ".github/workflows/harness-gates.yml",
-      "sha256": "58d4be5f5f3b5715ceb8c6fcdbe542333d1ca267637bcac182e356670755a863"
+      "sha256": "077a2592b99b4eebf6bc81696bbeb46216feaad22a6f1ddf45d2460a31dc3512"
     },
     {
       "path": ".gitignore#rules",
@@ -139,7 +139,7 @@
         "cargo": "cargo",
         "cargo_wrap": "bash -c"
       },
-      "sha256": "df39fca77ef07b6e1bb78d2e67868a54108b277f677c096ba8635d1c3f99022d",
+      "sha256": "a05968da0ffbbc7e51a2620dfaefadb29471a8a430b680d20d51ea74a9501525",
       "source": "../../core/skills/forge-build"
     },
     {
@@ -183,7 +183,7 @@
         "full_args": "--workspace --locked",
         "package_memo": true
       },
-      "sha256": "ed11d5fd3d5378a213b64cbc85664645b83222d3f82ad054ba33a7db0e32f96a",
+      "sha256": "70b5cd2ffc6ec3e91fd976a237ed27a8d617fd6fdcdcd28d3f5ed1cca4cc52f8",
       "source": "../../core/gates/cargo-check"
     },
     {
@@ -198,7 +198,7 @@
         "scope": "full",
         "test_args": "--workspace --locked"
       },
-      "sha256": "02c59620f0e1d86a50c84b5eb20afa870a6d5220fd259b51a5ca56b85f0dbae3",
+      "sha256": "2ecb10c36391eb43697f1533bbd5a8f510ae85b5d1494022962a595becce2fb2",
       "source": "../../core/gates/cargo-tests"
     },
     {
@@ -208,7 +208,7 @@
         "deny": "-D warnings",
         "manifest_path": ""
       },
-      "sha256": "568ff720df7636b0b66bed745ab47e4d535c72ab0079f3a8aee29da288bd1552",
+      "sha256": "325ec102285843ee1b8ee408979e73bfc7b0aaa74853bbb8a2cf0626f0605600",
       "source": "../../core/gates/cargo-clippy"
     },
     {
@@ -218,12 +218,12 @@
     },
     {
       "kind": "gate",
-      "sha256": "a1f501a357a768c24416e07b20a36a694218f3ea17800bda167d25a303c4b7b9",
+      "sha256": "6defc04c46c5839b813b13c15ce0eaf2406be49642fc2070b96013fe7be0545f",
       "source": "../../core/gates/code-structure"
     },
     {
       "kind": "gate",
-      "sha256": "4b2b3dc2b53e6a03fc9e1d0b016024b67dec964e56f6aae10f095b38c9f19019",
+      "sha256": "a4f6e3fadcd8cd52bf71f2eab3739f01087cda21aca6931594c25c22375d9476",
       "source": "../../core/gates/lint-waivers"
     },
     {
@@ -264,7 +264,7 @@
       "params": {
         "tests_dir": "core/runner/tests"
       },
-      "sha256": "b930b66dc9b5d7884b780ecd3f5eef3ed4688718c707dfe64e3004f13300f6d7",
+      "sha256": "9bcceead489638168769648fffdd739ec420ad705ab16eae5d19643a0ab31d0b",
       "source": "local/python-suite"
     },
     {
@@ -320,7 +320,7 @@
       "params": {
         "roots": "content"
       },
-      "sha256": "c0b4798dd796fb9caccc11d564399cfa6806ae2187aa98f72d811e99858981f1",
+      "sha256": "eb78ced59ef1e70ddbd046ff138cac3b06690b2669f057b50f855620c10e112b",
       "source": "local/prose-tells"
     },
     {
@@ -348,8 +348,8 @@
   "harness_dir": "harnesses/hybrid",
   "source": {
     "kind": "commit",
-    "ref": "c9d694513a5a",
-    "sha": "c9d694513a5afc2f8988fe2413bc06773b7a9377"
+    "ref": "e883aeaa04c606a73a852530cd43e211e09463a4",
+    "sha": "e883aeaa04c606a73a852530cd43e211e09463a4"
   },
   "targets": [
     "claude-code",
