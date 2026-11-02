@@ -59,7 +59,7 @@
     },
     {
       "path": ".github/workflows/harness-gates.yml",
-      "sha256": "077a2592b99b4eebf6bc81696bbeb46216feaad22a6f1ddf45d2460a31dc3512"
+      "sha256": "00f63801b334a0c7713cf36c52a3f7e66f107a0753e04fe38fa1708e3508d10b"
     },
     {
       "path": ".gitignore#rules",
@@ -218,12 +218,12 @@
     },
     {
       "kind": "gate",
-      "sha256": "6defc04c46c5839b813b13c15ce0eaf2406be49642fc2070b96013fe7be0545f",
+      "sha256": "a1f501a357a768c24416e07b20a36a694218f3ea17800bda167d25a303c4b7b9",
       "source": "../../core/gates/code-structure"
     },
     {
       "kind": "gate",
-      "sha256": "a4f6e3fadcd8cd52bf71f2eab3739f01087cda21aca6931594c25c22375d9476",
+      "sha256": "4b2b3dc2b53e6a03fc9e1d0b016024b67dec964e56f6aae10f095b38c9f19019",
       "source": "../../core/gates/lint-waivers"
     },
     {
@@ -320,7 +320,7 @@
       "params": {
         "roots": "content"
       },
-      "sha256": "eb78ced59ef1e70ddbd046ff138cac3b06690b2669f057b50f855620c10e112b",
+      "sha256": "c0b4798dd796fb9caccc11d564399cfa6806ae2187aa98f72d811e99858981f1",
       "source": "local/prose-tells"
     },
     {
@@ -348,8 +348,8 @@
   "harness_dir": "harnesses/hybrid",
   "source": {
     "kind": "commit",
-    "ref": "e883aeaa04c606a73a852530cd43e211e09463a4",
-    "sha": "e883aeaa04c606a73a852530cd43e211e09463a4"
+    "ref": "9d13234",
+    "sha": "9d132345d66d7986daf7e98768a8d46175c136cc"
   },
   "targets": [
     "claude-code",
