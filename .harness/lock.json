@@ -27,7 +27,7 @@
     },
     {
       "path": ".claude/skills/forge-build/SKILL.md",
-      "sha256": "19f49f6551bdf3fdae9d140cb398a97072ee7c040616c9673c39935dfd4c89f1"
+      "sha256": "1166ec4d6563dcea1e8cecc21698aae2263bc916cc94df472f1207f7150a9752"
     },
     {
       "path": ".claude/skills/forge-model-tiers/SKILL.md",
@@ -59,7 +59,7 @@
     },
     {
       "path": ".github/workflows/harness-gates.yml",
-      "sha256": "d8d8737adc1ffc8d6e2e8a08ed00d6cb1fef71257bf41d0980b03f2f78b16739"
+      "sha256": "9c978a51388b1316148f73bbaec3405d4b08467fe815016c68262fc3ac587a35"
     },
     {
       "path": ".gitignore#rules",
@@ -173,7 +173,7 @@
       "params": {
         "manifest_path": ""
       },
-      "sha256": "e5092f1ab8a5a60a0bca1a1770077bde1be70d94b9fdc0655c8d25a8758bab30",
+      "sha256": "483c01f825829922c08190cd2c3d335271d5e09c7e51b810546c700ffee60504",
       "source": "../../core/gates/cargo-fmt"
     },
     {
@@ -218,7 +218,7 @@
     },
     {
       "kind": "gate",
-      "sha256": "a1f501a357a768c24416e07b20a36a694218f3ea17800bda167d25a303c4b7b9",
+      "sha256": "d8635a44e0c2239907e82f38fd33e503a537f40086f98c8b410b5a2c0e160381",
       "source": "../../core/gates/code-structure"
     },
     {
@@ -348,8 +348,8 @@
   "harness_dir": "harnesses/hybrid",
   "source": {
     "kind": "commit",
-    "ref": "ce1f15752daeb8d3cdd1fe95165a324fd5112fc9",
-    "sha": "ce1f15752daeb8d3cdd1fe95165a324fd5112fc9"
+    "ref": "4afa5e0688fa726bd0e275256622dd3c6f61c496",
+    "sha": "4afa5e0688fa726bd0e275256622dd3c6f61c496"
   },
   "targets": [
     "claude-code",
