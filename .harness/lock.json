@@ -26,6 +26,10 @@
       "sha256": "8a2bd5c52b1b63d5b82a2fdbd9f56edb7a2c81965c54faa146d0b457589ff413"
     },
     {
+      "path": ".claude/skills/delivery/SKILL.md",
+      "sha256": "0363d1fe179977fd96b5408fdc20aad2680ec63b8f24d1bd9611461238ba9b7e"
+    },
+    {
       "path": ".claude/skills/forge-build/SKILL.md",
       "sha256": "1166ec4d6563dcea1e8cecc21698aae2263bc916cc94df472f1207f7150a9752"
     },
@@ -59,7 +63,7 @@
     },
     {
       "path": ".github/workflows/harness-gates.yml",
-      "sha256": "db5204b6a1d67f94c1466b1756a80e2a682ea8f0bb4787ffb1814799b8bcb6e2"
+      "sha256": "d6badf225338703bd4ab2c1ba4923a158277a7980538c6b6a0223f402760d63b"
     },
     {
       "path": ".gitignore#rules",
@@ -79,7 +83,7 @@
     },
     {
       "path": ".harness/plan.json",
-      "sha256": "e1c817eee656c312b6fd1b6b1b90d5a4d7ffb6d21e4f690d3b9f91f0c50a5a04"
+      "sha256": "a6c150d731b859cc0ec384db6710339c287626698ce7d1d7bbe01d69a484695e"
     },
     {
       "path": ".harness/runner.py",
@@ -127,6 +131,16 @@
       "kind": "verifier",
       "sha256": "8bdb5547c10771548f74f63f1550601626ebac001f69e6afde561655cd3a50b0",
       "source": "../../core/verifiers/ceo-review"
+    },
+    {
+      "kind": "verifier",
+      "sha256": "3cb069cd8668f889dea19c1e9c46a49a57f4337111cfedd3443186ef23fa5c5e",
+      "source": "../../core/verifiers/delivery-review"
+    },
+    {
+      "kind": "skill",
+      "sha256": "62f2157a062e5d5e04f6ce43bbdfa5071ddfa05e4d74d3b5cd54062f2bd9bf0b",
+      "source": "../../core/skills/delivery"
     },
     {
       "kind": "gate",
@@ -198,7 +212,7 @@
         "scope": "full",
         "test_args": "--workspace --locked"
       },
-      "sha256": "13ada099f1abb7a7809eb015295963d7c7c85b7f903f451de0b3aa4bdffd7be2",
+      "sha256": "7a3a86684a1fca93894256cc943ff73e140b9f2d8a0f63deb20a2da17ea619bd",
       "source": "../../core/gates/cargo-tests"
     },
     {
@@ -348,8 +362,8 @@
   "harness_dir": "harnesses/hybrid",
   "source": {
     "kind": "commit",
-    "ref": "bd47015391ce003287ccbcdb5f6d8685570d9bd7",
-    "sha": "bd47015391ce003287ccbcdb5f6d8685570d9bd7"
+    "ref": "354f6998ddd28c9a84fd275443077c265ffbe590",
+    "sha": "354f6998ddd28c9a84fd275443077c265ffbe590"
   },
   "targets": [
     "claude-code",

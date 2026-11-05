@@ -643,6 +643,28 @@
     },
     {
       "blocking": true,
+      "description": "The delivery judge (DJ-2): a fresh-context verifier that reads a roadmap before the plan is started and objects when a step is a layer and not a unit of work, when a chain of steps is not a real ordering, or when a step's acceptance cannot be checked. It holds the plan to the forge-roadmap skill's \"Shaping a plan to fan out\" and \"Sizing a step\" rules and argues from the step-cost digest in its rubric, which the harness writes from landed records and the build ledger. Bound to plan-approved beside ceo-review and reached by `plan start` through `runner.py verify-plan`; `plan edit --add-step` runs it over the added step alone, where its objection is recorded on the step and refuses nothing. It never fires on a commit and it does not judge quality.\n",
+      "eval_min_agreement": 0.9,
+      "evals": "evals",
+      "events": [
+        "plan-approved"
+      ],
+      "exclude": [],
+      "id": "delivery-review",
+      "include": [],
+      "inputs": [
+        "roadmap"
+      ],
+      "max_budget_usd": 8.0,
+      "model": "claude-fable-5",
+      "params": {},
+      "prompt": "prompt.md",
+      "rubric": "rubric.md",
+      "source": "core/verifiers/delivery-review",
+      "verdict_schema": "verdict.schema.json"
+    },
+    {
+      "blocking": true,
       "description": "The judgment half of the anti-tell prose doctrine (D-056): a fresh-context judge that reads the diff's prose sentence by sentence against the read-aloud bar — would a senior engineer say this aloud, verbatim, to a peer. Catches what the prose-tells grep cannot: stacked triads, aphoristic closers, adjective piles, uniform rhythm, keynote voice. Blocking at pre-review only — the same dormant-by-default posture D-052 left every judge in; it spends a model call only when a review is explicitly assembled (/harness-review).\n",
       "eval_min_agreement": 0.9,
       "evals": "evals",
