@@ -119,13 +119,13 @@ Dependencies flow `platform-wire → {runtime, agent, control-plane, edge}`, so:
 ## Rollout across a running fleet
 
 <!-- fact: ops/forge-deploy-is-pull-based -->
-Nodes converge themselves: forge-reconciler.timer fires every 60 s, fetches manifest.yaml and swaps any binary that differs.
+Nodes converge themselves: forge-reconciler.timer fires every 60 s, fetches manifest.yaml and swaps only the crates whose source hash changed, from one fleet release.
 
-forge nodes converge themselves. `forge-reconciler.timer` fires every 60s on each node, fetches `forge-platform-operations/manifest.yaml` over the GitHub API, compares `versions:` against `/etc/forge-versions/<crate>`, and atomic-swaps any binary that differs (sha256-verified, prior copy kept at `<bin>.prev`).
+forge nodes converge themselves. `forge-reconciler.timer` fires every 60s on each node, fetches `forge-platform-operations/manifest.yaml` over the GitHub API, compares `source_hashes:` against `/etc/forge-source-hashes/<crate>`, and atomic-swaps only the crates that differ, from the one fleet release `fleet_version:` names (sha256-verified, prior copy kept at `<bin>.prev`). A crate whose hash matches keeps its binary and restarts nothing; its `/etc/forge-versions/<crate>` still moves to the fleet version, because its source is that version's.
 
-The operator edits the manifest, `just bump <crate> vX.Y.Z`, rather than pushing binaries. `forge-runtime` is service-less, so its rollout lands gradually as workspaces cold-start.
+The operator edits the manifest, `just bump vX.Y.Z`, rather than pushing binaries. `forge-runtime` is service-less, so its rollout lands gradually as workspaces cold-start.
 
-**How to apply:** two consequences that bite. (1) `just rollback` is SSH-side and does NOT edit the manifest, so the reconciler pulls the bad version forward again within 60s; always follow a rollback by bumping the manifest back. (2) Nodes poll independently, so mixed versions are always live for at least one cycle; a non-additive wire change is an outage in that window. Version 1 warned that `runbooks/deploy.md` still documented the push model; AR-4 retired that section and the runbook pins this atom.
+**How to apply:** two consequences that bite. (1) `just rollback` is SSH-side and edits neither the manifest nor the hash marker, so the node stays on `.prev` and reads as converged until the crate's hash changes; follow a rollback with `just bump` to the prior version. (2) Nodes poll independently, so mixed versions are always live for at least one cycle; a non-additive wire change is an outage in that window. Version 2 said the reconciler pulls the bad version forward after a rollback: it compared a marker the rollback leaves untouched, so it never did.
 
 Nodes converge independently, so **there is always a window where mixed versions are
 live.** A non-additive change is a real outage in that window.
