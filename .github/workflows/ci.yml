@@ -14,6 +14,13 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  # A compile the shared sccache server cannot serve falls back to a local one
+  # instead of failing; 'failed to fill whole buffer' and 'Connection reset by
+  # peer' were reds on code that compiled (CI-15; forge-agent ci 41877780255,
+  # forge-control-plane ci 41877780278, forge-portal-e2e 41877780323).
+  SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+
 jobs:
   test:
     name: build + test
@@ -23,6 +30,16 @@ jobs:
       fail-fast: false
     runs-on: ${{ matrix.os }}
     steps:
+      # One sccache server per runner, not one per box (MR-4). sccache starts its
+      # server from whichever job compiles first, so the server is that job's child
+      # and the runner's end-of-job cleanup kills it. With one port for the box, a
+      # job that finished took every other job's compiles with it: run 41949500202
+      # went red in the second run 41949505192's cleanup killed the server.
+      - name: This runner's own sccache server
+        run: |
+          n="${RUNNER_NAME##*-}"
+          case "$n" in ''|*[!0-9]*) n=0 ;; esac
+          echo "SCCACHE_SERVER_PORT=$((4300 + n))" >> "$GITHUB_ENV"
       - name: Checkout forge-cli
         uses: actions/checkout@v4
         with:
