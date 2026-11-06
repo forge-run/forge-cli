@@ -63,7 +63,7 @@
     },
     {
       "path": ".github/workflows/harness-gates.yml",
-      "sha256": "b030ae1545306a651e76ca117fd74cc723294536a9bff459dbfb3e1a1dd4bf09"
+      "sha256": "a80214aa4944162f67d02ab789492bf668a182115a196057c668cbef300f575b"
     },
     {
       "path": ".gitignore#rules",
@@ -83,7 +83,7 @@
     },
     {
       "path": ".harness/plan.json",
-      "sha256": "66218170fd78a01871ee74885b669fdee6147f99c8286ae943baa6a8b74d0a5a"
+      "sha256": "b3b9e005c7b6ee181d38820051d336a209d2fd275861fa4d9d9fc89004c408d8"
     },
     {
       "path": ".harness/runner.py",
@@ -276,9 +276,11 @@
     {
       "kind": "gate",
       "params": {
-        "tests_dir": "core/runner/tests"
+        "module_timeout_seconds": 0,
+        "tests_dir": "core/runner/tests",
+        "workers": 0
       },
-      "sha256": "9bcceead489638168769648fffdd739ec420ad705ab16eae5d19643a0ab31d0b",
+      "sha256": "f9ddf946dd10ff1f0d0d53a89f6e0e6f828de1f469004e407a3a7cdf7b01511b",
       "source": "local/python-suite"
     },
     {
@@ -362,8 +364,8 @@
   "harness_dir": "harnesses/hybrid",
   "source": {
     "kind": "commit",
-    "ref": "ff0791aee15afa8165d9d4f15ea2cc6600cb34be",
-    "sha": "ff0791aee15afa8165d9d4f15ea2cc6600cb34be"
+    "ref": "9d5b7ef2a06d87e36820f6500a042e6caa8b7cbe",
+    "sha": "9d5b7ef2a06d87e36820f6500a042e6caa8b7cbe"
   },
   "targets": [
     "claude-code",

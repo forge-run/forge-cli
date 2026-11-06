@@ -383,7 +383,9 @@
       ],
       "memoize": true,
       "params": {
-        "tests_dir": "core/runner/tests"
+        "module_timeout_seconds": 0,
+        "tests_dir": "core/runner/tests",
+        "workers": 0
       },
       "source": "harnesses/hybrid/local/python-suite",
       "timeout_seconds": 4810,
