@@ -256,19 +256,14 @@ sweep:
 | forge-control-plane | forge-sdlc-harness |
 | forge-edge | forge-sdlc-harness |
 | forge-facts | none |
-| forge-gateway | none |
-| forge-graph | none |
 | forge-platform-operations | none |
 | forge-platform-wire | none |
-| forge-portal-web-v1-archive | forge-portal-web, forge-runtime, forge-sdk-v2, forge-web |
 | forge-runtime | forge-sdlc-harness |
 | forge-schema | none |
 | forge-sdk-v2 | forge-runtime, forge-schema |
-| forge-sdk | none |
 | forge-sdlc-harness | none |
 | forge-secrets | none |
 | forge-storage | forge-sdlc-harness |
-| forge-tui | none |
 | forge-types | none |
 | forge-ui | forge-sdlc-harness |
 | forge-web | forge-runtime, forge-schema, forge-sdk-v2, forge-types, forge-ui |
